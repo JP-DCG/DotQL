@@ -1,0 +1,505 @@
+/* DotQL By Example */
+
+/* Types: */
+
+// List - sequential:
+return [1 2 3]
+// Set - unordered, unique:
+return { 1 2 3 }
+// Tuple:
+return { Name: 'Sally' Age: 23 }
+// Interval:
+return 2..6
+// Enumerations:
+return Red	
+// Void:
+return void
+// Scalar - intrinsic types:
+return 456	// Integer (32bit), Long (64bit)
+return true	// Boolean
+return 'Hello'	// String (UTF16)
+return '2012-12-12'd	// Date
+return '15:30.2't // Time
+return '2012-12-12'dt	// DateTime
+return 2.4d	// Double
+return '84edd204-4b7d-45d0-9a3f-18f2fccc9732'g	// Guid
+return '5d3h'ts	// TimeSpan
+return 1.2.0	// Version
+
+// Note: commas and semi-colons are absent from expressions (noise-reduction)
+
+/* Declaration */
+
+// "Table" variable declaration:
+Person: 
+{
+	{ ID : Integer Origin : String Attributes: ref (ID) to Attribute(PersonID) key (ID) }
+}
+// Reads: The person member is a set of tuples, each having an ID, Origin, reference to Attributes, and identified by ID
+
+// Declaration of a variable of a set of integers:
+Things: { Integer }
+
+// Qualified name:
+Height\Value: Integer
+// ...if not ambiguous, may be accessed as:
+return Value
+// ...or
+return Height\Value
+
+/* Claused Expressions */
+
+// FLWOR:
+for ...
+let ...
+where ...
+order ...
+return ...
+// All but return are optional, let may be repeated any number of times
+
+// Simple cardinality 1 FLWOR
+return 5
+
+// Iterator - all clauses are per iteration:
+for i in 1..5
+return i
+// returns [1 2 3 4 5]
+
+// Let provides reuse:
+let x := 5**5
+return { Num: x Other: x + 1 }
+
+// Where restricts result cardinality:
+for i in 1..6
+where i % 2 = 0
+return i
+// returns [2 4 6]
+
+// Order specifies result ordering:
+for i in 1..3
+order i desc
+return i
+// returns [3 2 1]
+
+/* Dotted Path Expressions */
+
+// Base table access:
+return Person
+// returns entire person table. e.g. { { ID: 123 Origin: 'R' } { ID: 124 ...
+
+// "Point" restriction:
+return Person(ID = 234)
+// e.g. { ID: 123 Origin: 'R' }
+// Note: Result not in a set because cardinality 1 is detected due to equality restriction on entire key
+
+// Regular restriction:
+return Person(Origin = 'T')
+// e.g. { { ID: 125 Origin: 'T' } { ID: 126...
+// Result is a set because Origin is not a key
+
+// Restriction is arbitrary boolean expression:
+return Gender(not IsFemale)
+// e.g. { { ID: 456 IsFemale: false } ...
+
+// Reference following (dereferencing):
+return Person(ID = 123).Attributes
+// e.g. { { ID: 456 PersonID: 123 Type: 'NG } { ID: 457 PersonID: 123 Type: 'G' } ...
+// Attributes is a reference on the person tuple; accessing it gives attributes for all matching persons
+
+// Equivalent query:
+return Attributes(PersonID = 123)
+
+// Doesn't matter if left side of dot is many:
+return Person(Origin = 'R').Attributes
+// reads: all attributes associated with persons that have origin of 'R'
+// logically same as this:
+return Attributes(exists Person(Origin = 'R' and ID = PersonID))
+
+// Note: only the last table in a path sequence is returned, the prior tables serve to logically restrict said table
+
+// Dotting through Extention (one to zero or one) relationships: 
+return Person(ID = 123).Attributes.Name
+// e.g. { { ID: 123 First: 'Bob' Last: 'Smith' ... } 
+// Still a set cardinality because there can be any number of name attributes under a 
+//  person (any n cardinality table along the path causes subsequent tables to be n cardinality)
+
+// Single cardinality Extension:
+return Attribute(ID = 456).Name
+// e.g. { ID: 123 First: 'Bob' Last: 'Smith' ...  or null
+// Singular cardinality because the Attribute query
+
+/* Embedded Path Expressions */
+
+// Embedded reference:
+return Person(ID = 123)+Attributes
+// e.g. { ID: 123 Origin: 'R' Attributes: { { ID: 234 PersonID: 123 Type: 'NG' } ... } 
+// Note: A row from the Person table already has an Attributes member, but it is a reference, not an attribute;
+//  this operator acts to "materialize" the reference as an embedded table attribute
+
+// Dot paths following an embedded path:
+return Person(ID = 123)+Attributes.Name
+// e.g. { ID: 123 Origin: 'R' Attributes\Name: { { ID: 456 First: 'Bob' Last: 'Smith' } ... } }
+// NOTE: remember that because Attributes\Name is a qualified name, it may be accessed as just Name if not ambiguous
+
+// Dot paths preceeding an embedded path:
+return Person(ID = 123).Attributes+Name
+// e.g. { ID: 456 PersonID: 123 Type: 'NG' Name: { ID: 456 First: 'Bob' Last: 'Smith' } }
+
+// Embedding multiple tables:
+return Person(ID = 123).Attributes+(Name Gender)
+// e.g.
+//{
+//	{ ID: 234 Type: 'NG' Name: { ID: 234 First: 'Bob' Last: 'Smith' } Gender: null }
+//	{ ID: 345 Type: 'G' Name: null Gender: { ID: 345 IsFemale: false } }
+//}
+
+// Dereferencing multiple tables
+return Person(ID = 123).Attributes.(Name,Gender)
+// Causes the table names to be nested as attributes in a new tuple.  e.g.
+//{
+//	{ Name: { ID: 234 First: 'Bob' Last: 'Smith' } Gender: null }
+//	{ Name: null Gender: { ID: 345 IsFemale: false } }
+// ...
+//}
+
+// Paths within claused expressions:
+for a in Person(ID = 123).Attributes
+return { ID: a.ID }
+// e.g. { { ID: 456 } { ID: 457 } ... }
+
+// Ordering over keys produces lists rather than sets:
+for a in Person(ID = 123).Attributes
+order a.ID
+return { ID: a.ID }
+// e.g. [ { ID: 456 } { ID: 457 } ... ]
+
+// Per the Relational Model, there is an implicit key over all attributes, so the following results in a list:
+for a in Attributes
+order a.Type
+return { Type: a.Type }
+// e.g. [ { Type: 'EB' } { Type: 'EM' } ... ]
+
+// Path restriction works on lists too:
+return [ { ID: 123 } { ID: 124 } ](ID > 123)
+// returns [ { ID: 124 } ]
+
+// Reuse within paths:
+for a in Person.Attributes
+let n := ToLower(a.Type)
+where n = 'ng'
+return { ID: a.ID TypeUpper: ToUpper(n) TypeLower: n }
+
+/* Extraction */
+
+// List member extraction:
+return [ 2 4 6 8 ][0]
+// returns: 2
+
+// Single member extraction:
+return [ 2 ][]	// from list
+// result: 2
+
+return { 2 }[]	// from set
+// result: 2
+
+return [ ][]
+// result null
+
+return [ 2 4 ][]
+// n cardinality results in runtime exception!
+
+/* Explicit Typing */
+
+// Empty list type selection:
+return [ ] of [Integer]
+
+// Explicitly designating type of list:
+return [4] of [Long]
+
+// Similar for sets
+return { } of { String }
+
+// Types for nulls:
+return null of Integer
+
+// Types for tuples:
+return { ID: 135 } of { ID: Long }
+
+/* Nulls */
+
+// Resolving nulls:
+return [ ] of Integer[0] ? 5;
+// returns: 5
+// Note: out of range list extraction results in null, not error
+
+// Determining null:
+return Name[ID = 1212][].Prefix ??
+// e.g. true if null either because there was no such row, or there was a row but the prefix wasn't present
+
+// Tuple with optional attribute
+return { First: 'Bob' } of { Prefix: String?, First: String }
+
+/* Functions */
+
+// Complex queries:
+for p in Person
+let orderedn :=
+	for n in p.Attributes.Name
+	let ap := n.Attribute.Priority
+	order ap.Priority ? 0 desc n.ID
+	return n
+let pn := orderedn(Index = 0)
+return { PersonID: p.ID, First: pn.First, Last: pn.Last }
+// returns perons ID's and the associated highest priority first and last name
+// Need reuse...
+
+// Function declaration:
+PreferredName: function(PersonID: Long) : Name.MemberType
+	let orderedn :=
+		for n in Attributes(PersonID = args.PersonID).Name
+		let ap := n.Attribute.Priority
+		order ap.Priority ?? 0 desc, n.ID
+		return n
+	return orderedn[0]
+
+// Function usage:
+for p in Person
+let pn := PreferredName(p.ID)
+return { ID: p.ID FName: pn.First LName: pn.Last  }
+
+// TODO: Recursion
+
+/* Conditions and cases */
+
+// Conditional expression:
+return if true then 'Hello' else 'Goodbye'
+// returns 'Hello'
+
+// Value based case expression:
+let n := 123
+return 
+	case n 
+		when 123 then 'Hello'
+		when 234 then 'Goodbye'
+		else 'Speechless'
+	end
+// returns 'Hello'
+
+// Condition base case expression
+let x := 123
+let y := 234
+return
+	case
+		when x = 135 and y = 231 then 'Hello'
+		when true then 'Goodbye'
+		else 'Speechless'
+	end
+// returns 'Goodbye'
+
+/* Enumerations */
+
+// Enumeration declaration:
+Colors: enum { Red Yellow }
+
+// Enumeration usage:
+PickOpposite: function(Color: Colors)
+	return if Color = Red then Yellow else Red
+return PickOpposite(Red)
+// returns Yellow
+
+// Dealing with enumeration symbol ambiguity:
+Personality: enum { Red Yellow Blue White }
+return Red	
+// ERROR: this conflicts with the Color Red
+return Red of Personality
+// returns Red (of type Personality)
+
+/* Default Values */
+
+// Defaults for each type are as follows:
+// Integer 0
+// String ""
+// Tuple - each attribute defaulted
+// Set - empty
+// List - empty
+// Function - returns default of return type
+// TODO...
+
+// TODO: Passing a tuple, casting a tuple, variables
+
+/* Type Definitions */
+
+// Type Definitions provide type description reuse:
+SetOfNumbers: typedef { Integer }
+
+// Type Definitions are pure short-hands though; for instance, these represent the same type:
+PersonTuple1: typedef { Name: String Age: Integer }
+PersonTuple2: typedef { Age: Integer Name: String }
+// (order of attributes doesn't matter in a tuple, so these two typedefs are equivalent)
+// Tuples, lists, and sets don't have meaningful names; their type description is their name
+
+/* Modules */
+
+// Declaring a module:
+Ancestry\FamilyPaths: module 1.0.0
+{
+	Code: enum { Parent Sibling Child Spouse }
+	Modifier: enum { Male Female Elder Younger Legal God Former Practical }
+	Component: typedef { Code: Code Multiplier: Integer Modifiers: { Modifier } }
+	Path: typedef [Component]
+	Normalize: function(Path: Path) : Path
+		return ...
+	...
+}
+
+// Using a module:
+using Ancestry\FamilyPaths 1.0.0
+return Normalize([ { Code: Parent } { Code: Parent } ])
+// returns [ { Code: Parent Multiplier: 2 } ]
+
+// Module ambiguity:
+using Ancestry\FamilyPaths 1.0.0
+using Police 1.0.0
+return Fire of Code	// ERROR: Code is ambiguous
+// Valid:
+return Fire of Police\Code
+// NOTE: all module declaration and usage must include
+
+// Module aliases:
+using fp := Ancestry\FamilyPaths 1.0.0
+return Parent of fp\Code
+// ... or just Code if not ambiguous
+
+// Modules may contain the following members:
+module ...
+{
+	Current: Integer // Variables
+	Code: typedef Integer	// Type Definitions
+	Colors: enum { Red Green }	// Enumerations
+	BestNumber: const 5	// Constants
+	Square: function(x : Integer) return x * x	// Functions
+}
+
+/* Scripts */
+
+// A script is composed of the following:
+using Colors 1.2.0	// Any number of usings
+module Cars 1.2.1 ...	// Any number of module declarations
+var NewID := 123	// Any number of variable declarations
+set NewID := GenerateID()	// Any number of assignment executions
+return NewID	// Zero or one terminating claused expression
+// NOTE: Non-determinism is allowed in any expression
+
+// A script not ending in a claused expression implicitly has a result of void, but this can be explicit too:
+using ...
+...
+return void
+
+/* Updates */
+
+// All mutation (side-effects) happens within Set assignments:
+set	FavoriteColor := Green
+
+// The left-hand side of assignments may contain reference-based path expressions:
+set Person(ID = 123).Origin := 'R'
+// effect: Updates the Origin attribute of the specified tuple of the Person table
+
+// Set statements follow the FLWOR pattern except for Return becomes Set (FLWOS), and there may be any number of set clauses:
+let p = Person(ID = 123)
+set p := { ID: p.ID Origin: 'R' }
+// effect: Updates the specified tuple of the Person table
+// NOTE: Assignment of table references is logically a deletion of all matching tuples, followed by insertion of the given value(s)
+
+// Deletion is enabled by assignment of nothing:
+set Person(ID = 123) := null
+
+// Insertion:
+var newID: Long
+set newID := GenerateID()
+set Person(ID = newID) := { Origin: 'R' }
+return newID
+// effect: Generates a new ID, inserts a person tuple based on that ID, and returns the new ID
+
+// Updating with iteration:
+for i in 1..6
+set Person(ID = i).Origin := 'R'
+// effect: Sets the Origin attribute of a range of person tuples in the person table variable
+
+/* Scope */
+
+// Each script has a local frame, which hides any imported context:
+using Ancestry\FamilyPaths 1.0.0
+Code: Integer	// Hides the Code in FamilyPaths
+
+// A module also defines a frame.  The script scope is not visible to a module:
+Color: enum { Green, Orange, Red }
+Fruits: module
+{
+	FruitColor: Color	// ERROR: Script level symbols are not visible in a module
+}
+
+// Module members can access other members, and in any order
+Selfish: module
+{
+	Current: Code
+	Code: typedef Integer
+}
+
+// Usings are global to the script, including within modules
+using Ancestry\FamilyPaths 1.0.0
+PeopleFinder: module 1.2.0
+{
+	Connection: typedef { SourceID: Long TargetID: Long Path: Path }
+}
+
+/* Exceptions */
+
+// Try expression:
+return try 1 / 0 catch -1
+// returns -1
+
+/* Nullological Cases */
+
+// Empty set of normal tuples:
+return { } of { { ID: Integer } }
+
+// Empty lists of normal tuples:
+return [ ] of [ { ID: Integer } ]
+
+return { } of { ID: Integer }
+
+// { } when no type is given means no-attribute tuple, { } with a type means the empty set.
+// In other words, a { } in a type context is always a no-attribute tuple, because a set requires a member type; therefore:
+
+// Tuple with no attributes:
+return { }
+
+// Set containing one no-attribute tuple ("table dee"):
+return { { } }
+
+// Set containing zero no-attribute tuples ("table dum"):
+return { } of { }
+
+// List of no-attribute tuples:
+return [ { } { } ]
+
+// Empty set, of set of lists of sets of no-attribute tuples:
+return { } of { [ { } of { } ] }
+
+/* Aggregates */
+
+/* List functions */
+
+// Conversion
+// Push, Pop, Enqueue, Dequeue, Insert
+
+/* Time/Date functions */
+
+/* Guid functions */
+
+/* Numeric functions */
+
+/* Generators */
+
+// Blocks
+// Individual

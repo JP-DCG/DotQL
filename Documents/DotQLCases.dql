@@ -1,0 +1,171 @@
+﻿//*  Person IDs for people who have had any event in "Somewhere" and were born outside the USA
+
+//* AQL - FLWOR
+for swp in AttributePlace[Place = 'Somewhere'].Attribute.Person
+where exists 
+	for be in swp.Attribute.Event[Type = 'EB'] 
+	where not exists be.PlaceComponent[Type = 'NTY' and Value = 'USA'] 
+	return be
+return { PersonID: swp.ID }
+
+//* AQL - pure path
+return 
+	Person
+	[
+		exists (Attributes.AttributePlace[Place = 'Somewhere'] 
+			and exists 
+			(
+				Attributes
+				[
+					Type = 'EB' 
+						and not exists (PlaceComponent[Type = 'NTY' and Value = 'USA'])
+				]
+			)
+	]
+
+
+//* All persons having more than 2 events
+return Person[Count(Attributes.Event) > 2]
+
+//* Persons with their preferred names
+for p in Person
+let on :=
+	for n in p.Attributes.Name
+	let ap := n.Attribute.Priority
+	order ap.Priority ?? 0 desc, n.ID
+	return n
+let pn := on[Index = 0]
+return { PersonID: p.ID, First: pn.First, Last: pn.Last }
+
+//* Embedding: Persons and their attributes
+let PwithA :=
+	for p in Person
+	return { PersonID: p.ID, Attributes: p.Attributes }
+
+//* Implied join back to person
+Person[ID = PwithA.ID]
+
+//* Reference inference: 
+PwithA[Count(Attributes.Event) = 1].Attributes.Name
+Attribute.Name[exists (pwitha.ID = Attribute.PersonID)]
+
+//* Types: enumeration
+PathCode: enum [Parent, Sibling, Child, Spouse]
+
+//* Types: type defs
+PathComponent: typedef { Code: PathCode, Multiplier: Integer }
+FamilyPath: typedef PathComponent[]
+SourceTargetPath: typedef { Source: Person.MemberType, Target: Person.MemberType, Path: FamilyPath }
+
+//* Recursion: Family path walking
+WalkPath: function(source: Person.RowType originPath: FamilyPath remaining: FamilyPath current: Person.RowType): [SourceTargetPath]
+	let next := remaining.pop()
+	return
+	[
+		{ Source: source, Target: current, Path: originPath },
+		next ?
+			for member in
+				case strict next.Item.Code 
+					when PathCode.Parent then current.Attributes[Type = 'FC'].FamilyMember.FamilyMembers.Attribute[Type = 'FP'].Person
+					when PathCode.Sibling then current.Attributes[Type = 'FC'].FamilyMember.FamilyMembers.Attribute[Type = 'FC'].Person
+					when PathCode.Child then current.Attributes[Type = 'FP'].FamilyMember.FamilyMembers.Attribute[Type = 'FC'].Person
+					when PathCode.Spouse then current.Attributes[Type = 'FP'].FamilyMember.FamilyMembers.Attribute[Type = 'FP'].Person
+				end
+			return WalkPath(source, originPath.push(next.Item), next.Remaining, member)
+		: []
+	]
+PersonsInPath: function(source: Person.RowType path: FamilyPath) : [SourceTargetPath]
+	return WalkPath(source, [], path, source)
+
+//*
+return
+	Join
+	(
+		for pinp in PersonsInPath(Person[ID = 123], 'PSC')
+		return pinp.Source.Attributes.Name.First + ' is cousins with ' + pinp.Target.Attributes.Name.First,
+		'\r\n'
+	)
+
+//*
+function DNASurnameHistogram(
+
+//* Data definition
+Person: 
+[
+	{ ID: Long Origin: Integer Attributes: ref (ID) to Attribute(PersonID), key (ID) } 
+]
+
+//* Update: single cell
+Person[ID = 123].Attributes.Name[First = 'Ted'].First := 'Teddy'
+
+//* Update: update/insert row
+Person[ID = 123].Attributes.Gender := { ID: ID, IsFemale: true };
+
+//* Delete: row(s) 
+Person[ID = 123].Attributes.Gender := null;
+
+//* Persons with all attribute extensions
+return Person+Attributes+*1
+
+//* Persons with names and genders
+return Person+Attributes.(Name,Gender)
+
+//* Persons with names and events and custom events
+return Person+Attributes.(Name,Event+CustomEvent)
+
+//* Persons with names and name types
+return Person+Attributes.Name+NameType
+
+//* Module (just global tuple)
+FamilyPath:
+{
+	typedef ...;
+	function ...;
+}
+
+-Unidirectional references
+-Argument invocation by argument order or as a tuple (args)
+-Lists with push and pop - pop returns a tuple with the last item and the rest of the list, push returns a list with the added item at the end
+-Lists also support enqueue and dequeue
+-Restruction to a number is equivalent to "where Index = x"
+-Tables have the following members:
+	-Each attribute
+	-RowType, returns the row type for the table
+	-Each reference
+-Functions can be asked to obtain the return type and argument type (.ReturnType, .ArgumentType)
+-Identifier as data type, allowing enumerations to contain any type cleanly
+-Explicit lists/sets automatically expand nesting (union) (how to nest sets?)
+-Subtraction and addition for removing and adding tuple attributes
+-Need to prevent recursion on 
+-Syntax on for to access the index of the iteration (for quota queries)
+	
+Clauses:
+for - iteration
+let - reusable expression
+where - restriction
+having - where exists ...
+without - where not exists ...
+group - grouped aggregation
+return - result specification
+
+Expressions:
+{ } row construction
+. dereference to attribute or through reference
+X[ ] restriction 
+[ ] list or set
+
+Type constructors:
+{ } row
+[ ] list or set
+
+Scalar types:
+Boolean
+Integer
+Long
+String
+Date
+Time
+DateTime
+Double
+Guid
+TimeSpan
