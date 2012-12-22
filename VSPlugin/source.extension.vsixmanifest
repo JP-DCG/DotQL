@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Vsix Version="1.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2010">
+  <Identifier Id="DotQLLanguage..A72FCB2D-4B7E-49F8-ABA2-045057FCF56C">
+    <Name>DotQLLanguage</Name>
+    <Author>Ancestry</Author>
+    <Version>1.0</Version>
+    <Description>Classifier extension to the Visual Studio Editor for the DotQL language.</Description>
+    <Locale>1033</Locale>
+    <SupportedProducts>
+      <VisualStudio Version="11.0">
+        <Edition>VST_All</Edition>
+        <Edition>Pro</Edition>
+      </VisualStudio>
+    </SupportedProducts>
+    <SupportedFrameworkRuntimeEdition MinVersion="4.0" MaxVersion="4.0" />
+  </Identifier>
+  <References />
+  <Content>
+    <MefComponent>|DotQLLanguage|</MefComponent>
+  </Content>
+</Vsix>
