@@ -192,7 +192,7 @@ let n := ToLower(a.Type)
 where n = 'ng'
 return { ID: a.ID TypeUpper: ToUpper(n) TypeLower: n }
 
-/* Extraction */
+/* Item Extraction */
 
 // List member extraction:
 return [2 4 6 8][0]
@@ -273,13 +273,26 @@ let pn := PreferredName(p.ID)
 return { ID: p.ID FName: pn.First LName: pn.Last  }
 
 // Recursive function:
-let Factorial := function(x: Integer): Integer
-	return if x = 0 then 0 else 5 + Factorial(x - 1)
-return Factorial(5)
+let SequentialSum := function(x: Integer): Integer
+	return if x = 0 then 0 else x + SequentialSum(x - 1)
+return SequentialSum(5)
 // result: 15
 
 // Accessing arguments as a tuple:
-let Point := function(x: Integer
+let Point := function(x: Integer y: Integer) 
+	return { x: args.x y: args.y }
+return Point(5 7)
+// result: { x: 5 y: 7 }
+// Alternatively, the Point function can be just this:
+let Point := function(x: Integer y: Integer) 
+	return args
+// "args" is a tuple representation of the function's arguments
+
+// Passing arguments as a tuple:
+let Point := function(x: Integer y: Integer) 
+	return args
+return Point=>{ y: 5 x: 7 }
+// result: { x: 7 y: 5 }  (attribute order never matters)
 
 /* Conditions and cases */
 
@@ -307,6 +320,14 @@ return
 		else 'Speechless'
 	end
 // returns 'Goodbye'
+
+// Strict cases:
+Colors: enum { Green Red Blue }
+return 
+	case strict x // Error: this case statement must handle all colors
+		when Green then 1 
+		when Red then 2 
+	end
 
 /* Enumerations */
 
@@ -513,7 +534,11 @@ return Add<Integer>(5 10)
 The type parameter can be inferred:
 return Add(5 10)
 
-/* List functions */
+/* List Operations */
+
+// Union:
+return [1 2] | [2 3]
+// result: [1 2 2 3]
 
 // Push:
 return Push([1 2] 3)
@@ -536,15 +561,33 @@ return Insert([1 3] 1 2)
 // result: [1 2 3]
 // 1 is the zero-based position, 2 is the value
 
-// Remove:
+// Remove at index:
 return Remove([1 2 3] 1)
+// result: [1 3]
+
+// Removing based on value:
+for i in [1 2 2 3]
+where i <> 2
+return i
 // result: [1 3]
 
 // Conversion to set:
 return ToSet([5 5 6 6])
 // result: { 5 6 }
 
-/* Set functions */
+// List membership:
+return 5 in [1 3 5]
+// result: true
+
+// Detection of empty list:
+return { exists [1] exists [] }
+// result: { true false }
+
+// Quota:
+return [30 40 10 20][Index < 2]
+// result: [30 40]
+
+/* Set Operations */
 
 // Intersection:
 return { 1 2 } & { 2 3 }
@@ -568,6 +611,20 @@ order i	desc
 return i
 // result: [3 2 1]
 
+// Set membership:
+return 5 in { 1 3 5 }
+// result: true
+
+// Detection of empty set:
+return { exists { 1 } exists { } }
+// result: { true false }
+
+// Quota:
+return { 30 40 10 20 }[Index < 2]
+// result: { 10 20 }
+
+// Note: quota forces sorting for determinism; use list quote to control ordering
+
 /* Attribute Extraction */
 
 // Extraction of an attribute set from a tuple set:
@@ -585,7 +642,7 @@ return { { x: 50 y: 100 z: 0 } { x: 75 y: 125 z:25 } }.(x y)
 // result: [{ x: 50 y: 100 } { x: 75 y: 125 }]
 // Again, because x and y don't represent a superset of a key (not necessarily proper) the result is a list
 
-/* Aggregates */
+/* Aggregate Operations */
 
 // Count function on a set: 
 return Count({ 1 2 3 })
@@ -601,6 +658,12 @@ var i := { 1 3 5 }
 return { Min: Min(i) Max: Max(i) Avg: Avg(i) }
 // result: { Min: 1 Max: 5 Avg: 3 }
 
+// Logical aggregates:
+var i := { true true false }
+return { All: All(i) Any: Any(i) }
+// result: { All: false Any: true }
+// Logically equivalent to iterated AND and OR respectively
+
 // Grouped aggregation:
 for p in Person
 return { Person: p NumAttributes: Count(p.Attributes) }
@@ -610,7 +673,21 @@ return { Person: p NumAttributes: Count(p.Attributes) }
 return Count(ToSet(Person.Origin))
 // The result is the number of distinct origins in the Person table
 
-/* Time/Date Functions */
+// String concatenation
+return { Concat({ 'Zebra' 'Invasion' }) Concat(['Zebra' 'Invastion']) }
+// result { 'InvastionZebra' 'ZebraInvasion' }
+
+// Concatenation with delimiter
+return { Concat(['Zebra' 'Invastion'] ' ') }
+// result 'Zebra Invasion'
+
+// Aggregates and nulls
+return { S: Count({ 1 null 2 }) L: Count([1 null 2]) }
+// result: { S: 2 L: 3 }
+
+// Note: Nulls are not ever treated as existing in sets
+
+/* Time/Date Operations */
 
 // Selecting a Date from components:
 return Date(1955 3 25)
@@ -672,31 +749,25 @@ return DatePart('2011/03/2 12:30:00'dt)
 return DatePart('2011/03/2 12:30:00'dt)
 // result: '12:30:00't
 
-/* GUID Functions */
+/* GUID Operations */
 
 // Generate a new GUID:
 return NewGUID() = NewGUID()
 // result: extremely high probably of false
 // NewGUID is not deterministic, watch out!
 
-/* Numeric Operators */
-
-// Mod for integers:
-return 5 % 3
-// result: 2
-
-// Mod for floats:
-return 1.2 % 0.35
-// result: 0.15
-
-/* Bitwise Operators */
+/* Bitwise Operations */
 
 // Bitwise operators:
 let n := 2;
 return { Shl: n << 1 Shr: n >> 1 Inv: ~n Or: n | 1 And: n & 3 Xor: n ^ 3 }
 // result: { Shl: 4 Shr: 1 Inv: -3 Or: 3 And: 2 Xor: 1 }
 
-/* Numeric Functions */
+/* Numeric Operations */
+
+// Arithmetic operators:
+return { Add: 1 + 2 Sub: 4 - 1 IDiv: 3 / 2 DDiv: 3.0 / 2.0 Mul: 10 * 3 Neg: -55 Pow: 5**5 IMod: 5 % 3 FMod: 1.2 % 0.35 }
+// result: { Add: 3 Sub: 3 IDiv: 1 DDiv: 1.5 Mul: 30 Neg: -55 Pow: 25 IMod: 2 FMod: 0.15 }
 
 // Absolute value:
 return Abs(-3.2)
@@ -739,17 +810,29 @@ return { Round(n 0) Round(n 2) Round(n -2) }
 return ToInteger(5.6)
 // result: 5
 
+// Comparisons:
+return { Equal: 1 = 0 Compare1: 1 ?= 0 Compare2: 0 ?= 1 Compare3: 1 ?= 1 NotEqual: 1 <> 0 }
+// result: { Equal: false Compare1: 1 Compare2: -1 Compare3: 0 NotEqual: true }
+
 /* Random */
 
 // Create random generator and getting number:
 return Random(Seed()).Value
-// result: { Seed: <mutated seed value> Value: <pseudo-random double number between 0 and 1> }
+// result: { Seed: <mutated seed value> Value: <pseudo-random double between 0 and 1> }
 // Note: Seed() is non-deterministic, but Random() is deterministic
 
 // Generating multiple from the same seed:
 let r1 := Random(Seed())
 return { r1.Value Random(r1.Seed).Value }
 // { <random value> <random value }
+
+// Generating integers:
+return Random(Seed() 99)
+// result: <pseudo-random integer between 0-99>
+
+// Generating in range:
+return Random(Seed() 5..10)
+// result: <pseudo-random integer between 5-10>
 
 /* Generators */
 
@@ -766,6 +849,17 @@ return { n GenerateID('token') }
 
 // GenerateID is non-deterministic
  
-/* Interval Operators */
+/* String Operations */
+
+// String concatenation:
+return 'engine' + '-hitch-' + 'caboose\r\n'
+// result: 'engine-hitch-caboose\r\n'
+
+// Alternative concatenation:
+return Concat(['engine' '-hitch-' 'caboose\r\n'])
+
+// TODO: rest of string operators...
+
+/* Interval Operations */
 
 // TODO: Interval operators

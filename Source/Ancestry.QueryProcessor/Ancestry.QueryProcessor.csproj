@@ -88,7 +88,7 @@
     <EmbeddedResource Include="Parse\SyntaxException.resx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Parse\BNF.txt" />
+    <None Include="Parse\DotQL.g4" />
     <Content Include="Readme.txt" />
   </ItemGroup>
   <ItemGroup>

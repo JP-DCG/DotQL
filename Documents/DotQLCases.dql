@@ -79,7 +79,7 @@ PersonsInPath: function(source: Person.RowType path: FamilyPath) : [SourceTarget
 
 //*
 return
-	Join
+	Concat
 	(
 		for pinp in PersonsInPath(Person[ID = 123], 'PSC')
 		return pinp.Source.Attributes.Name.First + ' is cousins with ' + pinp.Target.Attributes.Name.First,
