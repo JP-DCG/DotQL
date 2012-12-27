@@ -89,7 +89,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Parse\DotQL.g4" />
-    <Content Include="Readme.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
