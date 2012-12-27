@@ -34,8 +34,14 @@ return 1.2.0	// Version
 // "Table" variable declaration:
 Person: 
 {
-	{ ID : Integer Origin : String ref Attributes(ID) Attribute(PersonID) key (ID) }
+	{ 
+		ID : Integer 
+		Origin : String 
+		ref Attributes(ID) Attribute(PersonID) 
+		key (ID) 
+	}
 }
+
 // Reads: The person member is a set of tuples, each having an ID, Origin, reference to Attributes, and identified by ID
 
 // Note: The terms: tuple set, table, and relation are all synonymous
@@ -92,13 +98,13 @@ return Person
 
 // "Point" restriction:
 return Person(ID = 234)
-// e.g. { ID: 123 Origin: 'R' }
+// e.g. { ID: 234 Origin: 'R' }
 // Note: Result not in a set because cardinality 1 is detected due to equality restriction on entire key
 
 // Regular restriction:
 return Person(Origin = 'T')
 // e.g. { { ID: 125 Origin: 'T' } { ID: 126...
-// Result is a set because Origin is not a key
+// Result is a set (not a tuple) because Origin is not a key
 
 // Restriction is arbitrary boolean expression:
 return Gender(not IsFemale)
@@ -134,22 +140,22 @@ return Attribute(ID = 456).Name
 /* Embedded Path Expressions */
 
 // Embedded reference:
-return Person(ID = 123)+Attributes
+return Person(ID = 123)#Attributes
 // e.g. { ID: 123 Origin: 'R' Attributes: { { ID: 234 PersonID: 123 Type: 'NG' } ... } 
 // Note: A row from the Person table already has an Attributes member, but it is a reference, not an attribute;
 //  this operator acts to "materialize" the reference as an embedded table attribute
 
 // Dot paths following an embedded path:
-return Person(ID = 123)+Attributes.Name
+return Person(ID = 123)#Attributes.Name
 // e.g. { ID: 123 Origin: 'R' Attributes\Name: { { ID: 456 First: 'Bob' Last: 'Smith' } ... } }
 // NOTE: remember that because Attributes\Name is a qualified name, it may be accessed as just Name if not ambiguous
 
 // Dot paths preceeding an embedded path:
-return Person(ID = 123).Attributes+Name
+return Person(ID = 123).Attributes#Name
 // e.g. { ID: 456 PersonID: 123 Type: 'NG' Name: { ID: 456 First: 'Bob' Last: 'Smith' } }
 
 // Embedding multiple tables:
-return Person(ID = 123).Attributes+(Name Gender)
+return Person(ID = 123).Attributes#(Name Gender)
 // e.g.
 //{
 //	{ ID: 234 Type: 'NG' Name: { ID: 234 First: 'Bob' Last: 'Smith' } Gender: null }
@@ -170,7 +176,7 @@ for a in Person(ID = 123).Attributes
 return { ID: a.ID }
 // e.g. { { ID: 456 } { ID: 457 } ... }
 
-// Ordering over keys produces lists rather than sets:
+// Ordering always produces lists rather than sets (not for distinct purposes but for representing sequence):
 for a in Person(ID = 123).Attributes
 order a.ID
 return { ID: a.ID }
@@ -335,16 +341,17 @@ return
 Colors: enum { Red Yellow }
 
 // Enumeration usage:
-PickOpposite: function(Color: Colors)
+let PickOpposite := function(Color: Colors)
 	return if Color = Red then Yellow else Red
 return PickOpposite(Red)
 // returns Yellow
 
 // Dealing with enumeration symbol ambiguity:
-Personality: enum { Red Yellow Blue White }
+let Colors := enum { Red Yellow }
+let Personality := enum { Red Yellow Blue White }
 return Red	
 // ERROR: this conflicts with the Color Red
-return Red of Personality
+return Personality\Red
 // returns Red (of type Personality)
 
 /* Default Values */
@@ -397,14 +404,14 @@ return Normalize([{ Code: Parent } { Code: Parent }])
 // Module ambiguity:
 using Ancestry\FamilyPaths 1.0.0
 using Police 1.0.0
-return Fire of Code	// ERROR: Code is ambiguous
+return Code\Fire	// ERROR: Code is ambiguous
 // Valid:
-return Fire of Police\Code
-// NOTE: all module declaration and usage must include
+return Police\Code\Fire
+// NOTE: all module declaration and usage must include explicit version number
 
 // Module aliases:
 using fp := Ancestry\FamilyPaths 1.0.0
-return Parent of fp\Code
+return fp\Code\Parent
 // ... or just Code if not ambiguous
 
 // Modules may contain the following members:
@@ -414,7 +421,7 @@ module ...
 	Code: typedef Integer	// Type Definitions
 	Colors: enum { Red Green }	// Enumerations
 	BestNumber: const 5	// Constants
-	Square: function(x : Integer) return x * x	// Functions
+	Square: const function(x : Integer) return x * x	// Functions (as variables or consts)
 }
 
 /* Scripts */
@@ -503,25 +510,26 @@ return { } of { { ID: Integer } }
 // Empty lists of normal tuples:
 return [] of [{ ID: Integer }]
 
-return { } of { ID: Integer }
+// Empty tuple:
+return { key () } of { ID: Integer key () }
 
-// { } when no type is given means no-attribute tuple, { } with a type means the empty set.
-// In other words, a { } in a type context is always a no-attribute tuple, because a set requires a member type; therefore:
+// In an expression context { } means empty set; for a no-attribute tuple specify a key to distinguish that it is a tuple
+// In a type context { } means a no-attribute tuple because a set requires a member type
 
-// Tuple with no attributes:
+// Set of type void:
 return { }
 
 // Set containing one no-attribute tuple ("table dee"):
-return { { } }
+return { { key () } }
 
 // Set containing zero no-attribute tuples ("table dum"):
-return { } of { }
+return { } of { { key() } }
 
 // List of no-attribute tuples:
-return [{ } { }]
+return [{ key () } { key () }]
 
 // Empty set, of set of lists of sets of no-attribute tuples:
-return { } of { [{ } of { }] }
+return { } of { [{ key () } of { key () }] }
 
 /* Generics */
 
@@ -769,6 +777,10 @@ return { Shl: n << 1 Shr: n >> 1 Inv: ~n Or: n | 1 And: n & 3 Xor: n ^ 3 }
 return { Add: 1 + 2 Sub: 4 - 1 IDiv: 3 / 2 DDiv: 3.0 / 2.0 Mul: 10 * 3 Neg: -55 Pow: 5**5 IMod: 5 % 3 FMod: 1.2 % 0.35 }
 // result: { Add: 3 Sub: 3 IDiv: 1 DDiv: 1.5 Mul: 30 Neg: -55 Pow: 25 IMod: 2 FMod: 0.15 }
 
+// Successor and predecessor for ordinal types:
+return { Succ: ++1 Pred: --1 }
+// result { Succ: 2 Pred: 0 }
+
 // Absolute value:
 return Abs(-3.2)
 // result: 3.2
@@ -861,5 +873,18 @@ return Concat(['engine' '-hitch-' 'caboose\r\n'])
 // TODO: rest of string operators...
 
 /* Interval Operations */
+
+// Interval type declaration:
+var i : interval Date
+
+// Interval selector:
+let dow := DayOfWeek(Today())
+return (Today() - dow)..(Today() + (6 - dow))
+// result: <dates of enveloping week, from Sunday to Sunday>
+
+// Interval functions:
+let i := 5..10
+return { Contains(i 6) Before(i 10) After(i 11) Meets(i 11..13) Overlaps(i 10..15) Merges(i 1..4) Begins(i 5) Ends(i 10) }
+// result { true false true true true true true true }
 
 // TODO: Interval operators
