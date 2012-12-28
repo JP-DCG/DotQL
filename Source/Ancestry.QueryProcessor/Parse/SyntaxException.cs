@@ -20,7 +20,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 			
 		// Resource manager for this exception class
-		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parser.SyntaxException", typeof(SyntaxException).Assembly);
+		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parse.SyntaxException", typeof(SyntaxException).Assembly);
 
 		public SyntaxException(Lexer lexer, Exception inner) : base(_resourceManager, (int)Codes.SyntaxError, ErrorSeverity.Application, inner, lexer[0, false].Token)
 		{

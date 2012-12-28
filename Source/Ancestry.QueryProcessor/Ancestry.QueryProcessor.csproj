@@ -48,6 +48,7 @@
     <Compile Include="Connection.cs" />
     <Compile Include="IConnection.cs" />
     <Compile Include="JsonInterop.cs" />
+    <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Planner.cs" />
     <Compile Include="QueryOptions.cs" />
     <Compile Include="QuerySla.cs" />
@@ -67,7 +68,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Parse\SyntaxException.cs" />
     <Compile Include="Parse\TextEmitter.cs" />
-    <Compile Include="Plan\BatchPlan.cs" />
+    <Compile Include="Plan\ScriptPlan.cs" />
     <Compile Include="Plan\PlanTable.cs" />
     <Compile Include="Type\BaseType.cs" />
     <Compile Include="Type\IntervalType.cs" />

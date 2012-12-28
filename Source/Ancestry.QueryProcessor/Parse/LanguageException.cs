@@ -357,7 +357,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		// Resource manager for this exception class
-		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parser.LanguageException", typeof(LanguageException).Assembly);
+		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parse.LanguageException", typeof(LanguageException).Assembly);
 
 		// Constructors
 		public LanguageException(Codes errorCode) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, null) {}

@@ -7,7 +7,7 @@ return [1 2 3]
 // Set - unordered, unique:
 return { 1 2 3 }
 // Tuple:
-return { Name: 'Sally' Age: 23 }
+return { Name: "Sally" Age: 23 }
 // Interval:
 return 2..6
 // Enumerations:
@@ -17,14 +17,16 @@ return void
 // Scalar - intrinsic types:
 return 456	// Integer (32bit), Long (64bit)
 return true	// Boolean
-return 'Hello'	// String (UTF16)
+return "Hello\r\nWorld"	// C-style string (UTF16)
+return 'Hello'#13#10'World' // Pascal-style string ('' escapes, captures whitespace) (UTF16)
+return 'H'c	// Character
 return '2012-12-12'd	// Date
 return '15:30.2't // Time
 return '2012-12-12'dt	// DateTime
 return 2.4	// Double
 return '84edd204-4b7d-45d0-9a3f-18f2fccc9732'g	// GUID
 return '5d3h'ts	// TimeSpan
-return 1.2.0	// Version
+return 1.2.0	// Version (up to 4 components)
 
 // Note: Commas and semi-colons are absent from expressions (noise-reduction)
 // Note: The convention is to use a single space inside of single-line braces (e.g. { x }), but no space for brackets (e.g. [x])
@@ -94,16 +96,16 @@ return i
 
 // Base table access:
 return Person
-// returns entire person table. e.g. { { ID: 123 Origin: 'R' } { ID: 124 ...
+// returns entire person table. e.g. { { ID: 123 Origin: "R" } { ID: 124 ...
 
 // "Point" restriction:
 return Person(ID = 234)
-// e.g. { ID: 234 Origin: 'R' }
+// e.g. { ID: 234 Origin: "R" }
 // Note: Result not in a set because cardinality 1 is detected due to equality restriction on entire key
 
 // Regular restriction:
-return Person(Origin = 'T')
-// e.g. { { ID: 125 Origin: 'T' } { ID: 126...
+return Person(Origin = "T")
+// e.g. { { ID: 125 Origin: "T" } { ID: 126...
 // Result is a set (not a tuple) because Origin is not a key
 
 // Restriction is arbitrary boolean expression:
@@ -112,61 +114,61 @@ return Gender(not IsFemale)
 
 // Reference following (dereferencing):
 return Person(ID = 123).Attributes
-// e.g. { { ID: 456 PersonID: 123 Type: 'NG } { ID: 457 PersonID: 123 Type: 'G' } ...
+// e.g. { { ID: 456 PersonID: 123 Type: "NG" } { ID: 457 PersonID: 123 Type: "G" } ...
 // Attributes is a reference on the person tuple; accessing it gives attributes for all matching persons
 
 // Equivalent query:
 return Attributes(PersonID = 123)
 
 // Doesn't matter if left side of dot is many:
-return Person(Origin = 'R').Attributes
-// reads: all attributes associated with persons that have origin of 'R'
+return Person(Origin = "R").Attributes
+// reads: all attributes associated with persons that have origin of "R"
 // logically same as this:
-return Attributes(exists Person(Origin = 'R' and ID = PersonID))
+return Attributes(exists Person(Origin = "R" and ID = PersonID))
 
 // Note: only the last table in a path sequence is returned, the prior tables serve to logically restrict said table
 
 // Dotting through Extention (one to zero or one) relationships: 
 return Person(ID = 123).Attributes.Name
-// e.g. { { ID: 123 First: 'Bob' Last: 'Smith' ... } 
+// e.g. { { ID: 123 First: "Bob" Last: "Smith" ... } 
 // Still a set cardinality because there can be any number of name attributes under a 
 //  person (any n cardinality table along the path causes subsequent tables to be n cardinality)
 
 // Single cardinality Extension:
 return Attribute(ID = 456).Name
-// e.g. { ID: 123 First: 'Bob' Last: 'Smith' ...  or null
+// e.g. { ID: 123 First: "Bob" Last: "Smith" ...  or null
 // Singular cardinality because the Attribute query
 
 /* Embedded Path Expressions */
 
 // Embedded reference:
-return Person(ID = 123)#Attributes
-// e.g. { ID: 123 Origin: 'R' Attributes: { { ID: 234 PersonID: 123 Type: 'NG' } ... } 
+return Person(ID = 123)+Attributes
+// e.g. { ID: 123 Origin: "R" Attributes: { { ID: 234 PersonID: 123 Type: "NG" } ... } 
 // Note: A row from the Person table already has an Attributes member, but it is a reference, not an attribute;
 //  this operator acts to "materialize" the reference as an embedded table attribute
 
 // Dot paths following an embedded path:
-return Person(ID = 123)#Attributes.Name
-// e.g. { ID: 123 Origin: 'R' Attributes\Name: { { ID: 456 First: 'Bob' Last: 'Smith' } ... } }
+return Person(ID = 123)+Attributes.Name
+// e.g. { ID: 123 Origin: "R" Attributes\Name: { { ID: 456 First: "Bob" Last: "Smith" } ... } }
 // NOTE: remember that because Attributes\Name is a qualified name, it may be accessed as just Name if not ambiguous
 
 // Dot paths preceeding an embedded path:
-return Person(ID = 123).Attributes#Name
-// e.g. { ID: 456 PersonID: 123 Type: 'NG' Name: { ID: 456 First: 'Bob' Last: 'Smith' } }
+return Person(ID = 123).Attributes+Name
+// e.g. { ID: 456 PersonID: 123 Type: "NG" Name: { ID: 456 First: "Bob" Last: "Smith" } }
 
 // Embedding multiple tables:
-return Person(ID = 123).Attributes#(Name Gender)
+return Person(ID = 123).Attributes+(Name Gender)
 // e.g.
 //{
-//	{ ID: 234 Type: 'NG' Name: { ID: 234 First: 'Bob' Last: 'Smith' } Gender: null }
-//	{ ID: 345 Type: 'G' Name: null Gender: { ID: 345 IsFemale: false } }
+//	{ ID: 234 Type: "NG" Name: { ID: 234 First: "Bob" Last: "Smith" } Gender: null }
+//	{ ID: 345 Type: "G" Name: null Gender: { ID: 345 IsFemale: false } }
 //}
 
 // Dereferencing multiple tables
 return Person(ID = 123).Attributes.(Name Gender)
 // Causes the table names to be nested as attributes in a new tuple.  e.g.
 //{
-//	{ Name: { ID: 234 First: 'Bob' Last: 'Smith' } Gender: null }
+//	{ Name: { ID: 234 First: "Bob" Last: "Smith" } Gender: null }
 //	{ Name: null Gender: { ID: 345 IsFemale: false } }
 // ...
 //}
@@ -186,7 +188,7 @@ return { ID: a.ID }
 for a in Attributes
 order a.Type
 return { Type: a.Type }
-// e.g. [{ Type: 'EB' } { Type: 'EM' } ...]
+// e.g. [{ Type: "EB" } { Type: "EM" } ...]
 
 // Path restriction works on lists too:
 return [{ ID: 123 } { ID: 124 }](ID > 123)
@@ -195,7 +197,7 @@ return [{ ID: 123 } { ID: 124 }](ID > 123)
 // Reuse within paths:
 for a in Person.Attributes
 let n := ToLower(a.Type)
-where n = 'ng'
+where n = "ng"
 return { ID: a.ID TypeUpper: ToUpper(n) TypeLower: n }
 
 /* Item Extraction */
@@ -247,8 +249,8 @@ return Name[ID = 1212][].Prefix ??
 // e.g. true if null either because there was no such row, or there was a row but the prefix wasn't present
 
 // Tuple with optional attribute
-return { First: 'Bob' } of { Prefix: String? First: String }
-// result: { Prefix: null First: 'Bob' } 
+return { First: "Bob" } of { Prefix: String? First: String }
+// result: { Prefix: null First: "Bob" } 
 
 /* Functions */
 
@@ -303,29 +305,29 @@ return Point=>{ y: 5 x: 7 }
 /* Conditions and cases */
 
 // Conditional expression:
-return if true then 'Hello' else 'Goodbye'
-// returns 'Hello'
+return if true then "Hello" else "Goodbye"
+// returns "Hello"
 
 // Value based case expression:
 let n := 123
 return 
 	case n 
-		when 123 then 'Hello'
-		when 234 then 'Goodbye'
-		else 'Speechless'
+		when 123 then "Hello"
+		when 234 then "Goodbye"
+		else "Speechless"
 	end
-// returns 'Hello'
+// returns "Hello"
 
 // Condition base case expression
 let x := 123
 let y := 234
 return
 	case
-		when x = 135 and y = 231 then 'Hello'
-		when true then 'Goodbye'
-		else 'Speechless'
+		when x = 135 and y = 231 then "Hello"
+		when true then "Goodbye"
+		else "Speechless"
 	end
-// returns 'Goodbye'
+// returns "Goodbye"
 
 // Strict cases:
 Colors: enum { Green Red Blue }
@@ -358,7 +360,7 @@ return Personality\Red
 
 // Defaults for each type are as follows:
 // Numerics: 0
-// String: ''
+// String: ""
 // Tuple: <each attribute defaulted>
 // Set: <empty>
 // List: <empty>
@@ -445,44 +447,41 @@ return void
 set	FavoriteColor := Green
 
 // The left-hand side of assignments may contain reference-based path expressions:
-set Person(ID = 123).Origin := 'R'
+set Person(ID = 123).Origin := "R"
 // effect: Updates the Origin attribute of the specified tuple of the Person table
 
 // Set statements follow the FLWOR pattern except for Return becomes Set (FLWOS), and there may be any number of set clauses:
 let p = Person(ID = 123)
-set p := { ID: p.ID Origin: 'R' }
+set p := { ID: p.ID Origin: "R" }
 // effect: Updates the specified tuple of the Person table
 // NOTE: Assignment of table references is logically a deletion of all matching tuples, followed by insertion of the given value(s)
+
+// Insert using the restriction predicate for defaulting:
+set Person(ID = 123) := { Origin: "R" }
+// Ensures that the given row is in the Person table
 
 // Deletion is enabled by assignment of nothing:
 set Person(ID = 123) := null
 
 // Insertion:
 var newID: Long
-set newID := GenerateID()
-set Person(ID = newID) := { Origin: 'R' }
+set newID := GenerateID("Person")
+set Person(ID = newID) := { Origin: "R" }
 return newID
 // effect: Generates a new ID, inserts a person tuple based on that ID, and returns the new ID
 
 // Updating with iteration:
 for i in 1..6
-set Person(ID = i).Origin := 'R'
+set Person(ID = i).Origin := "R"
 // effect: Sets the Origin attribute of a range of person tuples in the person table variable
 
 /* Scope */
 
 // Each script has a local frame, which hides any imported context:
 using Ancestry\FamilyPaths 1.0.0
-Code: Integer	// Hides the Code in FamilyPaths
+var Code: Integer	// Hides the Code in FamilyPaths
 
-// A module also defines a frame.  The script scope is not visible to a module:
-Color: enum { Green Orange Red }
-Fruits: module
-{
-	FruitColor: Color	// ERROR: Script level symbols are not visible in a module
-}
-
-// Module members can access other members, and in any order
+// Module members can access other module members, and in any order
 Selfish: module
 {
 	Current: Code
@@ -504,43 +503,45 @@ return try 1 / 0 catch -1
 
 /* Nullological Cases */
 
-// Empty set of normal tuples:
+// Empty set of attribute carrying tuples:
 return { } of { { ID: Integer } }
 
 // Empty lists of normal tuples:
 return [] of [{ ID: Integer }]
 
-// Empty tuple:
-return { key () } of { ID: Integer key () }
+// Empty tuple of attribute carrying tuple:
+return { : } of { ID: Integer key (ID) }
+// result: { ID: 0 }
 
-// In an expression context { } means empty set; for a no-attribute tuple specify a key to distinguish that it is a tuple
-// In a type context { } means a no-attribute tuple because a set requires a member type
+// In an expression context { } means empty set; for a no-attribute tuple specify a ":" to distinguish that it is a tuple
+// In a type context { : } means a no-attribute tuple because a set requires a member type ( { } is a set of type void in a type context )
 
 // Set of type void:
 return { }
 
 // Set containing one no-attribute tuple ("table dee"):
-return { { key () } }
+return { { : } }
 
 // Set containing zero no-attribute tuples ("table dum"):
-return { } of { { key() } }
+return { } of { { : } }
 
 // List of no-attribute tuples:
-return [{ key () } { key () }]
+return [{ : } null { : }]
 
-// Empty set, of set of lists of sets of no-attribute tuples:
-return { } of { [{ key () } of { key () }] }
+// Set of type set of lists of no-attribute tuples:
+return { [{ : }] [] [{ : } { : }] } of { [{ : }] }
 
 /* Generics */
 
 // Functions may take type arguments:
-let Add = function<T>(T x T y)
+let Add = function<T>(x: T y: T)
 	return x + y
 return Add<Integer>(5 10)
 // result: 15
 
 The type parameter can be inferred:
-return Add(5 10)
+return Add(5.0 10.0)
+// result: 15.0
 
 /* List Operations */
 
@@ -592,7 +593,7 @@ return { exists [1] exists [] }
 // result: { true false }
 
 // Quota:
-return [30 40 10 20][Index < 2]
+return [30 40 10 20](index < 2)
 // result: [30 40]
 
 /* Set Operations */
@@ -606,12 +607,12 @@ return { 1 2 } | { 2 3 }
 // result: { 1 2 3 }
 
 // Subtraction:
-return { 1 2 3 } - { 3 }
-// result: { 1 }
+return { 1 2 3 } - { 3 4 }
+// result: { 1 2 }
 
 // Conversion to list:
 return ToList({ 2 1 3 })
-// result: [1 2 3] (in order)
+// result: [1 2 3] (in sorted order)
 
 // Ordered conversion from set to list:
 for i in { 2 3 1 }
@@ -628,7 +629,7 @@ return { exists { 1 } exists { } }
 // result: { true false }
 
 // Quota:
-return { 30 40 10 20 }[Index < 2]
+return { 30 40 10 20 }(index < 2)
 // result: { 10 20 }
 
 // Note: quota forces sorting for determinism; use list quote to control ordering
@@ -637,10 +638,10 @@ return { 30 40 10 20 }[Index < 2]
 
 // Extraction of an attribute set from a tuple set:
 return { { ID: 123 } { ID: 234 } { ID: 345 } }.ID
-// result: {123 234 345 ...}
+// result: { 123 234 345 ... }
 
 // Extraction of an attribute list from a tuple set:
-let Items := { { ID: 123 Color: Red } { ID: 234 Color: Red } } as { { ID: Integer Color: Color key (ID) } }
+let Items := { { ID: 123 Color: Red } { ID: 234 Color: Red } } of { { ID: Integer Color: Color key (ID) } }
 return Items.Color
 // result: [Red Red]  
 // If the extracted attribute is not a key, the result is a list, not a set.  A Set result would be distinct, but this may not be desired (e.g. when counting)
@@ -675,19 +676,19 @@ return { All: All(i) Any: Any(i) }
 // Grouped aggregation:
 for p in Person
 return { Person: p NumAttributes: Count(p.Attributes) }
-// e.g. { Person: { ID: 123 Origin: 'R' } NumAttributes: 12 }
+// e.g. { Person: { ID: 123 Origin: "R" } NumAttributes: 12 }
 
 // Count of distinct
 return Count(ToSet(Person.Origin))
 // The result is the number of distinct origins in the Person table
 
 // String concatenation
-return { Concat({ 'Zebra' 'Invasion' }) Concat(['Zebra' 'Invastion']) }
-// result { 'InvastionZebra' 'ZebraInvasion' }
+return { Concat({ "Zebra" "Invasion" }) Concat(["Zebra" "Invastion"]) }
+// result { "InvastionZebra" "ZebraInvasion" }
 
 // Concatenation with delimiter
-return { Concat(['Zebra' 'Invastion'] ' ') }
-// result 'Zebra Invasion'
+return { Concat(["Zebra" "Invastion"] " ") }
+// result "Zebra Invasion"
 
 // Aggregates and nulls
 return { S: Count({ 1 null 2 }) L: Count([1 null 2]) }
@@ -849,14 +850,14 @@ return Random(Seed() 5..10)
 /* Generators */
 
 // Generate an individual ID
-return GenerateID('token')
+return GenerateID("token")
 // result: <next ID for given token> of Long
 
 // Note: Generators start at 1
 
 // ID Blocks
-let n := GenerateID('token' 100)
-return { n GenerateID('token') }
+let n := GenerateID("token" 100)
+return { n GenerateID("token") }
 // result: { <next ID> <number at least 100 greater than prior }
 
 // GenerateID is non-deterministic
@@ -864,11 +865,11 @@ return { n GenerateID('token') }
 /* String Operations */
 
 // String concatenation:
-return 'engine' + '-hitch-' + 'caboose\r\n'
-// result: 'engine-hitch-caboose\r\n'
+return "engine" + "-hitch-" + "caboose\r\n"
+// result: "engine-hitch-caboose\r\n"
 
 // Alternative concatenation:
-return Concat(['engine' '-hitch-' 'caboose\r\n'])
+return Concat(["engine" "-hitch-" "caboose\r\n"])
 
 // TODO: rest of string operators...
 

@@ -25,11 +25,16 @@ namespace Ancestry.QueryProcessor.Type
 		public override string ToString()
 		{
 			return "{" 
-				+ String.Join
+				+ 
 				(
-					" ", 
-					(from m in Members select m.Key + ": " + m.Value.ToString())
-						.Union(from k in Keys select k.ToString()).ToArray()
+					Members.Count == 0 
+						? " : " 
+						: String.Join
+						(
+							" ", 
+							(from m in Members select m.Key + ": " + m.Value.ToString())
+								.Union(from k in Keys select k.ToString()).ToArray()
+						)
 				) 
 				+ "}";
 		}

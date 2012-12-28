@@ -7,7 +7,7 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public class Compiler
 	{
-		public Action<JObject, CancellationToken> CreateExecutable(BatchPlan plan)
+		public Action<JObject, CancellationToken> CreateExecutable(ScriptPlan plan)
 		{
 			throw new NotImplementedException();
 		}

@@ -1,5 +1,4 @@
-﻿using Ancestry.QueryProcessor.Parse;
-using Ancestry.QueryProcessor.Type;
+﻿using Ancestry.QueryProcessor.Type;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -18,11 +17,11 @@ namespace Ancestry.QueryProcessor
 			// Use argument types if specified
 			if (argTypes != null)
 			{
-				var parser = new Parser();
+				var parser = new Parse.Parser();
 				foreach (var att in argTypes)
 				{
 					// TODO: assert that arr.value is a string for better error
-					result.Members.Add(att.Key, new AttributeMember { Type = parser.ParseTypeSpecifier((string)((JValue)att.Value).Value) });
+					result.Members.Add(att.Key, new AttributeMember { Type = Parse.Parser.ParseFrom(parser.ParseTypeDeclaration, (string)((JValue)att.Value).Value) });
 				}
 			}
 

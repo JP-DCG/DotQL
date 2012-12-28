@@ -104,7 +104,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		// Resource manager for this exception class
-		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parser.ParserException", typeof(ParserException).Assembly);
+		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parse.ParserException", typeof(ParserException).Assembly);
 
 		// Constructors
 		public ParserException(Codes errorCode) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, null) {}

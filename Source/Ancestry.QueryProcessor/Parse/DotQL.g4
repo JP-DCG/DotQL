@@ -4,7 +4,7 @@
 Script :=
 	Usings : [ UsingClause ]*
 	Modules : [ ModuleDeclaration ]*
-	VarDeclarations : [ VarDeclaration ]*
+	Vars : [ VarDeclaration ]*
 	Assignments : [ Assignment ]*
 	Expression : [ ClausedExpression ]
 
@@ -36,47 +36,50 @@ Assignment :=
 	"set" Target : PathExpression ":=" Source : Expression
 
 TypeDeclaration =
-	ListType | TupleType | SetType | FunctionType | IntervalType | ScalarType
+	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType
 
 ListType :=
-	"[" Type : TypeDeclaration "]"
+	"[" Type : [ TypeDeclaration ] "]"
 
 SetType :=
-	"{" Type : TypeDeclaration "}"
+	"{" Type : [ TypeDeclaration ] "}"
 
 TupleType :=
-	"{" Members : [ TupleAttribute | TupleReference | TupleKey ]* "}"
+	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}"
 
 TupleAttribute :=
 	Name : QualifiedIdentifier ":" Type : TypeDeclaration
 
 TupleReference :=
-	"ref" Name : QualifiedIdentifier "(" SourceColumns : QualifiedIdentifier* ")" 
-		Target : QualifiedIdentifier "(" TargetColumns : QualifiedIdentifier* ")"	
+	"ref" Name : QualifiedIdentifier "(" SourceAttributeNames : QualifiedIdentifier* ")" 
+		Target : QualifiedIdentifier "(" TargetAttributeNames : QualifiedIdentifier* ")"	
 
 TupleKey :=
-	"key" "(" Columns : [ QualifiedIdentifier ]* ")"
+	"key" "(" AttributeNames : [ QualifiedIdentifier ]* ")"
 
 FunctionType :=
-	"function" [ "<" TypeParameters : TypeDeclaration* ">" ] "(" Parameters : ( Name : QualifiedIdentifier ":" Type : TypeDeclaration )* ")" ":" ReturnType : TypeDeclaration
+	"function" [ "<" TypeParameters : TypeDeclaration* ">" ] "(" Parameters : [ FunctionParameter ]* ")" ":" ReturnType : TypeDeclaration
+
+FunctionParameter :=
+	Name : QualifiedIdentifier ":" Type : TypeDeclaration
 
 IntervalType :=
 	"interval" Type : TypeDeclaration
 
-ScalarType :=
+NamedType :=
 	Name : QualifiedIdentifier
 
 ClausedExpression :=
-	ForClauses : [ "for" ForTerm ]*
-	LetClauses : [ "let" LetTerm ]*
-	WhereClause : [ "where" Expression : Expression ]
-	OrderClause : [ "order" Dimensions : OrderDimension* ]
-	"return" Expression : [ Expression ]
+	[ "for" ForClauses : ForClause ]*
+	[ "let" LetClauses : LetClause ]*
+	[ "where" WhereClause : Expression ]
+	[ "order" OrderClause : OrderDimension* ]
+	"return" Expression : Expression
 
-ForTerm :=
+ForClause :=
 	Name : QualifiedIdentifier "in" Expression : Expression
 
-LetTerm :=
+LetClause :=
 	Name : QualifiedIdentifier ":=" Expression : Expression
 	
 OrderDimension :=
@@ -85,72 +88,69 @@ OrderDimension :=
 Expression =
 	ClausedExpression | PathExpression
 
-PathExpression 0 =
+PathExpression 10 =
+	OfExpression : ( Expression : PathExpression "of" Type : TypeDeclaration ) 
+
+PathExpression 20 =
     LogicalBinaryExpression : ( Expressions : PathExpression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" ) )
 
-PathExpression 1 =
+PathExpression 30 =
 	LogicalAndExpression : ( Expressions : PathExpression )^"and"
 
-PathExpression 2 =
+PathExpression 40 =
 	BitwiseBinaryExpression : ( Expressions : PathExpression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
 
-PathExpression 3 =
+PathExpression 50 =
 	ComparisonExpression : ( Expressions : PathExpression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
 
-PathExpression 4 =
+PathExpression 60 =
 	AdditiveExpression : ( Expressions : PathExpression )^( Operators : ( "+" | "-" ) )
 
-PathExpression 5 =
+PathExpression 70 =
 	MultiplicativeExpression : ( Expressions : PathExpression )^( Operators : ( "*" | "/" | "%" ) )
 
-PathExpression 6 =
+PathExpression 80 =
 	ExponentExpression : ( Expressions : PathExpression )^"**"
 
-PathExpression 7 =
+PathExpression 90 =
 	UnaryExpression : ( Operator : ( "++" | "--" | "+" | "-" | "~" | "not" | "exists" ) Expression : PathExpression )
 
-PathExpression 8 =
-	IndexerExpression : ( Expression : PathExpression "[" IndexerExpression : [ Expression ] "]" )
+PathExpression 100 =
+	DereferenceExpression : ( Expressions : PathExpression )^"."
 
-PathExpression 9 =
+PathExpression 110 =
+	IndexerExpression : ( Expression : PathExpression "[" Indexer : [ Expression ] "]" )
+
+PathExpression 120 =
 	InvocationExpression : 
 	( 
 		Expression : PathExpression [ "<" TypeArguments : TypeDeclaration* ">" ]
 			( "(" Arguments : [ Expression ]* ")" ) | ( "=>" Argument : Expression ) 
 	)
 
-PathExpression 10 =
-	EmbedExpression : ( Expressions : PathExpression )^"#"
-
-PathExpression 11 =
-	DereferenceExpression : ( [ IsRooted : "." ] ( Expressions : PathExpression )^"." )
-
 PathExpression =
-	Factor :
-	(
-		(
-			"(" Expression ")"
-				| ListSelector
-				| TupleSelector
-				| SetSelector
-				| FunctionSelector
-				| IntervalSelector
-				| IdentifierExpression
-				| IntegerLiteral
-				| DoubleLiteral
-				| StringLiteral
-				| BooleanLiteral : ( "true" | "false" )
-				| NullLiteral : "null"
-				| VoidLiteral : "void"
-				| CaseExpression
-		) [ "as" AsType : TypeDeclaration ]
-	)
+	"(" Expression ")"
+		| ListSelector
+		| TupleSelector
+		| SetSelector
+		| FunctionSelector
+		| IntervalSelector
+		| IdentifierExpression
+		| IntegerLiteral
+		| DoubleLiteral
+		| CharacterLiteral
+		| StringLiteral
+		| BooleanLiteral : ( "true" | "false" )
+		| NullLiteral : "null"
+		| VoidLiteral : "void"
+		| CaseExpression
+		| IfExpression
 
 ListSelector :=
 	"[" Items : [ Expression ]* "]"
 
 TupleSelector :=
-	"{" Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
+	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
 
 TupleAttributeSelector :=
 	Name : QualifiedIdentifier ":" Value : Expression
@@ -159,8 +159,7 @@ SetSelector :=
 	"{" Items : [ Expression ]* "}"
 
 FunctionSelector :=
-	"function" [ "<" TypeParameters : TypeDeclaration* ">" ] "(" Parameters : ( Name : QualifiedIdentifier ":" Type : TypeDeclaration )* ")" ":" ReturnType : TypeDeclaration
-		Expression : ClausedExpression
+	Type : FunctionType Expression : ClausedExpression
 
 IntervalSelector :=
 	Begin : Expression ".." End : Expression
@@ -174,14 +173,26 @@ IntegerLiteral :=
 DoubleLiteral :=
 	_ (digit* '.' digit* [( 'e' | 'E' ) [ '+' | '-' ] digit*])+ _
 
+CharacterLiteral :=
+	_ PascalString+ 'c' _
+
 StringLiteral :=
-	_ '''' ( [ '''''' as '''' | {?} &! '''' ]* )+ '''' _
+	_ ( PascalSegments : ( [ '#' LeadingChars : digit* ]* PascalString [ '#' TrailingChars : digit* ]* )* ) 
+		| ( '"' ( [ '\\' as '\' | '\"' as '"' | '\r' as #13 | '\n' as #10 | '\t' as #9 | {?} &! '"' ]* )+ '"' ) _
 
 CaseExpression :=
     "case" [ TestExpression : Expression ]
         Items : ( "when" WhenExpression : Expression "then" ThenExpression : Expression )*
-        else ElseExpression : Expression
-    end
+        "else" ElseExpression : Expression
+    "end"
+
+IfExpression :=
+	"if" TestExpression : Expression
+        "then" ThenExpression : Expression
+        "else" ElseExpression : Expression 
+
+PascalString =
+	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''
 
 QualifiedIdentifier =
 	Identifier [ '\' Identifier ]*

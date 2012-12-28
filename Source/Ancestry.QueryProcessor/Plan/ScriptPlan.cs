@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Plan
 {
-	public class BatchPlan
+	public class ScriptPlan
 	{
 	}
 }

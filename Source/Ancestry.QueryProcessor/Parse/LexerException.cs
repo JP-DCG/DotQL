@@ -35,11 +35,20 @@ namespace Ancestry.QueryProcessor.Parse
 			UnexpectedEOF = 102106,
 			
 			/// <summary>Error code 102107: "Unterminated comment."</summary>
-			UnterminatedComment = 102107
+			UnterminatedComment = 102107,
+
+			/// <summary>Error code 102108: "Invalid character."</summary>
+			InvalidCharacter = 102108,
+
+			/// <summary>Error code 102109: "Invalid character code."</summary>
+			InvalidCharacterCode = 102109,
+
+			/// <summary>Error code 102110: "Unsupported escape character ({0})."</summary>
+			InvalidEscapeCharacter = 102110,
 		}
 
 		// Resource manager for this exception class
-		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parser.LexerException", typeof(LexerException).Assembly);
+		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Parse.LexerException", typeof(LexerException).Assembly);
 
 		// Constructors
 		public LexerException(Codes errorCode) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, null) {}

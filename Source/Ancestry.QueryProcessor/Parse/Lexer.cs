@@ -5,118 +5,7 @@ using System.Runtime.Serialization;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-    public enum TokenType { Unknown, Symbol, Nil, Boolean, Integer, Hex, Float, Decimal, Money, String, EOF, Error }
 
-	public class LexerToken
-	{
-		public TokenType Type;
-		public string Token;
-		public int Line;
-		public int LinePos;
-		public Exception Error;
-
-		/// <summary> Returns the currently active TokenType as a symbol. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a symbol. </remarks>
-		public string AsSymbol
-		{
-			get
-			{
-				CheckType(TokenType.Symbol);
-				return Token;
-			}
-		}
-
-		/// <summary> Returns the currently active TokenType as a string. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a string. </remarks>
-		public string AsString
-		{
-			get
-			{
-				CheckType(TokenType.String);
-				return Token;
-			}
-		}
-
-		/// <summary> Returns the currently active TokenType as a boolean value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a boolean. </remarks>
-		public bool AsBoolean
-		{
-			get
-			{
-				CheckType(TokenType.Boolean);
-				return Token[0].Equals('t') || Token[0].Equals('T');
-			}
-		}
-
-		/// <summary> Returns the currently active TokenType as an integer value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not an integer. </remarks>
-		public long AsInteger
-		{
-			get
-			{
-				CheckType(TokenType.Integer);
-				return Int64.Parse(Token, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture);
-			}
-		}
-		
-		public decimal AsDecimal
-		{
-			get
-			{
-				CheckType(TokenType.Decimal);
-				return Decimal.Parse(Token, System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture);
-			}
-		}
-
-		public decimal AsMoney
-		{
-			get
-			{
-				CheckType(TokenType.Money);
-				return Decimal.Parse(Token, System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture);
-			}
-		}
-
-		/// <summary> Returns the currently active TokenType as a float value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a float. </remarks>
-		public double AsFloat
-		{
-			get
-			{
-				CheckType(TokenType.Float);
-				return Double.Parse(Token, System.Globalization.CultureInfo.InvariantCulture);
-			}
-		}
-
-		/// <summary> Returns the currently active TokenType as a money value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a money literal. </remarks>
-		public long AsHex
-		{
-			get
-			{
-				CheckType(TokenType.Hex);
-				return Int64.Parse(Token, System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture);
-			}
-		}
-
-		/// <summary> Ensures that the current TokenType is of the given type.  </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if it is not. </remarks>
-		public void CheckType(TokenType token)
-		{
-			if (Type == TokenType.Error)
-				throw Error;
-			if (Type != token)
-				throw new LexerException(LexerException.Codes.TokenExpected, Enum.GetName(typeof(TokenType), token));
-		}
-
-		/// <summary> Ensures that the current TokenType is a symbol equal to the given symbol.  </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if it is not. </remarks>
-		public void CheckSymbol(string symbol)
-		{
-			if ((Type != TokenType.Symbol) || !String.Equals(Token, symbol, StringComparison.Ordinal))
-				throw new LexerException(LexerException.Codes.SymbolExpected, symbol);
-		}
-	}
 
 	/// <summary> General purpose lexical analyzer suitable for tokenizing statements of SQL. </summary>
 	/// <remarks>
@@ -232,7 +121,8 @@ namespace Ancestry.QueryProcessor.Parse
 		// Boolean constants
 		public const string True = "true";
 		public const string False = "false";
-		public const string Nil = "nil";
+		public const string Null = "null";
+		public const string Void = "void";
 
 		public Tokenizer(string input)
 			: base()
@@ -352,12 +242,13 @@ namespace Ancestry.QueryProcessor.Parse
 						if (PeekEOF)
 							throw new LexerException(LexerException.Codes.UnterminatedComment);
 						Char peek = Peek;
-						if ((_next == '/') && (peek == '*'))
+						bool peekEOF = PeekEOF;
+						if ((_next == '/') && !peekEOF && (peek == '*'))
 						{
 							blockCommentDepth++;
 							Advance();
 						}
-						else if ((_next == '*') && (peek == '/'))
+						else if ((_next == '*') && !peekEOF && (peek == '/'))
 						{
 							blockCommentDepth--;
 							Advance();
@@ -375,8 +266,7 @@ namespace Ancestry.QueryProcessor.Parse
 		/// <returns> True if comment parsing should continue. </return>
 		private bool SkipLineComments()
 		{
-			Char peek = Peek;
-			if ((_next == '-') && (peek == '-'))
+			if ((_next == '-') && !PeekEOF && (Peek == '-'))
 			{
 				Advance();
 				Advance();
@@ -409,6 +299,8 @@ namespace Ancestry.QueryProcessor.Parse
 				case ']':
 				case '*':
 				case '/':
+				case '%':
+				case '\\':
 				case '~':
 				case '&':
 				case '|':
@@ -446,12 +338,7 @@ namespace Ancestry.QueryProcessor.Parse
 						_builder.Append(_current);
 					}
 					_token = _builder.ToString();
-					if (String.Equals(_token, True, StringComparison.OrdinalIgnoreCase) || String.Equals(_token, False, StringComparison.OrdinalIgnoreCase))
-						_tokenType = TokenType.Boolean;
-					else if (String.Equals(_token, Nil, StringComparison.OrdinalIgnoreCase))
-						_tokenType = TokenType.Nil;
-					else
-						_tokenType = TokenType.Symbol;
+					_tokenType = TokenType.Identifier;
 				}
 				else if (IsSymbol(_next))							// Symbols
 				{
@@ -510,34 +397,46 @@ namespace Ancestry.QueryProcessor.Parse
 									break;
 								}
 							break;
+						case '=':
+							if (!_nextEOF && _next == '>')
+							{
+								Advance();
+								_builder.Append(_current);
+								break;
+							}
+							break;
+						case '.':
+							if (!_nextEOF && _next == '.')
+							{
+								Advance();
+								_builder.Append(_current);
+								break;
+							}
+							break;
+							
 					}
 					_token = _builder.ToString();
 				}
-				else if	(Char.IsDigit(_next) || (_next == '$'))		// Numbers
+				else if	(Char.IsDigit(_next))		// Numbers
 				{
 					Advance();
 
 					bool digitSatisfied = false;	// at least one digit required
 
-					if (_current == '$')
-						_tokenType = TokenType.Money;
+					if ((_current == '0') && (!_nextEOF && ((_next == 'x') || (_next == 'X'))))
+					{
+						_tokenType = TokenType.Hex;
+						Advance();
+					}
 					else
 					{
-						if ((_current == '0') && (!_nextEOF && ((_next == 'x') || (_next == 'X'))))
-						{
-							_tokenType = TokenType.Hex;
-							Advance();
-						}
-						else
-						{
-							digitSatisfied = true;
-							_builder.Append(_current);
-							_tokenType = TokenType.Integer;
-						}
+						digitSatisfied = true;
+						_builder.Append(_current);
+						_tokenType = TokenType.Integer;
 					}
 
 					bool done = false;
-					bool hitPeriod = false;
+					int periodsHit = 0;
 					bool hitScalar = false;
 
 					while (!done && !_nextEOF)
@@ -565,32 +464,27 @@ namespace Ancestry.QueryProcessor.Parse
 							case 'b':
 							case 'C':
 							case 'c':
+							case 'D':
+							case 'd':
+							case 'f':
+							case 'F':
 								if (_tokenType != TokenType.Hex)
-									throw new LexerException(LexerException.Codes.InvalidNumericValue);
+								{
+									done = true;
+									break;
+								}
 								Advance();
 								digitSatisfied = true;
 								_builder.Append(_current);
 								break;
 								
-							case 'D':
-							case 'd':
-								Advance();
-								if (_tokenType == TokenType.Hex)
-								{
-									digitSatisfied = true;
-									_builder.Append(_current);
-								}
-								else if (_tokenType != TokenType.Money)
-								{
-									_tokenType = TokenType.Decimal;
-									done = true;
-								}
-								else
-									throw new LexerException(LexerException.Codes.InvalidNumericValue);
-								break;
-
 							case 'E':
 							case 'e':
+								if (_tokenType != TokenType.Hex || (!hitScalar && digitSatisfied))
+								{
+									done = true;
+									break;
+								}
 								Advance();
 								if (_tokenType == TokenType.Hex)
 								{
@@ -601,7 +495,7 @@ namespace Ancestry.QueryProcessor.Parse
 								{
 									hitScalar = true;
 									digitSatisfied = false;
-									_tokenType = TokenType.Float;
+									_tokenType = TokenType.Double;
 									_builder.Append(_current);
 									if ((_next == '-') || (_next == '+'))
 									{
@@ -609,41 +503,33 @@ namespace Ancestry.QueryProcessor.Parse
 										_builder.Append(_current);
 									}
 								}
-								else
-									throw new LexerException(LexerException.Codes.InvalidNumericValue);
-								break;
-
-							case 'f':
-							case 'F':
-								Advance();
-								if (_tokenType == TokenType.Hex)
-								{
-									digitSatisfied = true;
-									_builder.Append(_current);
-								}
-								else if (_tokenType != TokenType.Money)
-								{
-									_tokenType = TokenType.Float;
-									done = true;
-								}
-								else
-									throw new LexerException(LexerException.Codes.InvalidNumericValue);
 								break;
 
 							case '.':
-								if (!hitPeriod)
+								// If interval, or we've fully satisfied a version, stop looking for digits
+								if ((!PeekEOF && Peek == '.') || periodsHit >= 3)
 								{
-									Advance();
+									done = true;	
+									break;
+								}
+
+								if (!digitSatisfied || hitScalar)
+									throw new LexerException(LexerException.Codes.InvalidNumericValue);
+
+								if (periodsHit == 0)
+								{
 									if (_tokenType == TokenType.Hex)
 										throw new LexerException(LexerException.Codes.InvalidNumericValue);
 									if (_tokenType == TokenType.Integer)
-										_tokenType = TokenType.Decimal;
-									hitPeriod = true;
-									digitSatisfied = false;
-									_builder.Append(_current);
+										_tokenType = TokenType.Double;
 								}
-								else
-									done = true;	// a dot, not a point
+								else if (periodsHit == 1)
+									_tokenType = TokenType.Version;
+
+								Advance();
+								_builder.Append(_current);
+								periodsHit++;
+								digitSatisfied = false;
 								break;
 
 							default:
@@ -655,24 +541,111 @@ namespace Ancestry.QueryProcessor.Parse
 						throw new LexerException(LexerException.Codes.InvalidNumericValue);
 					_token = _builder.ToString();
 				}	
-				else if ((_next == '\'') || (_next == '"'))
+				else if (_next == '"')	// C-style string
 				{
 					_tokenType = TokenType.String;
 					Advance();
-					char quoteChar = _current;
+					var terminated = false;
+					while (!terminated)
+					{
+						if (_nextEOF)
+							throw new LexerException(LexerException.Codes.UnterminatedString);	// Better error than EOF
+						Advance();
+						switch (_current)
+						{
+							case '\\' :
+								if (_nextEOF)
+									throw new LexerException(LexerException.Codes.InvalidEscapeCharacter);
+								switch (_next)
+								{
+									case '\\' : 
+									case '\"' : _builder.Append(_next); Advance(); break;
+									case 'n' : _builder.Append('\n'); Advance(); break;
+									case 'r' : _builder.Append('\r'); Advance(); break;
+									case 't' : _builder.Append('\t'); Advance(); break;
+									default: throw new LexerException(LexerException.Codes.InvalidEscapeCharacter, _next);
+								}
+								break;
+
+							case '\"' : 
+								terminated = true; 
+								break;
+							
+							default : 
+								_builder.Append(_current); 
+								break;
+						}
+					}
+					_token = _builder.ToString();
+				}
+				else if (_next == '\'')
+				{
+					_tokenType = TokenType.String;
 					while (true)
 					{
 						if (_nextEOF)
 							throw new LexerException(LexerException.Codes.UnterminatedString);	// Better error than EOF
 						Advance();
-						if (_current == quoteChar)
-							if (!_nextEOF && (_next == quoteChar))
+						if (_current == '\'')
+						{
+							if (!_nextEOF && _next == '\'')
 								Advance();
 							else
 								break;
-						_builder.Append(_current);
+						} 
+						_builder.Append(_current); 
 					}
+					if (!_nextEOF)
+						switch (_next)
+						{
+							case 'c' :
+								Advance(); 
+								_tokenType = TokenType.Char;
+								if (_builder.Length != 1)
+									throw new LexerException(LexerException.Codes.InvalidCharacter);
+								break;
+							case 'd' :
+								Advance(); 
+								if (!_nextEOF && _next == 't')
+								{
+									Advance();
+									_tokenType = TokenType.DateTime;
+								}
+								else
+									_tokenType = TokenType.Date;
+								break;
+							case 't' :
+								Advance(); 
+								if (!_nextEOF && _next == 's')
+								{
+									Advance();
+									_tokenType = TokenType.TimeSpan;
+								}
+								else
+									_tokenType = TokenType.Time;
+								break;
+							case 'g' :
+								Advance();
+								_tokenType = TokenType.Guid;
+								break;
+						}
 					_token = _builder.ToString();
+				}
+				else if (_next == '#')
+				{
+					_tokenType = TokenType.String;
+					Advance();
+					var digitSatisfied = false;
+					int code = 0;
+					while (!_nextEOF && Char.IsDigit(_next))
+					{
+						digitSatisfied = true;
+						Advance();
+						code = code * 10 + (_current - '0');
+					}
+					if (!digitSatisfied)
+						throw new LexerException(LexerException.Codes.InvalidCharacterCode);
+					_token = Convert.ToChar(code).ToString();
 				}
 				else
 					throw new LexerException(LexerException.Codes.IllegalInputCharacter, _next); 

@@ -10,7 +10,7 @@ namespace Ancestry.QueryProcessor.Storage
 {
 	public interface IStorageModule
 	{
-		int GetCost(PlanTable table, BatchPlan plan);
+		int GetCost(PlanTable table, ScriptPlan plan);
 		
 		ICursor Open(PlanTable table);
 

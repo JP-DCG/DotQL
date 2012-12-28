@@ -16,12 +16,13 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Var = "var";
         public const string Set = "set";
 		public const string Function = "function";
-		public const string Interval = "interval";
+		public const string IntervalType = "interval";
         public const string For = "for";
         public const string Let = "let";
         public const string Where = "where";
 		public const string Order = "order";
 		public const string Return = "return";
+		public const string Index = "index";
         public const string In = "in";
         public const string Asc = "asc";
         public const string Desc = "desc";
@@ -41,6 +42,8 @@ namespace Ancestry.QueryProcessor.Parse
         public const string When = "when";
         public const string Then = "then";
         public const string If = "if";
+		public const string Else = "else";
+		public const string End = "end";
         public const string BitwiseAnd = "&";
         public const string BitwiseOr = "|";
         public const string BitwiseXor = "^";
@@ -71,6 +74,8 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Dereference = ".";
 		public const string Embed = "#";
 		public const string Qualifier = "\\";
+		public const string IntervalValue = "..";
+		public const string Assignment = ":=";
         
         private static string[] FKeywords;
         

@@ -1,5 +1,4 @@
-﻿using Ancestry.QueryProcessor.Parse;
-using Ancestry.QueryProcessor.Type;
+﻿using Ancestry.QueryProcessor.Type;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -15,7 +14,7 @@ namespace Ancestry.QueryProcessor.Plan
 		{
 		}
 
-		public BatchPlan PlanBatch(Batch batch, TupleType fullArgumentTypes, QueryOptions actualOptions)
+		public ScriptPlan PlanScript(Parse.Script script, TupleType fullArgumentTypes, QueryOptions actualOptions)
 		{
 			throw new NotImplementedException();
 		}

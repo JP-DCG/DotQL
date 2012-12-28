@@ -19,7 +19,7 @@ namespace Ancestry.QueryProcessor
 			_defaultOptions = defaultOptions;
 		}
 
-		public void Execute(string script, JObject args = null, QueryOptions options = null, JObject argTypes = null)
+		public void Execute(string text, JObject args = null, QueryOptions options = null, JObject argTypes = null)
 		{
 			var actualOptions = options ?? _defaultOptions;
 			var token = new CancellationTokenSource();
@@ -29,12 +29,12 @@ namespace Ancestry.QueryProcessor
 				{
 					// Parse
 					var parser = new Parser();
-					var batch = parser.ParseScript(script);
+					var script = Parser.ParseFrom(parser.ParseScript, text);
 
 					// Plan
 					var fullArgumentTypes = JsonInterop.InferArgumentTypes(args, argTypes);
 					var planner = new Planner();
-					var plan = planner.PlanBatch(batch, fullArgumentTypes, actualOptions);
+					var plan = planner.PlanScript(script, fullArgumentTypes, actualOptions);
 					
 					// Compile
 					var compiler = new Compiler();
@@ -61,7 +61,7 @@ namespace Ancestry.QueryProcessor
 		}
 
 
-		public JToken Evaluate(string script, JObject args = null, QueryOptions options = null, JObject argTypes = null)
+		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null, JObject argTypes = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
@@ -71,7 +71,7 @@ namespace Ancestry.QueryProcessor
 		/// <param name="argTypes"> Argument names and strings with DotQL type names. </param>
 		/// <param name="options">Optionally overridden query options. </param>
 		/// <returns> Handle to well-known query. </returns>
-		public Guid Prepare(string script, JObject argTypes = null, QueryOptions options = null)
+		public Guid Prepare(string text, JObject argTypes = null, QueryOptions options = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
