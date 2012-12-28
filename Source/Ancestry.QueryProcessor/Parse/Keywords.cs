@@ -17,6 +17,8 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Set = "set";
 		public const string Function = "function";
 		public const string IntervalType = "interval";
+		public const string Try = "try";
+		public const string Catch = "catch";
         public const string For = "for";
         public const string Let = "let";
         public const string Where = "where";
@@ -37,7 +39,7 @@ namespace Ancestry.QueryProcessor.Parse
         public const string False = "false";
         public const string Null = "null";
         public const string Void = "void";
-        public const string As = "as";
+        public const string Of = "of";
         public const string Case = "case";
         public const string When = "when";
         public const string Then = "then";
@@ -57,12 +59,13 @@ namespace Ancestry.QueryProcessor.Parse
         public const string InclusiveGreater = ">=";
         public const string Compare = "?=";
         public const string Addition = "+";
-        public const string Subtraction = "-";
+        public const string Subtract = "-";
 		public const string Successor = "++";
 		public const string Predicessor = "--";
-        public const string Multiplication = "*";
-        public const string Division = "/";
-        public const string Mod = "%";
+		public const string Negate = "-";
+        public const string Multiply = "*";
+        public const string Divide = "/";
+        public const string Modulus = "%";
         public const string Power = "**";
         public const string BitwiseNot = "~";
         public const string BeginGroup = "(";
@@ -71,11 +74,18 @@ namespace Ancestry.QueryProcessor.Parse
         public const string EndIndexer = "]";
 		public const string BeginSet = "{";
 		public const string EndSet = "}";
-        public const string Dereference = ".";
+		public const string BeginListSelector = "[";
+		public const string EndListSelector = "]";
+		public const string BeginTuple = "{";
+		public const string EndTuple = "}";
+		public const string Dereference = ".";
 		public const string Embed = "#";
 		public const string Qualifier = "\\";
 		public const string IntervalValue = "..";
 		public const string Assignment = ":=";
+		public const string IsNull = "??";
+		public const string IfNull = "?";
+		public const string Call = "=>";
         
         private static string[] FKeywords;
         

@@ -338,7 +338,7 @@ namespace Ancestry.QueryProcessor.Parse
 						_builder.Append(_current);
 					}
 					_token = _builder.ToString();
-					_tokenType = TokenType.Identifier;
+					_tokenType = TokenType.Symbol;
 				}
 				else if (IsSymbol(_next))							// Symbols
 				{

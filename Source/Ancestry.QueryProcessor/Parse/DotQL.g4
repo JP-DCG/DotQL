@@ -33,7 +33,7 @@ VarDeclaration :=
 	"var" Name : QualifiedIdentifier [ ":" Type : TypeDeclaration ] [ ":=" Initializer : Expression )
 
 Assignment :=
-	"set" Target : PathExpression ":=" Source : Expression
+	"set" Target : Expression ":=" Source : Expression
 
 TypeDeclaration =
 	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType
@@ -69,72 +69,55 @@ IntervalType :=
 NamedType :=
 	Name : QualifiedIdentifier
 
-ClausedExpression :=
-	[ "for" ForClauses : ForClause ]*
-	[ "let" LetClauses : LetClause ]*
-	[ "where" WhereClause : Expression ]
-	[ "order" OrderClause : OrderDimension* ]
-	"return" Expression : Expression
+Expression 1 =
+	OfExpression : ( Expression : Expression "of" Type : TypeDeclaration )
 
-ForClause :=
-	Name : QualifiedIdentifier "in" Expression : Expression
+Expression 2 =
+    LogicalBinaryExpression : ( Expressions : Expression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" | "?" ) )
 
-LetClause :=
-	Name : QualifiedIdentifier ":=" Expression : Expression
-	
-OrderDimension :=
-	Expression : Expression [ Direction : ( "asc" | "desc" ) ]
+Expression 3 =
+	LogicalAndExpression : ( Expressions : Expression )^"and"
 
-Expression =
-	ClausedExpression | PathExpression
+Expression 4 =
+	BitwiseBinaryExpression : ( Expressions : Expression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
 
-PathExpression 10 =
-	OfExpression : ( Expression : PathExpression "of" Type : TypeDeclaration ) 
+Expression 5 =
+	ComparisonExpression : ( Expressions : Expression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
 
-PathExpression 20 =
-    LogicalBinaryExpression : ( Expressions : PathExpression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" ) )
+Expression 6 =
+	AdditiveExpression : ( Expressions : Expression )^( Operators : ( "+" | "-" ) )
 
-PathExpression 30 =
-	LogicalAndExpression : ( Expressions : PathExpression )^"and"
+Expression 7 =
+	MultiplicativeExpression : ( Expressions : Expression )^( Operators : ( "*" | "/" | "%" | ".." ) )
 
-PathExpression 40 =
-	BitwiseBinaryExpression : ( Expressions : PathExpression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
+Expression 8 :=
+	IntervalSelector : ( Begin : Expression ".." End : Expression )
 
-PathExpression 50 =
-	ComparisonExpression : ( Expressions : PathExpression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
+Expression 9 =
+	ExponentExpression : ( Expressions : Expression )^"**"
 
-PathExpression 60 =
-	AdditiveExpression : ( Expressions : PathExpression )^( Operators : ( "+" | "-" ) )
+Expression 10 =
+	UnaryExpression : ( Operator : ( "++" | "--" | "-" | "~" | "not" | "exists" | "??" ) Expression : Expression )
 
-PathExpression 70 =
-	MultiplicativeExpression : ( Expressions : PathExpression )^( Operators : ( "*" | "/" | "%" ) )
+Expression 11 =
+	DereferenceExpression : ( Expressions : Expression )^"."
 
-PathExpression 80 =
-	ExponentExpression : ( Expressions : PathExpression )^"**"
+Expression 12 =
+	IndexerExpression : ( Expression : Expression "[" Indexer : [ Expression ] "]" )
 
-PathExpression 90 =
-	UnaryExpression : ( Operator : ( "++" | "--" | "+" | "-" | "~" | "not" | "exists" ) Expression : PathExpression )
-
-PathExpression 100 =
-	DereferenceExpression : ( Expressions : PathExpression )^"."
-
-PathExpression 110 =
-	IndexerExpression : ( Expression : PathExpression "[" Indexer : [ Expression ] "]" )
-
-PathExpression 120 =
-	InvocationExpression : 
+Expression 13 =
+	CallExpression : 
 	( 
-		Expression : PathExpression [ "<" TypeArguments : TypeDeclaration* ">" ]
+		Expression : Expression [ "<" TypeArguments : TypeDeclaration* ">" ]
 			( "(" Arguments : [ Expression ]* ")" ) | ( "=>" Argument : Expression ) 
 	)
 
-PathExpression =
+Expression =
 	"(" Expression ")"
 		| ListSelector
 		| TupleSelector
 		| SetSelector
 		| FunctionSelector
-		| IntervalSelector
 		| IdentifierExpression
 		| IntegerLiteral
 		| DoubleLiteral
@@ -145,6 +128,8 @@ PathExpression =
 		| VoidLiteral : "void"
 		| CaseExpression
 		| IfExpression
+		| TryExpression
+		| ClausedExpression
 
 ListSelector :=
 	"[" Items : [ Expression ]* "]"
@@ -160,9 +145,6 @@ SetSelector :=
 
 FunctionSelector :=
 	Type : FunctionType Expression : ClausedExpression
-
-IntervalSelector :=
-	Begin : Expression ".." End : Expression
 
 IdentifierExpression := 
 	Name : QualifiedIdentifier
@@ -190,6 +172,25 @@ IfExpression :=
 	"if" TestExpression : Expression
         "then" ThenExpression : Expression
         "else" ElseExpression : Expression 
+
+TryExpression :=
+	"try" TryExpression : Expression "catch" CatchExpression : Expression
+
+ClausedExpression :=
+	ForClauses : [ ForClause ]*
+	LetClauses : [ LetClause ]*
+	[ "where" WhereClause : Expression ]
+	[ "order" "(" OrderDimensions : OrderDimension* ")" ]
+	"return" Expression : Expression
+
+ForClause :=
+	"for" Name : QualifiedIdentifier "in" Expression : Expression
+
+LetClause :=
+	"let" Name : QualifiedIdentifier ":=" Expression : Expression
+	
+OrderDimension :=
+	Expression : Expression [ Direction : ( "asc" | "desc" ) ]
 
 PascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''

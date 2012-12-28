@@ -168,10 +168,9 @@ namespace Ancestry.QueryProcessor.Parse
         
         public Expression WhereClause { get; set; }
 
-		private List<OrderDimension> _orderDimensions = new List<OrderDimension>();
-        public List<OrderDimension> OrderDimensions { get { return _orderDimensions; } }
+        public List<OrderDimension> OrderDimensions { get; set; }
 
-        public Expression Expresssion { get; set; }
+        public Expression Expression { get; set; }
     }
 
 	public class ForClause : Statement
@@ -199,7 +198,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class OfExpression : PathExpression
 	{
-		public PathExpression Expression { get; set; }
+		public Expression Expression { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 	}
@@ -227,7 +226,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression Indexer { get; set; }
 	}
 
-	public class InvocationExpression : PathExpression
+	public class CallExpression : PathExpression
 	{
 		public Expression Expression { get; set; }
 
@@ -295,7 +294,7 @@ namespace Ancestry.QueryProcessor.Parse
 	{
 		public string Value { get; set; }
 
-		public TokenType Token { get; set; }
+		public TokenType TokenType { get; set; }
 	}
 
 	public class CaseExpression : PathExpression
@@ -322,6 +321,13 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression ThenExpression { get; set; }
 
 		public Expression ElseExpression { get; set; }
+	}
+
+	public class TryExpression : PathExpression
+	{
+		public Expression TryExpression { get; set; }
+
+		public Expression CatchExpression { get; set; }
 	}
 }
 

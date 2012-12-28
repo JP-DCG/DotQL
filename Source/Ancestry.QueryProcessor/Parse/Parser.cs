@@ -32,1143 +32,538 @@ namespace Ancestry.QueryProcessor.Parse
 				Assignments : [ Assignment ]*
 				Expression : [ ClausedExpression ]
 		*/
-		public Script ParseScript(Lexer lexer)
+		public Script Script(Lexer lexer)
 		{
 			var script = new Script();
 			script.SetPosition(lexer);
 
-			var next = lexer[1];
-			while (next.Type == TokenType.Identifier && next.Token == Keywords.Using)
-				script.Usings.Add(ParseUsing(lexer));
-			while (next.Type == TokenType.Identifier && next.Token == Keywords.Module)
-				script.Modules.Add(ParseModule(lexer));
-			while (next.Type == TokenType.Identifier && next.Token == Keywords.Var)
-				script.Vars.Add(ParseVar(lexer));
-			while (next.Type == TokenType.Identifier && next.Token == Keywords.Set)
-				script.Usings.Add(ParseAssignment(lexer));
-			if (next.Type != TokenType.EOF)
-				script.Expression = ParseClausedExpression(lexer);
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Using)
+				script.Usings.Add(Using(lexer));
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Module)
+				script.Modules.Add(Module(lexer));
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Var)
+				script.Vars.Add(Var(lexer));
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Set)
+				script.Usings.Add(Assignment(lexer));
+			if (lexer[1].Type == TokenType.Symbol)
+				script.Expression = ClausedExpression(lexer);
 
 			if (ErrorIfNotEOF)
-				next.CheckType(TokenType.EOF);
+				lexer[1].CheckType(TokenType.EOF);
 
 			return script;
 		}
 
-		public Using ParseUsing(Lexer lexer)
+		public Using Using(Lexer lexer)
 		{
 			throw new NotImplementedException();
 		}
 
-		public ModuleDeclaration ParseModule(Lexer lexer)
+		public ModuleDeclaration Module(Lexer lexer)
 		{
 			throw new NotImplementedException();
 		}
 
-		public VarDeclaration ParseVar(Lexer lexer)
+		public VarDeclaration Var(Lexer lexer)
 		{
 			throw new NotImplementedException();
 		}
 
-		public Using ParseAssignment(Lexer lexer)
+		public Using Assignment(Lexer lexer)
 		{
 			throw new NotImplementedException();
 		}
 
-		public ClausedExpression ParseClausedExpression(Lexer lexer)
+		public Expression Expression(Lexer lexer)
+		{
+			return OfExpression(lexer);
+		}
+
+		/*
+			ListType | TupleType | SetType | FunctionType | IntervalType | NamedType
+		*/
+		public TypeDeclaration TypeDeclaration(Lexer lexer)
 		{
 			throw new NotImplementedException();
 		}
-		
-		//public Statement ParseStatement(string AInput)
-		//{
-		//	Lexer LLexer = new Lexer(AInput);
-		//	try
-		//	{
-		//		return Statement(LLexer);
-		//	}
-		//	catch (Exception E)
-		//	{
-		//		throw new SyntaxException(LLexer, E);
-		//	}
-		//}
-        
-		///*
-		//	BNF:
-		//	<statement> ::=
-		//		<select statement> |
-		//		<insert statement> |
-		//		<update statement> |
-		//		<delete statement> |
-		//		<expression>
-		//*/
-		//protected Statement Statement(Lexer ALexer)
-		//{
-		//	switch (ALexer.PeekToken(1).AsSymbol)
-		//	{
-		//		case Keywords.Select: return SelectStatement(ALexer);
-		//		case Keywords.Insert: return InsertStatement(ALexer);
-		//		case Keywords.Update: return UpdateStatement(ALexer);
-		//		case Keywords.Delete: return DeleteStatement(ALexer);
-		//		default: return Expression(ALexer);
-		//	}
-		//}
-		
-		///*
-		//	BNF:
-		//	<select statement> ::=
-		//		<query expression>
-		//		[<order by clause>]
-		//*/
-		//protected Statement SelectStatement(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	SelectStatement LStatement = new SelectStatement();
-		//	LStatement.QueryExpression = QueryExpression(ALexer);
-		//	if (ALexer[1].Token == Keywords.Order)
-		//		LStatement.OrderClause = OrderClause(ALexer);
-		//	return LStatement;
-		//}
-		
-		///*
-		//	BNF:
-		//	<order by clause> ::=
-		//		order by <order column expression commalist>
-				
-		//	<order column expression> ::=
-		//		<column identifier> [asc | desc]
-				
-		//	<column identifier> ::=
-		//		<qualified identifier>
-		//*/
-		//protected OrderClause OrderClause(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	ALexer.NextToken().CheckSymbol(Keywords.By);
-		//	OrderClause LClause = new OrderClause();
-		//	while (true)
-		//	{
-		//		LClause.Columns.Add(OrderFieldExpression(ALexer));
-		//		if (ALexer[1].Token == Keywords.ListSeparator)
-		//			ALexer.NextToken();
-		//		else
-		//			break;
-		//	}
-		//	return LClause;
-		//}
-		
-		//protected OrderFieldExpression OrderFieldExpression(Lexer ALexer)
-		//{
-		//	OrderFieldExpression LExpression = new OrderFieldExpression();
-		//	QualifiedFieldExpression(ALexer, LExpression);
-		//	switch (ALexer[1].Token)
-		//	{
-		//		case Keywords.Asc: 
-		//			ALexer.NextToken(); 
-		//			LExpression.Ascending = true; 
-		//		break;
 
-		//		case Keywords.Desc: ALexer.NextToken(); break;
-		//		default: LExpression.Ascending = true; break;
-		//	}
-		//	return LExpression;
-		//}
-		
-		//protected void QualifiedFieldExpression(Lexer ALexer, QualifiedFieldExpression AExpression)
-		//{
-		//	string LIdentifier = Identifier(ALexer);
-		//	if (ALexer[1].Token == Keywords.Qualifier)
-		//	{
-		//		AExpression.TableAlias = LIdentifier;
-		//		ALexer.NextToken();
-		//		AExpression.FieldName = Identifier(ALexer);
-		//	}
-		//	else
-		//		AExpression.FieldName = LIdentifier;
-		//}
+		#region Expression Helpers
 
-		///*
-		//	BNF:
-		//	<query expression> ::=
-		//		<select expression> [<binary table expression>]
+		private void AppendToBinaryExpression(Lexer lexer, Expression expression, LexerToken next, ref BinaryExpression result)
+		{
+			lexer.NextToken();
+			if (result == null)
+			{
+				result = new BinaryExpression();
+				result.SetPosition(lexer);
+				result.Expressions.Add(expression);
+			}
+			result.Operators.Add(BinaryKeywordToOperator(next.Token));
+			result.Expressions.Add(LogicalAndExpression(lexer));
+		}
 
-		//	<binary table expression> ::=
-		//		[union | intersect | minus] <select expression>
-		//*/
-		//protected QueryExpression QueryExpression(Lexer ALexer)
-		//{
-		//	QueryExpression LExpression = new QueryExpression();
-		//	LExpression.SelectExpression = SelectExpression(ALexer);
-		//	bool LDone = false;
-		//	while (!LDone)
-		//	{
-		//		switch (ALexer[1].Token)
-		//		{
-		//			case Keywords.Union:
-		//				ALexer.NextToken();
-		//				ALexer.NextToken();
-		//				LExpression.TableOperators.Add(new TableOperatorExpression(TableOperator.Union, SelectExpression(ALexer)));
-		//			break;
+		public Operator UnaryKeywordToOperator(string keyword)
+		{
+			switch (keyword)
+			{
+				case Keywords.Exists: return Operator.Exists;
+				case Keywords.Negate: return Operator.Negate;
+				case Keywords.Not: return Operator.Not;
+				case Keywords.IsNull: return Operator.IsNull;
+				case Keywords.Successor: return Operator.Successor;
+				case Keywords.Predicessor: return Operator.Predicessor;
+				default: return Operator.Unknown;
+			}
+		}
 
-		//			case Keywords.Intersect:
-		//				ALexer.NextToken();
-		//				ALexer.NextToken();
-		//				LExpression.TableOperators.Add(new TableOperatorExpression(TableOperator.Intersect, SelectExpression(ALexer)));
-		//			break;
+		public Operator BinaryKeywordToOperator(string keyword)
+		{
+			switch (keyword)
+			{
+				case Keywords.In: return Operator.In;
+				case Keywords.Or: return Operator.Or;
+				case Keywords.Xor: return Operator.Xor;
+				case Keywords.Like: return Operator.Like;
+				case Keywords.Matches: return Operator.Matches;
+				case Keywords.And: return Operator.And;
+				case Keywords.Addition: return Operator.Addition;
+				case Keywords.BitwiseAnd: return Operator.BitwiseAnd;
+				case Keywords.BitwiseNot: return Operator.BitwiseNot;
+				case Keywords.BitwiseOr: return Operator.BitwiseOr;
+				case Keywords.BitwiseXor: return Operator.BitwiseXor;
+				case Keywords.Compare: return Operator.Compare;
+				case Keywords.Divide: return Operator.Divide;
+				case Keywords.Equal: return Operator.Equal;
+				case Keywords.Exists: return Operator.Exists;
+				case Keywords.Greater: return Operator.Greater;
+				case Keywords.InclusiveGreater: return Operator.InclusiveGreater;
+				case Keywords.Modulus: return Operator.Modulus;
+				case Keywords.NotEqual: return Operator.NotEqual;
+				case Keywords.InclusiveLess: return Operator.InclusiveLess;
+				case Keywords.Less: return Operator.Less;
+				case Keywords.Multiply: return Operator.Multiply;
+				case Keywords.Power: return Operator.Power;
+				case Keywords.ShiftLeft: return Operator.ShiftLeft;
+				case Keywords.ShiftRight: return Operator.ShiftRight;
+				case Keywords.Subtract: return Operator.Subtract;
+				case Keywords.IfNull: return Operator.IfNull;
+				case Keywords.Dereference: return Operator.Dereference;
+				default: return Operator.Unknown;
+			}
+		}
 
-		//			case Keywords.Minus:
-		//				ALexer.NextToken();
-		//				ALexer.NextToken();
-		//				LExpression.TableOperators.Add(new TableOperatorExpression(TableOperator.Difference, SelectExpression(ALexer)));
-		//			break;
+		public bool NextIsClausedExpression(Lexer lexer)
+		{
+			if (lexer[1].Type == TokenType.Symbol)
+				switch (lexer[1].Token)
+				{
+					case Keywords.For:
+					case Keywords.Let:
+					case Keywords.Order:
+					case Keywords.Where:
+					case Keywords.Return:
+						return true;
+				}
 
-		//			default: 
-		//				LDone = true; 
-		//			break;
-		//		}
-		//	}
+			return false;
+		}
 
-		//	return LExpression;
-		//}
-		
-		///*
-		//	BNF:
-		//	<select expression> ::=
-		//		select * | <column expression commalist>
-		//			[
-		//				<from clause>
-		//				[<where clause>]
-		//				[<group by clause>]
-		//				[<having clause>]
-		//			]
-		//*/
-		//protected SelectExpression SelectExpression(Lexer ALexer)
-		//{
-		//	ALexer[0].CheckSymbol(Keywords.Select);
-		//	SelectExpression LExpression = new SelectExpression();
-		//	LExpression.SelectClause = new SelectClause();
-		//	if (ALexer[1].Token == Keywords.Star)
-		//	{
-		//		ALexer.NextToken();
-		//		LExpression.SelectClause.NonProject = true;
-		//	}
-		//	else
-		//	{
-		//		do
-		//		{
-		//			LExpression.SelectClause.Columns.Add(ColumnExpression(ALexer));
-		//			if (ALexer[1].Token == Keywords.ListSeparator)
-		//				ALexer.NextToken();
-		//			else
-		//				break;
-		//		} while (true);
-		//	}
+		#endregion
 
-		//	if (ALexer[1].Token == Keywords.From)
-		//	{
-		//		LExpression.FromClause = FromClause(ALexer);
-			
-		//		if (ALexer[1].Token == Keywords.Where)
-		//			LExpression.WhereClause = WhereClause(ALexer);
-			
-		//		if (ALexer[1].Token == Keywords.Group)
-		//			LExpression.GroupClause = GroupClause(ALexer);
-				
-		//		if (ALexer[1].Token == Keywords.Having)
-		//			LExpression.HavingClause = HavingClause(ALexer);
-		//	}
-							
-		//	return LExpression;
-		//}
+		/*
+			( Expression : Expression "of" Type : TypeDeclaration )
+		*/
+		public Expression OfExpression(Lexer lexer)
+		{
+			var expression = LogicalBinaryExpression(lexer);
+			if (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Of)
+			{
+				lexer.NextToken();
+				var result = new OfExpression();
+				result.SetPosition(lexer);
+				result.Expression = expression;
+				result.Type = TypeDeclaration(lexer);
+				return result;
+			}
+			return expression;
+		}
 
-		///*
-		//	BNF:
-		//	<column expression> ::=
-		//		<expression> [[as] <identifier>]
-		//*/		
-		//protected ColumnExpression ColumnExpression(Lexer ALexer)
-		//{
-		//	ColumnExpression LExpression = new ColumnExpression();
-		//	LExpression.Expression = Expression(ALexer);
-		//	if (ALexer[1].Token == Keywords.As)
-		//	{
-		//		ALexer.NextToken();
-		//		LExpression.ColumnAlias = Identifier(ALexer);
-		//	}
-		//	else
-		//	{
-		//		if (ALexer[1].Type == TokenType.Symbol && !Keywords.Contains(ALexer[1].Token))
-		//			LExpression.ColumnAlias = Identifier(ALexer);
-		//	}
-					
-		//	return LExpression;
-		//}
+		/*
+			( Expressions : Expression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" | "?" ) )
+		*/
+		public Expression LogicalBinaryExpression(Lexer lexer)
+		{
+			var expression = LogicalAndExpression(lexer);
 
-		///*
-		//	BNF:
-		//	<table specifier> ::=
-		//		(<table identifier> | "("<query expression>")") [as <table identifier>]
-				
-		//	<table identifier> ::=
-		//		<identifier>
-		//*/
-		//protected TableSpecifier TableSpecifier(Lexer ALexer)
-		//{
-		//	TableSpecifier result;
-		//	if (ALexer[1].Token == Keywords.BeginGroup)
-		//	{
-		//		ALexer.NextToken();
-		//		ALexer.NextToken();
-		//		result = new TableSpecifier(QueryExpression(ALexer));
-		//		ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//	}
-		//	else
-		//		result = new TableSpecifier(new TableExpression(QualifiedIdentifier(ALexer)));
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol)
+			{
+				switch (lexer[1].Token)
+				{
+					case Keywords.In:
+					case Keywords.Or:
+					case Keywords.Xor:
+					case Keywords.Like:
+					case Keywords.Matches:
+					case Keywords.IfNull:
+						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						break;
+					default:
+						return result ?? expression;
+				}
+			}
+			return result ?? expression;
+		}
 
-		//	if (ALexer[1].Token == Keywords.As)
-		//	{
-		//		ALexer.NextToken();
-		//		result.TableAlias = Identifier(ALexer);
-		//	} 
-			
-		//	return result;
-		//}
-		 
-		///*
-		//	BNF:
-		//	<from clause> ::=
-		//		from <table specifier> [<join clause list>]
+		/*
+			( Expressions : Expression )^"and"
+		*/
+		public Expression LogicalAndExpression(Lexer lexer)
+		{
+			var expression = BitwiseBinaryExpression(lexer);
 
-		//	<join clause> ::=
-		//		[cross | inner | ((left | right) [outer])] join <table specifier> [on <expression>]
-		//*/
-		//protected AlgebraicFromClause FromClause(Lexer ALexer)
-		//{
-		//	AlgebraicFromClause LFromClause = new AlgebraicFromClause();
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.And)
+				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
 
-		//	LFromClause.TableSpecifier = TableSpecifier(ALexer);
+			return result ?? expression;
+		}
 
-		//	bool LDone = false;
-		//	JoinClause LJoinClause;
-		//	while (!LDone)
-		//	{
-		//		switch (ALexer[1].Token)
-		//		{
-		//			case Keywords.Cross:
-		//				ALexer.NextToken();
-		//				ALexer.NextToken().CheckSymbol(Keywords.Join);
-		//				LJoinClause = new JoinClause();
-		//				LJoinClause.TableSpecifier = TableSpecifier(ALexer);
-		//				LJoinClause.JoinType = JoinType.Cross;
-		//				LFromClause.Joins.Add(LJoinClause);
-		//			break;
-					
-		//			case Keywords.Inner:
-		//			case Keywords.Join:
-		//				if (ALexer[1].Token == Keywords.Inner)
-		//					ALexer.NextToken();
-		//				ALexer.NextToken().CheckSymbol(Keywords.Join);
-		//				LJoinClause = new JoinClause();
-		//				LJoinClause.TableSpecifier = TableSpecifier(ALexer);
-		//				LJoinClause.JoinType = JoinType.Inner;
-		//				ALexer.NextToken().CheckSymbol(Keywords.On);
-		//				LJoinClause.JoinExpression = Expression(ALexer);
-		//				LFromClause.Joins.Add(LJoinClause);
-		//			break;
-					
-		//			case Keywords.Left:
-		//				ALexer.NextToken();
-		//				if (ALexer[1].Token == Keywords.Outer)
-		//					ALexer.NextToken();
-		//				ALexer.NextToken().CheckSymbol(Keywords.Join);
-		//				LJoinClause = new JoinClause();
-		//				LJoinClause.TableSpecifier = TableSpecifier(ALexer);
-		//				LJoinClause.JoinType = JoinType.Left;
-		//				ALexer.NextToken().CheckSymbol(Keywords.On);
-		//				LJoinClause.JoinExpression = Expression(ALexer);
-		//				LFromClause.Joins.Add(LJoinClause);
-		//			break;
+		/*
+			( Expressions : Expression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
+		*/
+		public Expression BitwiseBinaryExpression(Lexer lexer)
+		{
+			var expression = ComparisonExpression(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol)
+			{
+				switch (lexer[1].Token)
+				{
+					case Keywords.BitwiseAnd:
+					case Keywords.BitwiseOr:
+					case Keywords.BitwiseXor:
+					case Keywords.ShiftLeft:
+					case Keywords.ShiftRight:
+						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						break;
+					default:
+						return result ?? expression;
+				}
+			}
+			return result ?? expression;
+		}
+
+		/*
+			( Expressions : Expression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
+		*/
+		public Expression ComparisonExpression(Lexer lexer)
+		{
+			var expression = AdditiveExpression(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol)
+			{
+				switch (lexer[1].Token)
+				{
+					case Keywords.Equal:
+					case Keywords.NotEqual:
+					case Keywords.Less:
+					case Keywords.Greater:
+					case Keywords.InclusiveLess:
+					case Keywords.InclusiveGreater:
+					case Keywords.Compare:
+						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						break;
+					default:
+						return result ?? expression;
+				}
+			}
+			return result ?? expression;
+		}
+
+		/*
+			( Expressions : Expression )^( Operators : ( "+" | "-" ) )
+		*/
+		public Expression AdditiveExpression(Lexer lexer)
+		{
+			var expression = MultiplicativeExpression(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol)
+			{
+				switch (lexer[1].Token)
+				{
+					case Keywords.Addition:
+					case Keywords.Subtract:
+						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						break;
+					default:
+						return result ?? expression;
+				}
+			}
+			return result ?? expression;
+		}
+
+		/*
+			( Expressions : Expression )^( Operators : ( "*" | "/" | "%" | ".." ) )
+		*/
+		public Expression MultiplicativeExpression(Lexer lexer)
+		{
+			var expression = IntervalSelector(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol)
+			{
+				switch (lexer[1].Token)
+				{
+					case Keywords.Multiply:
+					case Keywords.Divide:
+					case Keywords.Modulus:
+						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						break;
+					default:
+						return result ?? expression;
+				}
+			}
+			return result ?? expression;
+		}
+
+		/*
+			Begin : Expression ".." End : Expression
+		*/
+		public Expression IntervalSelector(Lexer lexer)
+		{
+			var expression = ExponentExpression(lexer);
+
+			if (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.IntervalValue)
+			{
+				lexer.NextToken();
+				var result = new IntervalSelector();
+				result.SetPosition(lexer);
+				result.Begin = expression;
+				result.End = Expression(lexer);
+				return result;
+			}
+			return expression;
+		}
+
+		/*
+			( Expressions : Expression )^"**"
+		*/
+		public Expression ExponentExpression(Lexer lexer)
+		{
+			var expression = UnaryExpression(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Power)
+				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+			return result ?? expression;
+		}
+
+		/*
+			Operator : ( "++" | "--" | "-" | "~" | "not" | "exists" | "??" ) Expression : Expression
+		*/
+		public Expression UnaryExpression(Lexer lexer)
+		{
+			var next = lexer[1];
+			if (next.Type == TokenType.Symbol)
+				switch (next.Token)
+				{
+					case Keywords.Predicessor:
+					case Keywords.Successor:
+					case Keywords.Negate:
+					case Keywords.BitwiseNot:
+					case Keywords.Not:
+					case Keywords.Exists:
+					case Keywords.IsNull:
+						lexer.NextToken();
+						var result = new UnaryExpression();
+						result.SetPosition(lexer);
+						result.Operator = UnaryKeywordToOperator(next.Token);
+						result.Expression = DereferenceExpression(lexer);
+						return result;
+				}
+
+			return DereferenceExpression(lexer);
+		}
+
+		/*
+			( Expressions : Expression )^"."
+		*/
+		public Expression DereferenceExpression(Lexer lexer)
+		{
+			var expression = IndexerExpression(lexer);
+
+			BinaryExpression result = null;
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Dereference)
+				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+			return result ?? expression;
+		}
+
+		/*
+			Expression : Expression "[" Indexer : [ Expression ] "]"
+		*/
+		public Expression IndexerExpression(Lexer lexer)
+		{
+			var expression = CallExpression(lexer);
+
+			if (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.BeginIndexer)
+			{
+				lexer.NextToken();
+				var result = new IndexerExpression();
+				result.SetPosition(lexer);
+				result.Expression = expression;
+				result.Indexer = Expression(lexer);
+				lexer.NextToken().CheckSymbol(Keywords.EndIndexer);
+				return result;
+			}
+			return expression;
+		}
+
+		/*
+			Expression : Expression [ "<" TypeArguments : TypeDeclaration* ">" ]
+				( "(" Arguments : [ Expression ]* ")" ) | ( "=>" Argument : Expression ) 
+		*/
+		public Expression CallExpression(Lexer lexer)
+		{
+			var expression = TermExpression(lexer);
+
+			if (lexer[1].Type == TokenType.Symbol)
+			{
+				if (lexer[1].Token == Keywords.BeginGroup)
+				{
+					lexer.NextToken();
+					var result = new CallExpression();
+					result.SetPosition(lexer);
+					result.Expression = expression;
+
+					while (lexer[1].Type == TokenType.Symbol && lexer[1].Token != Keywords.EndGroup)
+						result.Arguments.Add(Expression(lexer));
+
+					lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+					return result;
+				}
+				else if (lexer[1].Token == Keywords.Call)
+				{
+					lexer.NextToken();
+					var result = new CallExpression();
+					result.SetPosition(lexer);
+					result.Expression = expression;
+
+					result.Argument = Expression(lexer);
+
+					return result;
+				}
+			}
+			return expression;
+		}
+
+		public Expression TermExpression(Lexer lexer)
+		{
+			switch (lexer[1].Type)
+			{
+				case TokenType.Symbol:
+					switch (lexer[1].Token)
+					{
+						case Keywords.BeginListSelector: return ListSelector(lexer);
+
+						case Keywords.BeginSet: return ListOrTupleSelector(lexer);
+
+						case Keywords.Function: return FunctionSelector(lexer);
 						
-		//			case Keywords.Right:
-		//				ALexer.NextToken();
-		//				if (ALexer[1].Token == Keywords.Outer)
-		//					ALexer.NextToken();
-		//				ALexer.NextToken().CheckSymbol(Keywords.Join);
-		//				LJoinClause = new JoinClause();
-		//				LJoinClause.TableSpecifier = TableSpecifier(ALexer);
-		//				LJoinClause.JoinType = JoinType.Right;
-		//				ALexer.NextToken().CheckSymbol(Keywords.On);
-		//				LJoinClause.JoinExpression = Expression(ALexer);
-		//				LFromClause.Joins.Add(LJoinClause);
-		//			break;
-					
-		//			default: LDone = true; break;
-		//		}
-		//	}
+						case Keywords.Case: return CaseExpression(lexer);
+						
+						case Keywords.If: return IfExpression(lexer);
+						
+						case Keywords.Try: return TryExpression(lexer);
+						
+						case Keywords.For:
+						case Keywords.Let:
+						case Keywords.Where:
+						case Keywords.Order:
+						case Keywords.Return: return ClausedExpression(lexer);
 
-		//	return LFromClause;
-		//}
-		
-		///*
-		//	BNF:
-		//	<where clause> ::=
-		//		where <expression>
-		//*/
-		//protected WhereClause WhereClause(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	return new WhereClause(Expression(ALexer));
-		//}
-		
-		///*
-		//	BNF:
-		//	<group by clause> ::=
-		//		group by <expression commalist>
-		//*/
-		//protected GroupClause GroupClause(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	ALexer.NextToken().CheckSymbol(Keywords.By);
-		//	GroupClause LGroupClause = new GroupClause();
-		//	do
-		//	{
-		//		LGroupClause.Columns.Add(Expression(ALexer));
-		//		if (ALexer[1].Token == Keywords.ListSeparator)
-		//			ALexer.NextToken();
-		//		else
-		//			break;
-		//	} while (true);
-		//	return LGroupClause;
-		//}
-		
-		///*
-		//	BNF:
-		//	<having clause> ::=
-		//		having <expression>
-		//*/
-		//protected HavingClause HavingClause(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	return new HavingClause(Expression(ALexer));
-		//}
-		
-		///*
-		//	BNF:
-		//	<insert statement> ::=
-		//		insert into <table identifier>"("<column identifier commalist>")"
-		//			(<values clause> | <query expression>)
-					
-		//	<values clause> ::=
-		//		values"("<expression commalist>")"
-		//*/
-		//protected Statement InsertStatement(Lexer ALexer)
-		//{
-		//	ALexer.NextToken();
-		//	ALexer.NextToken().CheckSymbol(Keywords.Into);
-		//	InsertStatement LStatement = new InsertStatement();
-		//	LStatement.InsertClause = new InsertClause();
-		//	LStatement.InsertClause.TableExpression = new TableExpression(QualifiedIdentifier(ALexer));
-		//	ALexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-		//	do
-		//	{
-		//		LStatement.InsertClause.Columns.Add(new InsertFieldExpression(Identifier(ALexer)));
-		//		if (ALexer[1].Token == Keywords.ListSeparator)
-		//			ALexer.NextToken();
-		//		else
-		//			break;
-		//	} while (true);
-		//	ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//	if (ALexer[1].Token == Keywords.Values)
-		//	{
-		//		ValuesExpression LValues = new ValuesExpression();
-		//		ALexer.NextToken();							   
-		//		ALexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-		//		do
-		//		{
-		//			LValues.Expressions.Add(Expression(ALexer));
-		//			if (ALexer[1].Token == Keywords.ListSeparator)
-		//				ALexer.NextToken();
-		//			else
-		//				break;
-		//		} while (true);
-		//		ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//		LStatement.Values = LValues;
-		//	}
-		//	else
-		//	{
-		//		ALexer.NextToken();
-		//		LStatement.Values = QueryExpression(ALexer);
-		//	}
+						case Keywords.Null:
+						case Keywords.Void:
+						case Keywords.True:
+						case Keywords.False: return LiteralExpression(lexer);
+						
+						default: return IdentifierExpression(lexer);
+					}
+				case TokenType.Integer:
+				case TokenType.Double:
+				case TokenType.String:
+				case TokenType.Char:
+				case TokenType.Date:
+				case TokenType.DateTime:
+				case TokenType.Guid:
+				case TokenType.Hex:
+				case TokenType.Time:
+				case TokenType.TimeSpan:
+				case TokenType.Version: return LiteralExpression(lexer);
+			}
+		}
 
-		//	return LStatement;
-		//}
-		
-		///*
-		//	BNF:
-		//	<update statement> ::=
-		//		update <table identifier> 
-		//				set <update column expression commalist>
-		//			[<where clause>]
-		//*/
-		//protected Statement UpdateStatement(Lexer ALexer)
-		//{
-		//	UpdateStatement LStatement = new UpdateStatement();
-		//	ALexer.NextToken();
-		//	LStatement.UpdateClause = new UpdateClause();
-		//	LStatement.UpdateClause.TableExpression = new TableExpression(QualifiedIdentifier(ALexer));
-		//	ALexer.NextToken().CheckSymbol(Keywords.Set);
-		//	do
-		//	{
-		//		LStatement.UpdateClause.Columns.Add(UpdateColumnExpression(ALexer));
-		//		if (ALexer[1].Token == Keywords.ListSeparator)
-		//			ALexer.NextToken();
-		//		else
-		//			break;
-		//	} while (true);
-		//	if (ALexer[1].Token == Keywords.Where)
-		//		LStatement.WhereClause = WhereClause(ALexer);
-		//	return LStatement;
-		//}
-		
-		///*
-		//	BNF:
-		//	<update column expression> ::=
-		//		<identifier> = <expression>
-		//*/
-		//protected UpdateFieldExpression UpdateColumnExpression(Lexer ALexer)
-		//{
-		//	UpdateFieldExpression LExpression = new UpdateFieldExpression();
-		//	LExpression.FieldName = Identifier(ALexer);
-		//	ALexer.NextToken().CheckSymbol(Keywords.Equal);
-		//	LExpression.Expression = Expression(ALexer);
-		//	return LExpression;
-		//}
-		
-		///*
-		//	BNF:
-		//	<delete statement> ::=
-		//		delete <table identifier>
-		//			[<where clause>]
-		//*/
-		//protected Statement DeleteStatement(Lexer ALexer)
-		//{
-		//	DeleteStatement LStatement = new DeleteStatement();
-		//	ALexer.NextToken();
-		//	LStatement.DeleteClause = new DeleteClause();
-		//	LStatement.DeleteClause.TableExpression = new TableExpression(QualifiedIdentifier(ALexer));
-		//	if (ALexer[1].Token == Keywords.Where)
-		//		LStatement.WhereClause = WhereClause(ALexer);
-		//	return LStatement;
-		//}
-		
-		//protected bool IsLogicalOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.In: 
-		//		case Keywords.Or:
-		//		case Keywords.Xor:
-		//		case Keywords.Like: 
-		//		case Keywords.Matches: 
-		//		case Keywords.Between: return true;
-		//		default: return false;
-		//	}
-		//}
-        
-		///*
-		//	BNF:
-		//	<expression> ::=
-		//		<logical and expression> <logical operator clause list>
-                
-		//	<logical operator clause> ::=
-		//		<logical ternary clause> |
-		//		<logical binary clause>
-				
-		//	<logical ternary clause> ::=
-		//		<logical ternary operator> <additive expression> and <additive expression>
-				
-		//	<logical ternary operator> ::=
-		//		between
-                
-		//	<logical binary clause> ::=
-		//		<logical binary operator> <logical and expression>
-                
-		//	<logical binary operator> ::=
-		//		in | or | xor | like | matches
-		//*/
-		//protected Expression Expression(Lexer ALexer)
-		//{
-		//	Expression LExpression = LogicalAndExpression(ALexer);
-		//	while (IsLogicalOperator(ALexer[1].Token))
-		//	{
-		//		if (ALexer[1].Token == Keywords.Between)
-		//		{
-		//			ALexer.NextToken();
-		//			BetweenExpression LBetweenExpression = new BetweenExpression();
-		//			LBetweenExpression.Expression = LExpression;
-		//			LBetweenExpression.LowerExpression = AdditiveExpression(ALexer);
-		//			ALexer.NextToken().CheckSymbol(Keywords.And);
-		//			LBetweenExpression.UpperExpression = AdditiveExpression(ALexer);
-		//			LExpression = LBetweenExpression;
-		//		}
-		//		else
-		//		{
-		//			BinaryExpression LBinaryExpression = new BinaryExpression();
-		//			LBinaryExpression.LeftExpression = LExpression;
-		//			switch (ALexer.NextToken().Token)
-		//			{
-		//				case Keywords.In: LBinaryExpression.Operator = Operator.In; break;
-		//				case Keywords.Or: LBinaryExpression.Operator = Operator.Or; break;
-		//				case Keywords.Xor: LBinaryExpression.Operator = Operator.Xor; break;
-		//				case Keywords.Like: LBinaryExpression.Operator = Operator.Like; break;
-		//				case Keywords.Matches: LBinaryExpression.Operator = Operator.Matches; break;
-		//			}
-		//			LBinaryExpression.RightExpression = LogicalAndExpression(ALexer);
-		//			LExpression = LBinaryExpression;
-		//		}
-		//	}
-		//	return LExpression;
-		//}
-		
-		///* 
-		//	BNF:
-		//	<logical and expression> ::= 
-		//		<bitwise binary expression> {<logical and operator> <bitwise binary expression>}
-                
-		//	<logical and operator> ::=
-		//		and
-		//*/
-		//protected Expression LogicalAndExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = BitwiseBinaryExpression(ALexer);
-		//	while (ALexer[1].Token == Keywords.And)
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		ALexer.NextToken();
-		//		LBinaryExpression.Operator = Operator.And;
-		//		LBinaryExpression.RightExpression = BitwiseBinaryExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
-        
-		//protected bool IsBitwiseBinaryOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.BitwiseOr:
-		//		case Keywords.BitwiseAnd:
-		//		case Keywords.BitwiseXor:
-		//		case Keywords.ShiftLeft:
-		//		case Keywords.ShiftRight: return true;
-		//		default: return false;
-		//	}
-		//}
-        
-		///* 
-		//	BNF:
-		//	<bitwise binary expression> ::= 
-		//		<comparison expression> {<bitwise binary operator> <comparison expression>}
-                
-		//	<bitwise binary operator> ::=
-		//		^ | & | "|" | "<<" | ">>"
-		//*/
-		//protected Expression BitwiseBinaryExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = ComparisonExpression(ALexer);
-		//	while (IsBitwiseBinaryOperator(ALexer[1].Token))
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		switch (ALexer.NextToken().Token)
-		//		{
-		//			case Keywords.BitwiseXor: LBinaryExpression.Operator = Operator.BitwiseXor; break;
-		//			case Keywords.BitwiseAnd: LBinaryExpression.Operator = Operator.BitwiseAnd; break;
-		//			case Keywords.BitwiseOr: LBinaryExpression.Operator = Operator.BitwiseOr; break;
-		//			case Keywords.ShiftLeft: LBinaryExpression.Operator = Operator.ShiftLeft; break;
-		//			case Keywords.ShiftRight: LBinaryExpression.Operator = Operator.ShiftRight; break;
-		//		}
-		//		LBinaryExpression.RightExpression = ComparisonExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
-        
-		//protected bool IsComparisonOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.Equal:
-		//		case Keywords.NotEqual:
-		//		case Keywords.Less:
-		//		case Keywords.Greater:
-		//		case Keywords.InclusiveLess:
-		//		case Keywords.InclusiveGreater: 
-		//		case Keywords.Compare: return true;
-		//		default: return false;
-		//	}
-		//}
-        
-		///* 
-		//	BNF:
-		//	<comparison expression> ::= 
-		//		<additive expression> {<comparison operator> <additive expression>}
-                
-		//	<comparison operator> ::=
-		//		= | "<>" | "<" | ">" | "<=" | ">=" | ?=
-		//*/
-		//protected Expression ComparisonExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = AdditiveExpression(ALexer);
-		//	while (IsComparisonOperator(ALexer[1].Token))
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		switch (ALexer.NextToken().Token)
-		//		{
-		//			case Keywords.Equal: LBinaryExpression.Operator = Operator.Equal; break;
-		//			case Keywords.NotEqual: LBinaryExpression.Operator = Operator.NotEqual; break;
-		//			case Keywords.Less: LBinaryExpression.Operator = Operator.Less; break;
-		//			case Keywords.Greater: LBinaryExpression.Operator = Operator.Greater; break;
-		//			case Keywords.InclusiveLess: LBinaryExpression.Operator = Operator.InclusiveLess; break;
-		//			case Keywords.InclusiveGreater: LBinaryExpression.Operator = Operator.InclusiveGreater; break;
-		//			case Keywords.Compare: LBinaryExpression.Operator = Operator.Compare; break;
-		//		}
-		//		LBinaryExpression.RightExpression = AdditiveExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
-       
-		//protected bool IsAdditiveOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.Addition:
-		//		case Keywords.Subtraction: return true;
-		//		default: return false;
-		//	}
-		//}
-        
-		///* 
-		//	BNF:
-		//	<additive expression> ::= 
-		//		<multiplicative expression> {<additive operator> <multiplicative expression>}
-                
-		//	<additive operator> ::=
-		//		+ | -
-		//*/
-		//protected Expression AdditiveExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = MultiplicativeExpression(ALexer);
-		//	while (IsAdditiveOperator(ALexer[1].Token))
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		switch (ALexer.NextToken().Token)
-		//		{
-		//			case Keywords.Addition: LBinaryExpression.Operator = Operator.Addition; break;
-		//			case Keywords.Subtraction: LBinaryExpression.Operator = Operator.Subtraction; break;
-		//		}
-		//		LBinaryExpression.RightExpression = MultiplicativeExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
-        
-		//protected bool IsMultiplicativeOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.Multiplication:
-		//		case Keywords.Division:
-		//		case Keywords.Div:
-		//		case Keywords.Mod: return true;
-		//		default: return false;
-		//	}
-		//}
+		public Expression LiteralExpression(Lexer lexer)
+		{
+			lexer.NextToken();
+			var result = new LiteralExpression { TokenType = lexer[0].Type, Value = lexer[0].Token };
+			result.SetPosition(lexer);
+			return result;
+		}
 
-		///*                 
-		//	BNF:
-		//	<multiplicative expression> ::= 
-		//		<exponent expression> {<multiplicative operator> <exponent expression>}
-                
-		//	<multiplicative operator> ::=
-		//		* | / | div | mod
-		//*/
-		//protected Expression MultiplicativeExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = ExponentExpression(ALexer);
-		//	while (IsMultiplicativeOperator(ALexer[1].Token))
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		switch (ALexer.NextToken().Token)
-		//		{
-		//			case Keywords.Multiplication: LBinaryExpression.Operator = Operator.Multiplication; break;
-		//			case Keywords.Division: LBinaryExpression.Operator = Operator.Division; break;
-		//			case Keywords.Div: LBinaryExpression.Operator = Operator.Div; break;
-		//			case Keywords.Mod: LBinaryExpression.Operator = Operator.Mod; break;
-		//		}
-		//		LBinaryExpression.RightExpression = ExponentExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
+		/*
+			ForClauses : [ ForClause ]*
+			LetClauses : [ LetClause ]*
+			[ "where" WhereClause : Expression ]
+			[ "order" "(" OrderDimensions : OrderDimension* ")" ]
+			"return" Expression : Expression
+		*/
+		public ClausedExpression ClausedExpression(Lexer lexer)
+		{
+			var result = new ClausedExpression();
+			result.SetPosition(lexer);
 
-		///* 
-		//	BNF:
-		//	<exponent expression> ::= 
-		//		<unary expression> {<exponent operator> <unary expression>}
-                
-		//	<exponent operator> ::=
-		//		**
-		//*/
-		//protected Expression ExponentExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = UnaryExpression(ALexer);
-		//	while (ALexer[1].Token == Keywords.Power)
-		//	{
-		//		BinaryExpression LBinaryExpression = new BinaryExpression();
-		//		LBinaryExpression.LeftExpression = LExpression;
-		//		ALexer.NextToken();
-		//		LBinaryExpression.Operator = Operator.Power;
-		//		LBinaryExpression.RightExpression = UnaryExpression(ALexer);
-		//		LExpression = LBinaryExpression;
-		//	}
-		//	return LExpression;
-		//}
-        
-		//protected bool IsUnaryOperator(string AOperator)
-		//{
-		//	switch (AOperator)
-		//	{
-		//		case Keywords.Addition: 
-		//		case Keywords.Subtraction:
-		//		case Keywords.BitwiseNot: 
-		//		case Keywords.Not:
-		//		case Keywords.Exists: return true;
-		//		default: return false;
-		//	}
-		//}
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.For)
+				result.ForClauses.Add(ForClause(lexer));
+			while (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Let)
+				result.LetClauses.Add(LetClause(lexer));
+			if (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Where)
+				result.WhereClause = Expression(lexer);
+			if (lexer[1].Type == TokenType.Symbol && lexer[1].Token == Keywords.Order)
+				result.OrderDimensions = OrderDimensions(lexer);
+			lexer[1].CheckSymbol(Keywords.Return);
+			result.Expression = Expression(lexer);
 
-		///* 
-		//	BNF:
-		//	<unary expression> ::=
-		//		{<unary operator>} <qualified factor>
-				
-		//	<unary operator> ::=
-		//		+ | - | ~ | not | exists
-		//*/
-		//protected Expression UnaryExpression(Lexer ALexer)
-		//{
-		//	if (IsUnaryOperator(ALexer[1].Token))
-		//	{
-		//		switch (ALexer.NextToken().Token)
-		//		{
-		//			case Keywords.Addition: return UnaryExpression(ALexer);
-		//			case Keywords.Subtraction: return new UnaryExpression(Operator.Negate, UnaryExpression(ALexer));
-		//			case Keywords.BitwiseNot: return new UnaryExpression(Operator.BitwiseNot, UnaryExpression(ALexer));
-		//			case Keywords.Not: return new UnaryExpression(Operator.Not, UnaryExpression(ALexer));
-		//			case Keywords.Exists: return new UnaryExpression(Operator.Exists, UnaryExpression(ALexer));
-		//		}
-		//	}
-		//	return QualifiedFactor(ALexer);
-		//}
-        
-		///* 
-		//	BNF:
-		//	<qualified factor> ::=
-		//		(([.]<identifier>) | <qualifier expression>){"["<expression>"]"[.<qualifier expression>]}
-		//*/
-		//protected Expression QualifiedFactor(Lexer ALexer)
-		//{
-		//	Expression LExpression;
-		//	if (ALexer[1].Token == Keywords.Qualifier)
-		//	{
-		//		ALexer.NextToken();
-		//		LExpression = new IdentifierExpression(String.Format("{0}{1}", Keywords.Qualifier, Identifier(ALexer)));
-		//	}
-		//	else
-		//		LExpression = QualifierExpression(ALexer);
-				
-		//	while (ALexer[1].Token == Keywords.BeginIndexer)
-		//	{
-		//		IndexerExpression LIndexerExpression = new IndexerExpression();
-		//		LIndexerExpression.SetPosition(ALexer);
-		//		LIndexerExpression.Expression = LExpression;
-		//		ALexer.NextToken();
-		//		LIndexerExpression.Indexer = Expression(ALexer);
-		//		ALexer.NextToken().CheckSymbol(Keywords.EndIndexer);
-		//		LExpression = LIndexerExpression;
-				
-		//		if (ALexer[1].Token == Keywords.Qualifier)
-		//		{
-		//			ALexer.NextToken();
-		//			QualifierExpression LQualifierExpression = new QualifierExpression();
-		//			LQualifierExpression.SetPosition(ALexer);
-		//			LQualifierExpression.LeftExpression = LExpression;
-		//			LQualifierExpression.RightExpression = QualifierExpression(ALexer);
-		//			LExpression = LQualifierExpression;
-		//		}
-		//	}
+			return result;
+		}
 
-		//	return LExpression;
-		//}
-        
-		///*
-		//	BNF:
-		//	<qualifier expression> ::=
-		//		<factor>[.<qualifier expression>]
-		//*/
-		//protected Expression QualifierExpression(Lexer ALexer)
-		//{
-		//	Expression LExpression = Factor(ALexer);
-		//	if (ALexer[1].Token == Keywords.Qualifier)
-		//	{
-		//		ALexer.NextToken();
-		//		QualifierExpression LQualifierExpression = new QualifierExpression();
-		//		LQualifierExpression.SetPosition(ALexer);
-		//		LQualifierExpression.LeftExpression = LExpression;
-		//		LQualifierExpression.RightExpression = QualifierExpression(ALexer);
-		//		return LQualifierExpression;
-		//	}
-		//	return LExpression;
-		//}
-        
-		//protected bool IsAggregateOperator(string AIdentifier)
-		//{
-		//	switch (AIdentifier)
-		//	{
-		//		case Keywords.Sum:
-		//		case Keywords.Min:
-		//		case Keywords.Max:
-		//		case Keywords.Avg:
-		//		case Keywords.Count:
-		//			return true;
-					
-		//		default:
-		//			return false;
-		//	}
-		//}
+		/*
+			"let" Name : QualifiedIdentifier ":=" Expression : Expression
+		*/
+		public LetClause LetClause(Lexer lexer)
+		{
+			throw new NotImplementedException();
+		}
 
-		///* 
-		//	BNF:
-		//	<factor> ::= 
-		//		"("<expression>")" |
-		//		[table]"("<query expression>")" |
-		//		<literal> |
-		//		<identifier> |
-		//		<identifier>"("<actual parameter commalist>")" |
-		//		<identifier>"("[distinct] <expression>")" |
-		//		<case expression>
-		//*/
-		//protected Expression Factor(Lexer ALexer)
-		//{
-		//	if (ALexer[1].Type != TokenType.Symbol)
-		//		switch (ALexer.NextToken().Type)
-		//		{
-		//			case TokenType.Boolean: return new ValueExpression(ALexer[0].AsBoolean, TokenType.Boolean); 
-		//			case TokenType.Integer: return new ValueExpression(ALexer[0].AsInteger, TokenType.Integer); 
-		//			case TokenType.Hex: return new ValueExpression(ALexer[0].AsHex, TokenType.Hex);
-		//			case TokenType.Float: return new ValueExpression(ALexer[0].AsFloat, TokenType.Float);
-		//			case TokenType.Decimal: return new ValueExpression(ALexer[0].AsDecimal, TokenType.Decimal); 
-		//			case TokenType.Money: return new ValueExpression(ALexer[0].AsMoney, TokenType.Money);
-		//			case TokenType.String: return new ValueExpression(ALexer[0].AsString, TokenType.String); 
-		//			default: throw new ParserException(ParserException.Codes.UnknownTokenType, Enum.GetName(typeof(TokenType), ALexer[0].Type));
-		//		}
-		//	else
-		//	{
-		//		// Table valued expression
-		//		if (ALexer[1].Token == Keywords.Table)
-		//		{
-		//			ALexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-		//			ALexer.NextToken();
-		//			var LExpression = new TableValuedExpression { QueryExpression = QueryExpression(ALexer) };
-		//			ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//			return LExpression;
-		//		}					
+		/*
+			"for" Name : QualifiedIdentifier "in" Expression : Expression
+		*/
+		public ForClause ForClause(Lexer lexer)
+		{
+			throw new NotImplementedException();
+		}
 
-		//		switch (ALexer[1].Token)
-		//		{
-		//			case Keywords.BeginGroup:
-		//				ALexer.NextToken();
-		//				Expression LExpression;
-		//				if (ALexer[1].Token == Keywords.Select)
-		//				{
-		//					ALexer.NextToken();
-		//					LExpression = QueryExpression(ALexer);
-		//				}
-		//				else
-		//					LExpression = Expression(ALexer);
-		//				ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//				return LExpression;
-                        
-		//			case Keywords.Case: return CaseExpression(ALexer);
+		/*
+			( Expression : Expression [ Direction : ( "asc" | "desc" ) ] )*
+		*/
+		public List<OrderDimension> OrderDimensions(Lexer lexer)
+		{
+			throw new NotImplementedException();
+		}
 
-		//			default:
-		//			{
-		//				string LIdentifier = Identifier(ALexer);
-		//				switch (ALexer[1].Token)
-		//				{
-		//					case Keywords.BeginGroup: 
-		//						if (IsAggregateOperator(LIdentifier))
-		//							return AggregateCallExpression(ALexer, LIdentifier);
-		//						else
-		//							return CallExpression(ALexer, LIdentifier);
-		//					default: return new IdentifierExpression(LIdentifier);
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
-        
-		//protected Expression AggregateCallExpression(Lexer ALexer, string AIdentifier)
-		//{
-		//	AggregateCallExpression LCallExpression = new AggregateCallExpression();
-		//	LCallExpression.Identifier = AIdentifier;
-		//	ALexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-		//	if (ALexer[1].Token == Keywords.Distinct)
-		//	{
-		//		ALexer.NextToken();
-		//		LCallExpression.IsDistinct = true;
-		//	}
-			
-		//	if (ALexer[1].Token == Keywords.Star)
-		//	{
-		//		ALexer.NextToken();
-		//		LCallExpression.IsRowLevel = true;
-		//	}
-		//	else
-		//		LCallExpression.Expressions.Add(Expression(ALexer));
-		//	ALexer.NextToken().CheckSymbol(Keywords.EndGroup);
-		//	return LCallExpression;
-		//}
-
-		//protected Expression CallExpression(Lexer ALexer, string AIdentifier)
-		//{
-		//	CallExpression LCallExpression = new CallExpression();
-		//	LCallExpression.Identifier = AIdentifier;
-		//	ALexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-		//	if (ALexer[1].Token != Keywords.EndGroup)
-		//	{
-		//		bool LDone = false;
-		//		do
-		//		{
-		//			LCallExpression.Expressions.Add(ActualParameter(ALexer));
-		//			if (ALexer.NextToken().Type == TokenType.Symbol)
-		//			{
-		//				switch (ALexer[0].AsSymbol)
-		//				{
-		//					case Keywords.ListSeparator: break;
-		//					case Keywords.EndGroup: LDone = true; break;
-		//					default: throw new ParserException(ParserException.Codes.GroupTerminatorExpected);
-		//				}
-		//			}
-		//			else
-		//				throw new ParserException(ParserException.Codes.GroupTerminatorExpected);
-		//		}
-		//		while (!LDone);
-		//	}
-		//	else
-		//		ALexer.NextToken();
-		//	return LCallExpression;
-		//}
-		
-		///*
-		//	BNF:
-		//	<actual parameter> ::=
-		//		[var] <expression>
-		//*/		
-		//protected Expression ActualParameter(Lexer ALexer)
-		//{
-		//	Expression LExpression;
-		//	switch (ALexer[1].Token)
-		//	{
-		//		case Keywords.Var:
-		//			ALexer.NextToken();
-		//			LExpression = new ParameterExpression(Modifier.Var, Expression(ALexer));
-		//		break;
-					
-		//		default:
-		//			LExpression = Expression(ALexer);
-		//		break;
-		//	}
-
-		//	return LExpression;
-		//}
-		
-		///* 
-		//	BNF:
-		//	<case expression> ::=
-		//		case [<expression>]
-		//			<ne case item expression commalist>
-		//			else <expression>
-		//		end
-                
-		//	<case item expression> ::=
-		//		when <expression> then <expression>
-		//*/
-		//protected CaseExpression CaseExpression(Lexer ALexer)
-		//{
-		//	ALexer.NextToken().CheckSymbol(Keywords.Case);
-		//	CaseExpression LCaseExpression = new CaseExpression();
-		//	if (!(ALexer[1].Token == Keywords.When))
-		//		LCaseExpression.Expression = Expression(ALexer);
-		//	bool LDone = false;
-		//	do
-		//	{
-		//		LCaseExpression.CaseItems.Add(CaseItemExpression(ALexer));
-		//		switch (ALexer[1].AsSymbol)
-		//		{
-		//			case Keywords.When: break;
-		//			case Keywords.Else: 
-		//				LCaseExpression.ElseExpression = CaseElseExpression(ALexer);
-		//				LDone = true;
-		//				break;
-		//			default: throw new ParserException(ParserException.Codes.CaseItemExpressionExpected);
-		//		}
-		//	}
-		//	while (!LDone);
-		//	ALexer.NextToken().CheckSymbol(Keywords.End);
-		//	return LCaseExpression;
-		//}
-        
-		//protected CaseItemExpression CaseItemExpression(Lexer ALexer)
-		//{
-		//	ALexer.NextToken().CheckSymbol(Keywords.When);
-		//	CaseItemExpression LExpression = new CaseItemExpression();
-		//	LExpression.WhenExpression = Expression(ALexer);
-		//	ALexer.NextToken().CheckSymbol(Keywords.Then);
-		//	LExpression.ThenExpression = Expression(ALexer);
-		//	return LExpression;
-		//}
-        
-		//protected CaseElseExpression CaseElseExpression(Lexer ALexer)
-		//{
-		//	ALexer.NextToken().CheckSymbol(Keywords.Else);
-		//	return new CaseElseExpression(Expression(ALexer));
-		//}
-        
-		///* 
-		//	BNF:
-		//	<qualified identifier> ::=
-		//		[.]{<identifier>.}<identifier>
-		//*/        
-		//protected string QualifiedIdentifier(Lexer ALexer)
-		//{
-		//	StringBuilder LIdentifier = new StringBuilder();
-		//	if (ALexer[1].Token == Keywords.Qualifier)
-		//		LIdentifier.Append(ALexer.NextToken().Token);
-
-		//	LIdentifier.Append(Identifier(ALexer));
-		//	while (ALexer[1].Token == Keywords.Qualifier)
-		//		LIdentifier.AppendFormat("{0}{1}", ALexer.NextToken().Token, Identifier(ALexer));
-
-		//	return LIdentifier.ToString();
-		//}
-        
 		//protected bool IsValidIdentifier(string AIdentifier)
 		//{
 		//	for (int LIndex = 0; LIndex < AIdentifier.Length; LIndex++)
@@ -1205,11 +600,6 @@ namespace Ancestry.QueryProcessor.Parse
 		//	return ALexer[0].Token;
 		//}
 
-
-		public BaseType ParseTypeDeclaration(Lexer lexer)
-		{
-			throw new NotImplementedException();
-		}
 	}
 }
 

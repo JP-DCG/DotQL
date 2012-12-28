@@ -8,20 +8,21 @@ namespace Ancestry.QueryProcessor.Parse
 {
 	public enum Operator
 	{
+		Unknown,
 		In,
 		Or,
 		Xor,
 		Like,
 		Matches,
 		And,
-		Add,
+		Addition,
 		BitwiseAnd,
 		BitwiseNot,
 		BitwiseOr,
 		BitwiseXor,
 		Compare,
 		Divide,
-		Equals,
+		Equal,
 		Exists,
 		Greater,
 		InclusiveGreater,
@@ -38,6 +39,8 @@ namespace Ancestry.QueryProcessor.Parse
 		Subtract,
 		IsNull,
 		IfNull,
-		Dereference
+		Dereference,
+		Successor,
+		Predicessor
 	}
 }

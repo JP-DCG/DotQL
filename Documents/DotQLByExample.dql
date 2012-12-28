@@ -88,7 +88,7 @@ return i
 
 // Order specifies result ordering:
 for i in 1..3
-order i desc
+order (i desc)
 return i
 // returns [3 2 1]
 
@@ -180,13 +180,13 @@ return { ID: a.ID }
 
 // Ordering always produces lists rather than sets (not for distinct purposes but for representing sequence):
 for a in Person(ID = 123).Attributes
-order a.ID
+order (a.ID)
 return { ID: a.ID }
 // e.g. [{ ID: 456 } { ID: 457 } ...]
 
 // Per the Relational Model, there is an implicit key over all attributes, so the following results in a list:
 for a in Attributes
-order a.Type
+order (a.Type)
 return { Type: a.Type }
 // e.g. [{ Type: "EB" } { Type: "EM" } ...]
 
@@ -245,7 +245,7 @@ return ([] of Integer)[0] ? 5;
 // Note: out of range list extraction results in null, not error
 
 // Determining null:
-return Name[ID = 1212][].Prefix ??
+return ??Name[ID = 1212][].Prefix
 // e.g. true if null either because there was no such row, or there was a row but the prefix wasn't present
 
 // Tuple with optional attribute
@@ -259,7 +259,7 @@ for p in Person
 let orderedn :=
 	for n in p.Attributes.Name
 	let ap := n.Attribute.Priority
-	order ap.Priority ? 0 desc n.ID
+	order (ap.Priority ? 0 desc n.ID)
 	return n
 let pn := orderedn(Index = 0)
 return { PersonID: p.ID  First: pn.First Last: pn.Last }
@@ -271,11 +271,11 @@ let PreferredName := function(PersonID: Long): Name.MemberType
 	let orderedn :=
 		for n in Attributes(PersonID = args.PersonID).Name
 		let ap := n.Attribute.Priority
-		order ap.Priority ?? 0 desc n.ID
+		order (ap.Priority ? 0 desc n.ID)
 		return n
 	return orderedn[0]
 
-// Function usage:
+// Calling Functions:
 for p in Person
 let pn := PreferredName(p.ID)
 return { ID: p.ID FName: pn.First LName: pn.Last  }
@@ -616,7 +616,7 @@ return ToList({ 2 1 3 })
 
 // Ordered conversion from set to list:
 for i in { 2 3 1 }
-order i	desc
+order (i desc)
 return i
 // result: [3 2 1]
 
