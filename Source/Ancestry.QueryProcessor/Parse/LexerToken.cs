@@ -85,5 +85,17 @@ namespace Ancestry.QueryProcessor.Parse
 			if ((Type != TokenType.Symbol) || !String.Equals(Token, symbol, StringComparison.Ordinal))
 				throw new LexerException(LexerException.Codes.SymbolExpected, symbol);
 		}
+
+		[System.Diagnostics.Conditional("DEBUG")]
+		public void DebugCheckSymbol(string symbol)
+		{
+			CheckSymbol(symbol);
+		}
+
+		/// <summary> Return true if the token's type is Symbol it matches the given symbol. </summary>
+		public bool IsSymbol(string symbol)
+		{
+			return Type == TokenType.Symbol && Token == symbol;
+		}
 	}
 }

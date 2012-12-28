@@ -19,7 +19,7 @@ namespace Ancestry.QueryProcessor
 			_defaultOptions = defaultOptions;
 		}
 
-		public void Execute(string text, JObject args = null, QueryOptions options = null, JObject argTypes = null)
+		public void Execute(string text, JObject args = null, QueryOptions options = null)
 		{
 			var actualOptions = options ?? _defaultOptions;
 			var token = new CancellationTokenSource();
@@ -29,19 +29,19 @@ namespace Ancestry.QueryProcessor
 				{
 					// Parse
 					var parser = new Parser();
-					var script = Parser.ParseFrom(parser.ParseScript, text);
+					var script = Parser.ParseFrom(parser.Script, text);
 
 					// Plan
-					var fullArgumentTypes = JsonInterop.InferArgumentTypes(args, argTypes);
 					var planner = new Planner();
-					var plan = planner.PlanScript(script, fullArgumentTypes, actualOptions);
+					var plan = planner.PlanScript(script, actualOptions);
 					
 					// Compile
 					var compiler = new Compiler();
 					var executable = compiler.CreateExecutable(plan);
 					
 					// Run
-					executable(args, token.Token);
+					executable.SetArgs(JsonInterop.JsonArgsToNative(args));
+					executable.Run(token.Token);
 				}),
 				token.Token
 			);

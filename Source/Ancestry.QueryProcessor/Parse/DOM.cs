@@ -21,16 +21,23 @@ namespace Ancestry.QueryProcessor.Parse
 		public ClausedExpression Expression { get; set; }
 	}
 
+	public struct QualifiedIdentifier
+	{
+		public bool IsRooted;
+		public string[] Components;
+	}
+
+
 	public class Using : Statement
 	{
-		public string Alias { get; set; }
+		public QualifiedIdentifier Alias { get; set; }
 		
-		public string Target { get; set; }
+		public QualifiedIdentifier Target { get; set; }
 	}
 
 	public class ModuleDeclaration : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		private List<ModuleMember> _members = new List<ModuleMember>();
 		public List<ModuleMember> Members { get { return _members; } }
@@ -38,7 +45,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public abstract class ModuleMember : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 	}
 
 	public class TypeMember : ModuleMember
@@ -48,8 +55,8 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class EnumMember : ModuleMember
 	{
-		private List<string> _values = new List<string>();
-		public List<string> Values { get { return _values; } }
+		private List<QualifiedIdentifier> _values = new List<QualifiedIdentifier>();
+		public List<QualifiedIdentifier> Values { get { return _values; } }
 	}
 
 	public class ConstMember : ModuleMember
@@ -64,7 +71,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class VarDeclaration : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 		
@@ -104,28 +111,28 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class TupleAttribute : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 	}
 
 	public class TupleReference : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
-		private List<string> _sourceAttributeNames = new List<string>();
-		public List<string> SourceAttributeNames { get { return _sourceAttributeNames; } }
+		private List<QualifiedIdentifier> _sourceAttributeNames = new List<QualifiedIdentifier>();
+		public List<QualifiedIdentifier> SourceAttributeNames { get { return _sourceAttributeNames; } }
 
-		public string Target { get; set; }
+		public QualifiedIdentifier Target { get; set; }
 
-		private List<string> _targetAttributeNames = new List<string>();
-		public List<string> TargetAttributeNames { get { return _targetAttributeNames; } }
+		private List<QualifiedIdentifier> _targetAttributeNames = new List<QualifiedIdentifier>();
+		public List<QualifiedIdentifier> TargetAttributeNames { get { return _targetAttributeNames; } }
 	}
 
 	public class TupleKey : Statement
 	{
-		private List<string> _attributeNames = new List<string>();
-		public List<string> AttributeNames { get { return _attributeNames; } }
+		private List<QualifiedIdentifier> _attributeNames = new List<QualifiedIdentifier>();
+		public List<QualifiedIdentifier> AttributeNames { get { return _attributeNames; } }
 	}
 
 	public class FunctionType : TypeDeclaration
@@ -141,7 +148,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class FunctionParameter : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 	}
@@ -153,7 +160,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class NamedType : TypeDeclaration
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 	}
 
 	public abstract class Expression : Statement { }
@@ -175,14 +182,14 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class ForClause : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Expression { get; set; }
 	}
 
 	public class LetClause : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Expression { get; set; }
 	}
@@ -260,7 +267,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class AttributeSelector : Statement
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Value { get; set; }
 	}
@@ -287,7 +294,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class IdentifierExpression : PathExpression
 	{
-		public string Name { get; set; }
+		public QualifiedIdentifier Name { get; set; }
 	}
 
 	public class LiteralExpression : PathExpression
@@ -323,7 +330,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression ElseExpression { get; set; }
 	}
 
-	public class TryExpression : PathExpression
+	public class TryCatchExpression : PathExpression
 	{
 		public Expression TryExpression { get; set; }
 

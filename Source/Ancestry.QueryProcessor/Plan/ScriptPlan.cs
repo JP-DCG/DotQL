@@ -7,5 +7,6 @@ namespace Ancestry.QueryProcessor.Plan
 {
 	public class ScriptPlan
 	{
+		public Parse.Script Script { get; set; }
 	}
 }

@@ -100,7 +100,10 @@ namespace Ancestry.QueryProcessor.Parse
 			UnknownConstraintTarget = 109127,
 
 			/// <summary>Error code 109128: "Column extractor expression must reference a single column unless invoking an aggregate operator."</summary>
-			InvalidColumnExtractorExpression = 109128
+			InvalidColumnExtractorExpression = 109128,
+
+			/// <summary>Error code 109129: "Invalid attribute name."</summary>
+			InvalidAttributeName = 109129,
 		}
 
 		// Resource manager for this exception class

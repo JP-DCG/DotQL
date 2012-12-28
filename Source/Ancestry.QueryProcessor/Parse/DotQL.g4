@@ -196,7 +196,7 @@ PascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''
 
 QualifiedIdentifier =
-	Identifier [ '\' Identifier ]*
+	IsRooted : [ '\' ] Items : Identifier^'\'
 
 Identifier =
 	_ ( letter | '_' [ letter | digit | '_' ]* )+ _

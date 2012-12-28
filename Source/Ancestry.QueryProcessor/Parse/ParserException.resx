@@ -1,129 +1,210 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
-	<xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-		<xsd:element name="root" msdata:IsDataSet="true">
-			<xsd:complexType>
-				<xsd:choice maxOccurs="unbounded">
-					<xsd:element name="data">
-						<xsd:complexType>
-							<xsd:sequence>
-								<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-								<xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-							</xsd:sequence>
-							<xsd:attribute name="name" type="xsd:string" />
-							<xsd:attribute name="type" type="xsd:string" />
-							<xsd:attribute name="mimetype" type="xsd:string" />
-						</xsd:complexType>
-					</xsd:element>
-					<xsd:element name="resheader">
-						<xsd:complexType>
-							<xsd:sequence>
-								<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-							</xsd:sequence>
-							<xsd:attribute name="name" type="xsd:string" use="required" />
-						</xsd:complexType>
-					</xsd:element>
-				</xsd:choice>
-			</xsd:complexType>
-		</xsd:element>
-	</xsd:schema>
-	<resheader name="ResMimeType">
-		<value>text/microsoft-resx</value>
-	</resheader>
-	<resheader name="Version">
-		<value>1.0.0.0</value>
-	</resheader>
-	<resheader name="Reader">
-		<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=1.0.3102.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-	</resheader>
-	<resheader name="Writer">
-		<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=1.0.3102.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-	</resheader>
-	<data name="109100">
-		<value>Statement expected.</value>
-	</data>
-	<data name="109101">
-		<value>Unknown token type "{0}".</value>
-	</data>
-	<data name="109102">
-		<value>"," or "}" expected.</value>
-	</data>
-	<data name="109103">
-		<value>"," or ")" expected.</value>
-	</data>
-	<data name="109104">
-		<value>";" or EOF expected.</value>
-	</data>
-	<data name="109105">
-		<value>Case item expression expected.</value>
-	</data>
-	<data name="109106">
-		<value>Unknown create directive "{0}".</value>
-	</data>
-	<data name="109107">
-		<value>Unknown create type directive "{0}".</value>
-	</data>
-	<data name="109108">
-		<value>Unknown alter directive "{0}".</value>
-	</data>
-	<data name="109109">
-		<value>Unknown alter type directive "{0}".</value>
-	</data>
-	<data name="109110">
-		<value>Unknown drop directive "{0}".</value>
-	</data>
-	<data name="109111">
-		<value>Unknown reference action "{0}".</value>
-	</data>
-	<data name="109112">
-		<value>Default definition already specified.</value>
-	</data>
-	<data name="109113">
-		<value>Override directive not allowed after reintroduce.</value>
-	</data>
-	<data name="109114">
-		<value>Operator marked as abstract cannot have a method body.</value>
-	</data>
-	<data name="109115">
-		<value>Operator must have either a class definition or a body defined.</value>
-	</data>
-	<data name="109116">
-		<value>Invalid parameter modifier.</value>
-	</data>
-	<data name="109117">
-		<value>"{0}" is not a valid identifier.</value>
-	</data>
-	<data name="109118">
-		<value>"{0}" is a reserved word and may not be used as an identifier.</value>
-	</data>
-	<data name="109119">
-		<value>finally or except expected.</value>
-	</data>
-	<data name="109120">
-		<value>Schema definition directive expected.</value>
-	</data>
-	<data name="109121">
-		<value>Type specifier already set for selector expression.</value>
-	</data>
-	<data name="109122">
-		<value>Unknown event specifier "{0}".</value>
-	</data>
-	<data name="109123">
-		<value>Event specifier list contains incompatible event specifiers.</value>
-	</data>
-	<data name="109124">
-		<value>Sort definition already specified.</value>
-	</data>
-	<data name="109125">
-		<value>Invalid right specifier ('all', 'usage', or '{&lt;list of rights&gt;}' expected).</value>
-	</data>
-	<data name="109126">
-		<value>Invalid security specifier.</value>
-	</data>
-	<data name="109127">
-		<value>Unknown constraint target.</value>
-	</data>
-	<data name="109128">
-		<value>Column extractor expression must reference a single column unless invoking an aggregate operator.</value>
-	</data>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="109100" xml:space="preserve">
+    <value>Statement expected.</value>
+  </data>
+  <data name="109101" xml:space="preserve">
+    <value>Unknown token type "{0}".</value>
+  </data>
+  <data name="109102" xml:space="preserve">
+    <value>"," or "}" expected.</value>
+  </data>
+  <data name="109103" xml:space="preserve">
+    <value>"," or ")" expected.</value>
+  </data>
+  <data name="109104" xml:space="preserve">
+    <value>";" or EOF expected.</value>
+  </data>
+  <data name="109105" xml:space="preserve">
+    <value>Case item expression expected.</value>
+  </data>
+  <data name="109106" xml:space="preserve">
+    <value>Unknown create directive "{0}".</value>
+  </data>
+  <data name="109107" xml:space="preserve">
+    <value>Unknown create type directive "{0}".</value>
+  </data>
+  <data name="109108" xml:space="preserve">
+    <value>Unknown alter directive "{0}".</value>
+  </data>
+  <data name="109109" xml:space="preserve">
+    <value>Unknown alter type directive "{0}".</value>
+  </data>
+  <data name="109110" xml:space="preserve">
+    <value>Unknown drop directive "{0}".</value>
+  </data>
+  <data name="109111" xml:space="preserve">
+    <value>Unknown reference action "{0}".</value>
+  </data>
+  <data name="109112" xml:space="preserve">
+    <value>Default definition already specified.</value>
+  </data>
+  <data name="109113" xml:space="preserve">
+    <value>Override directive not allowed after reintroduce.</value>
+  </data>
+  <data name="109114" xml:space="preserve">
+    <value>Operator marked as abstract cannot have a method body.</value>
+  </data>
+  <data name="109115" xml:space="preserve">
+    <value>Operator must have either a class definition or a body defined.</value>
+  </data>
+  <data name="109116" xml:space="preserve">
+    <value>Invalid parameter modifier.</value>
+  </data>
+  <data name="109117" xml:space="preserve">
+    <value>"{0}" is not a valid identifier.</value>
+  </data>
+  <data name="109118" xml:space="preserve">
+    <value>"{0}" is a reserved word and may not be used as an identifier.</value>
+  </data>
+  <data name="109119" xml:space="preserve">
+    <value>finally or except expected.</value>
+  </data>
+  <data name="109120" xml:space="preserve">
+    <value>Schema definition directive expected.</value>
+  </data>
+  <data name="109121" xml:space="preserve">
+    <value>Type specifier already set for selector expression.</value>
+  </data>
+  <data name="109122" xml:space="preserve">
+    <value>Unknown event specifier "{0}".</value>
+  </data>
+  <data name="109123" xml:space="preserve">
+    <value>Event specifier list contains incompatible event specifiers.</value>
+  </data>
+  <data name="109124" xml:space="preserve">
+    <value>Sort definition already specified.</value>
+  </data>
+  <data name="109125" xml:space="preserve">
+    <value>Invalid right specifier ('all', 'usage', or '{&lt;list of rights&gt;}' expected).</value>
+  </data>
+  <data name="109126" xml:space="preserve">
+    <value>Invalid security specifier.</value>
+  </data>
+  <data name="109127" xml:space="preserve">
+    <value>Unknown constraint target.</value>
+  </data>
+  <data name="109128" xml:space="preserve">
+    <value>Column extractor expression must reference a single column unless invoking an aggregate operator.</value>
+  </data>
+  <data name="109129" xml:space="preserve">
+    <value>Invalid attribute name.</value>
+  </data>
 </root>

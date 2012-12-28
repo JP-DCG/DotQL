@@ -72,12 +72,10 @@ namespace Ancestry.QueryProcessor.Parse
         public const string EndGroup = ")";
         public const string BeginIndexer = "[";
         public const string EndIndexer = "]";
-		public const string BeginSet = "{";
-		public const string EndSet = "}";
 		public const string BeginListSelector = "[";
 		public const string EndListSelector = "]";
-		public const string BeginTuple = "{";
-		public const string EndTuple = "}";
+		public const string BeginTupleSet = "{";
+		public const string EndTupleSet = "}";
 		public const string Dereference = ".";
 		public const string Embed = "#";
 		public const string Qualifier = "\\";
@@ -86,6 +84,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public const string IsNull = "??";
 		public const string IfNull = "?";
 		public const string Call = "=>";
+		public const string AttributeSeparator = ":";
         
         private static string[] FKeywords;
         

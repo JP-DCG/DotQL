@@ -49,7 +49,7 @@ namespace Ancestry.QueryProcessor.Parse
 		
 		// The line and position of the starting token for this element in the syntax tree
 		private LineInfo _lineInfo;
-		public LineInfo LineInfo { get { return _lineInfo; } }
+		public LineInfo LineInfo { get { return _lineInfo; } set { _lineInfo = value; } }
 		
 		public int Line
 		{
@@ -97,17 +97,26 @@ namespace Ancestry.QueryProcessor.Parse
 		
 		public void SetPosition(Lexer lexer)
 		{
-			Line = lexer[0, false].Line;
-			LinePos = lexer[0, false].LinePos;
+			SetPosition(lexer[0, false]);
+		}
+
+		public void SetPosition(LexerToken token)
+		{
+			Line = token.Line;
+			LinePos = token.LinePos;
 		}
 		
 		public void SetEndPosition(Lexer lexer)
 		{
-			EndLine = lexer[0, false].Line;
-			LexerToken token = lexer[0, false];
+			SetEndPosition(lexer[0, false]);
+		}
+
+		public void SetEndPosition(LexerToken token)
+		{
+			EndLine = token.Line;
 			EndLinePos = token.LinePos + (token.Token == null ? 0 : token.Token.Length);
 		}
-		
+
 		public void SetLineInfo(LineInfo lineInfo)
 		{
 			if (lineInfo != null)

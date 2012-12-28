@@ -11,7 +11,7 @@ namespace Ancestry.QueryProcessor.Type
 
 	public class AttributeMember : TupleMember
 	{
-		public BaseType Type { get; set; }
+		public TypeDeclaration Type { get; set; }
 		
 		public override string ToString()
 		{

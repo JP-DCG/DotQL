@@ -21,7 +21,7 @@ namespace Ancestry.QueryProcessor
 				foreach (var att in argTypes)
 				{
 					// TODO: assert that arr.value is a string for better error
-					result.Members.Add(att.Key, new AttributeMember { Type = Parse.Parser.ParseFrom(parser.ParseTypeDeclaration, (string)((JValue)att.Value).Value) });
+					result.Members.Add(att.Key, new AttributeMember { Type = Parse.Parser.ParseFrom(parser.TypeDeclaration, (string)((JValue)att.Value).Value) });
 				}
 			}
 
@@ -62,6 +62,12 @@ namespace Ancestry.QueryProcessor
 			foreach (var a in jObject)
 				result.Members.Add(a.Key, new AttributeMember { Type = InferTypeFromValue(a.Value) });
 			return result;
+		}
+
+		public static object JsonArgsToNative(JObject args)
+		{
+			return null;
+			// TODO: dynamically construct class
 		}
 	}
 }

@@ -10,13 +10,9 @@ namespace Ancestry.QueryProcessor.Plan
 {
 	public class Planner
 	{
-		public Planner()
+		public ScriptPlan PlanScript(Parse.Script script, QueryOptions actualOptions)
 		{
-		}
-
-		public ScriptPlan PlanScript(Parse.Script script, TupleType fullArgumentTypes, QueryOptions actualOptions)
-		{
-			throw new NotImplementedException();
+			return new ScriptPlan { Script = script };
 		}
 	}
 }
