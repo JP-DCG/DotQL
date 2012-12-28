@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-	public enum TokenType { Unknown, Symbol, Identifier, Integer, Hex, Double, Version, String, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
+	public enum TokenType { Unknown, Symbol, Integer, Hex, Double, Version, String, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
 
 	public class LexerToken
 	{
