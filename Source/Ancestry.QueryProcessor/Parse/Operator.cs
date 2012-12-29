@@ -26,7 +26,7 @@ namespace Ancestry.QueryProcessor.Parse
 		Exists,
 		Greater,
 		InclusiveGreater,
-		Modulus,
+		Modulo,
 		Negate,
 		Not,
 		NotEqual,

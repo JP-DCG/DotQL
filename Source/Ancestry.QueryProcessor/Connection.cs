@@ -1,7 +1,6 @@
 ﻿using Ancestry.QueryProcessor.Compile;
 using Ancestry.QueryProcessor.Parse;
 using Ancestry.QueryProcessor.Plan;
-using Ancestry.QueryProcessor.Type;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -14,64 +13,24 @@ namespace Ancestry.QueryProcessor
 	{
 		private QueryOptions _defaultOptions;
 
-		public Connection(QueryOptions defaultOptions)
+		public Connection(QueryOptions defaultOptions = null)
 		{
-			_defaultOptions = defaultOptions;
+			_defaultOptions = defaultOptions ?? new QueryOptions();
 		}
 
 		public void Execute(string text, JObject args = null, QueryOptions options = null)
 		{
-			var actualOptions = options ?? _defaultOptions;
-			var token = new CancellationTokenSource();
-			var task = Task.Run
-			(
-				(Action)(() =>
-				{
-					// Parse
-					var parser = new Parser();
-					var script = Parser.ParseFrom(parser.Script, text);
-
-					// Plan
-					var planner = new Planner();
-					var plan = planner.PlanScript(script, actualOptions);
-					
-					// Compile
-					var compiler = new Compiler();
-					var executable = compiler.CreateExecutable(plan);
-					
-					// Run
-					executable.SetArgs(JsonInterop.JsonArgsToNative(args));
-					executable.Run(token.Token);
-				}),
-				token.Token
-			);
-			try
-			{
-				var timeout = actualOptions != null ? actualOptions.SLA.MaximumTime : QuerySla.DefaultMaximumTime;
-				if (!task.Wait(timeout))
-				{
-					token.Cancel();
-					task.Wait();
-				}
-			}
-			finally
-			{
-				task.Dispose();
-			}
+			InternalCall((ao, ct) => { InternalExecute(text, args, ao, ct); }, options);
 		}
 
-
-		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null, JObject argTypes = null)
+		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null)
 		{
-			throw new NotImplementedException("Not implemented.");
+			JToken result = null;
+			InternalCall((ao, ct) => { result = InternalExecute(text, args, ao, ct); }, options);
+			return result;
 		}
 
-		/// <summary> Prepares a "well-known" query. </summary>
-		/// <param name="script">DotQL script.</param>
-		/// <param name="argTypes"> Argument names and strings with DotQL type names. </param>
-		/// <param name="options">Optionally overridden query options. </param>
-		/// <returns> Handle to well-known query. </returns>
-		public Guid Prepare(string text, JObject argTypes = null, QueryOptions options = null)
+		public Guid Prepare(string text, QueryOptions options = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
@@ -90,5 +49,63 @@ namespace Ancestry.QueryProcessor
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
- 	}
+
+		/// <summary> All calls pass through this method. </summary>
+		/// <remarks> This handles enforcement of SLA and other cross-cutting concerns. </remarks>
+		/// <param name="options"> Optional option overrides. </param>
+		private void InternalCall(Action<QueryOptions, CancellationToken> makeCall, QueryOptions options)
+		{
+			var actualOptions = options ?? _defaultOptions;
+			var token = new CancellationTokenSource();
+			var task = Task.Run
+			(
+				(Action)(() =>
+				{
+					makeCall(actualOptions, token.Token);
+				}),
+				token.Token
+			);
+			try
+			{
+				var timeout = 
+					actualOptions != null && actualOptions.Sla != null 
+						? actualOptions.Sla.MaximumTime 
+						: QuerySla.DefaultMaximumTime;
+
+				if (!task.Wait(timeout))
+				{
+					token.Cancel();
+					task.Wait();
+				}
+			}
+			finally
+			{
+				task.Dispose();
+			}
+		}
+
+		private static JToken InternalExecute(string text, JObject args, QueryOptions actualOptions, CancellationToken cancelToken)
+		{
+			// Convert arguments
+			var convertedArgs = JsonInterop.JsonArgsToNative(args);
+
+			// Parse
+			var parser = new Parser();
+			var script = Parser.ParseFrom(parser.Script, text);
+
+			// Plan
+			var planner = new Planner();
+			var plan = planner.PlanScript(script, actualOptions);
+
+			// Compile
+			var compiler = new Compiler();
+			var executable = compiler.CreateExecutable(plan);
+
+			// Run
+			var result = executable(convertedArgs, cancelToken);
+
+			// Convert results
+			return JsonInterop.NativeToJson(result);
+		}
+	}
 }

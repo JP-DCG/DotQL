@@ -453,6 +453,10 @@ namespace Ancestry.QueryProcessor.Parse
 							case '7':
 							case '8':
 							case '9':
+								if (_tokenType == TokenType.Integer && ExceedsInt32(_builder))
+									_tokenType = TokenType.Long;
+								else if (_tokenType == Parse.TokenType.Hex && ExceedsInt32Hex(_builder))
+									_tokenType = TokenType.LongHex;
 								Advance();
 								digitSatisfied = true;
 								_builder.Append(_current);
@@ -468,7 +472,7 @@ namespace Ancestry.QueryProcessor.Parse
 							case 'd':
 							case 'f':
 							case 'F':
-								if (_tokenType != TokenType.Hex)
+								if (_tokenType != TokenType.Hex && _tokenType != TokenType.LongHex)
 								{
 									done = true;
 									break;
@@ -480,13 +484,13 @@ namespace Ancestry.QueryProcessor.Parse
 								
 							case 'E':
 							case 'e':
-								if (_tokenType != TokenType.Hex || (!hitScalar && digitSatisfied))
+								if ((_tokenType != TokenType.Hex && _tokenType != TokenType.LongHex) || (!hitScalar && digitSatisfied))
 								{
 									done = true;
 									break;
 								}
 								Advance();
-								if (_tokenType == TokenType.Hex)
+								if (_tokenType == TokenType.Hex || _tokenType == TokenType.LongHex)
 								{
 									digitSatisfied = true;
 									_builder.Append(_current);
@@ -518,7 +522,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 								if (periodsHit == 0)
 								{
-									if (_tokenType == TokenType.Hex)
+									if (_tokenType == TokenType.Hex || _tokenType == TokenType.LongHex)
 										throw new LexerException(LexerException.Codes.InvalidNumericValue);
 									if (_tokenType == TokenType.Integer)
 										_tokenType = TokenType.Double;
@@ -578,9 +582,10 @@ namespace Ancestry.QueryProcessor.Parse
 					}
 					_token = _builder.ToString();
 				}
-				else if (_next == '\'')
+				else if (_next == '\'')	// Pascal-style string
 				{
 					_tokenType = TokenType.String;
+					Advance();
 					while (true)
 					{
 						if (_nextEOF)
@@ -592,8 +597,8 @@ namespace Ancestry.QueryProcessor.Parse
 								Advance();
 							else
 								break;
-						} 
-						_builder.Append(_current); 
+						}
+						_builder.Append(_current);
 					}
 					if (!_nextEOF)
 						switch (_next)
@@ -655,6 +660,17 @@ namespace Ancestry.QueryProcessor.Parse
 
 			return _tokenType;
 		}
-    }
+
+		private static bool ExceedsInt32(StringBuilder builder)
+		{
+			int x;
+			return builder.Length >= 10 && !Int32.TryParse(builder.ToString(), out x);
+		}
+
+		private static bool ExceedsInt32Hex(StringBuilder builder)
+		{
+			return builder.Length >= 8;
+		}
+	}
 }
 

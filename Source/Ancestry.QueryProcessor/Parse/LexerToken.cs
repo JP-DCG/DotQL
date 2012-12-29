@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-	public enum TokenType { Unknown, Symbol, Integer, Hex, Double, Version, String, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
+	public enum TokenType { Unknown, Symbol, Long, Integer, Hex, LongHex, Double, Version, String, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
 
 	public class LexerToken
 	{
@@ -21,50 +21,118 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			get
 			{
-				CheckType(TokenType.Symbol);
+				DebugCheckType(TokenType.Symbol);
 				return Token;
 			}
 		}
 
 		/// <summary> Returns the currently active TokenType as a string. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a string. </remarks>
 		public string AsString
 		{
 			get
 			{
-				CheckType(TokenType.String);
+				DebugCheckType(TokenType.String);
 				return Token;
 			}
 		}
 
-		/// <summary> Returns the currently active TokenType as an integer value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not an integer. </remarks>
-		public long AsInteger
+		/// <summary> Returns the currently active TokenType as a char. </summary>
+		public char AsChar
 		{
 			get
 			{
-				CheckType(TokenType.Integer);
+				DebugCheckType(TokenType.Char);
+				return Token[0];
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a long integer value. </summary>
+		public long AsLong
+		{
+			get
+			{
+				DebugCheckType(TokenType.Long);
 				return Int64.Parse(Token, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture);
 			}
 		}
 
+		/// <summary> Returns the currently active TokenType as an integer value. </summary>
+		public int AsInteger
+		{
+			get
+			{
+				DebugCheckType(TokenType.Integer);
+				return Int32.Parse(Token, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a DateTime value. </summary>
+		public DateTime AsDateTime
+		{
+			get
+			{
+				DebugCheckType(TokenType.DateTime);
+				return DateTime.Parse(Token, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a TimeSpan value. </summary>
+		public TimeSpan AsTimeSpan
+		{
+			get
+			{
+				DebugCheckType(TokenType.TimeSpan);
+				return TimeSpan.Parse(Token, System.Globalization.CultureInfo.InvariantCulture);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a Double value. </summary>
 		public double AsDouble
 		{
 			get
 			{
-				CheckType(TokenType.Double);
+				DebugCheckType(TokenType.Double);
 				return Double.Parse(Token, System.Globalization.CultureInfo.InvariantCulture);
 			}
 		}
 
-		/// <summary> Returns the currently active TokenType as a money value. </summary>
-		/// <remarks> Will raise a <see cref="LexerException"/> if the current TokenType is not a money literal. </remarks>
-		public long AsHex
+		/// <summary> Returns the currently active TokenType as a hex value. </summary>
+		public int AsHex
 		{
 			get
 			{
-				CheckType(TokenType.Hex);
+				DebugCheckType(TokenType.Hex);
+				return Int32.Parse(Token, System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a long hex value. </summary>
+		public long AsLongHex
+		{
+			get
+			{
+				DebugCheckType(TokenType.LongHex);
 				return Int64.Parse(Token, System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a GUID value. </summary>
+		public Guid AsGuid
+		{
+			get
+			{
+				DebugCheckType(TokenType.Guid);
+				return Guid.Parse(Token);
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a Version value. </summary>
+		public Version AsVersion
+		{
+			get
+			{
+				DebugCheckType(TokenType.Version);
+				return Version.Parse(Token);
 			}
 		}
 
@@ -76,6 +144,12 @@ namespace Ancestry.QueryProcessor.Parse
 				throw Error;
 			if (Type != token)
 				throw new LexerException(LexerException.Codes.TokenExpected, Enum.GetName(typeof(TokenType), token));
+		}
+
+		[System.Diagnostics.Conditional("DEBUG")]
+		public void DebugCheckType(TokenType token)
+		{
+			CheckType(token);
 		}
 
 		/// <summary> Ensures that the current TokenType is a symbol equal to the given symbol.  </summary>

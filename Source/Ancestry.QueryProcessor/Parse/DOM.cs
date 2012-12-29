@@ -299,9 +299,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class LiteralExpression : PathExpression
 	{
-		public string Value { get; set; }
-
-		public TokenType TokenType { get; set; }
+		public object Value { get; set; }
 	}
 
 	public class CaseExpression : PathExpression

@@ -2,7 +2,6 @@ using System;
 using System.Text;
 using System.IO;
 using System.Collections.Generic;
-using Ancestry.QueryProcessor.Type;
 
 namespace Ancestry.QueryProcessor.Parse
 {
@@ -89,7 +88,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		#region Expression Helpers
 
-		private void AppendToBinaryExpression(Lexer lexer, Expression expression, LexerToken next, ref BinaryExpression result)
+		protected void AppendToBinaryExpression(Lexer lexer, Expression expression, LexerToken next, ref BinaryExpression result)
 		{
 			lexer.NextToken();
 			if (result == null)
@@ -102,7 +101,7 @@ namespace Ancestry.QueryProcessor.Parse
 			result.Expressions.Add(LogicalAndExpression(lexer));
 		}
 
-		public Operator UnaryKeywordToOperator(string keyword)
+		public static Operator UnaryKeywordToOperator(string keyword)
 		{
 			switch (keyword)
 			{
@@ -116,7 +115,7 @@ namespace Ancestry.QueryProcessor.Parse
 			}
 		}
 
-		public Operator BinaryKeywordToOperator(string keyword)
+		public static Operator BinaryKeywordToOperator(string keyword)
 		{
 			switch (keyword)
 			{
@@ -137,7 +136,7 @@ namespace Ancestry.QueryProcessor.Parse
 				case Keywords.Exists: return Operator.Exists;
 				case Keywords.Greater: return Operator.Greater;
 				case Keywords.InclusiveGreater: return Operator.InclusiveGreater;
-				case Keywords.Modulus: return Operator.Modulus;
+				case Keywords.Modulo: return Operator.Modulo;
 				case Keywords.NotEqual: return Operator.NotEqual;
 				case Keywords.InclusiveLess: return Operator.InclusiveLess;
 				case Keywords.Less: return Operator.Less;
@@ -152,7 +151,7 @@ namespace Ancestry.QueryProcessor.Parse
 			}
 		}
 
-		public bool NextIsClausedExpression(Lexer lexer)
+		public static bool NextIsClausedExpression(Lexer lexer)
 		{
 			if (lexer[1].Type == TokenType.Symbol)
 				switch (lexer[1].Token)
@@ -166,6 +165,37 @@ namespace Ancestry.QueryProcessor.Parse
 				}
 
 			return false;
+		}
+
+		public static object TokenToLiteralObject(LexerToken token)
+		{
+			object value = null;
+			switch (token.Type)
+			{
+				case TokenType.Symbol:
+					switch (token.Token)
+					{
+						//case Keywords.Void: value = void;
+						case Keywords.True: value = true; break;
+						case Keywords.False: value = false; break;
+						default: value = null; break; // case Keywords.Null:
+					}
+					break;
+				case TokenType.Long: value = token.AsLong; break;
+				case TokenType.Integer: value = token.AsInteger; break;
+				case TokenType.Double: value = token.AsDouble; break;
+				case TokenType.String: value = token.AsString; break;
+				case TokenType.Char: value = token.AsChar; break;
+				//case TokenType.Date: value = token.AsDateTime;	// TODO: Create 1st class Date and Time types
+				case TokenType.DateTime: value = token.AsDateTime; break;
+				case TokenType.Guid: value = token.AsGuid; break;
+				case TokenType.Hex: value = token.AsHex; break;
+				//case TokenType.Time: value = token.AsDateTime;
+				case TokenType.TimeSpan: value = token.AsTimeSpan; break;
+				case TokenType.Version: value = token.AsVersion; break;
+				default: throw new NotSupportedException(String.Format("Token type {0} is unsupported.", token.Type));
+			}
+			return value;
 		}
 
 		#endregion
@@ -320,7 +350,7 @@ namespace Ancestry.QueryProcessor.Parse
 				{
 					case Keywords.Multiply:
 					case Keywords.Divide:
-					case Keywords.Modulus:
+					case Keywords.Modulo:
 						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
 						break;
 					default:
@@ -707,7 +737,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression LiteralExpression(Lexer lexer)
 		{
 			lexer.NextToken();
-			var result = new LiteralExpression { TokenType = lexer[0].Type, Value = lexer[0].Token };
+			var result = new LiteralExpression { Value = TokenToLiteralObject(lexer[0]) };
 			result.SetPosition(lexer);
 			return result;
 		}
@@ -732,7 +762,7 @@ namespace Ancestry.QueryProcessor.Parse
 				result.WhereClause = Expression(lexer);
 			if (lexer[1].IsSymbol(Keywords.Order))
 				result.OrderDimensions = OrderDimensions(lexer);
-			lexer[1].CheckSymbol(Keywords.Return);
+			lexer.NextToken().CheckSymbol(Keywords.Return);
 			result.Expression = Expression(lexer);
 
 			return result;

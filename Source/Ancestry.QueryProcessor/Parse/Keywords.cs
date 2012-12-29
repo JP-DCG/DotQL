@@ -65,7 +65,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public const string Negate = "-";
         public const string Multiply = "*";
         public const string Divide = "/";
-        public const string Modulus = "%";
+        public const string Modulo = "%";
         public const string Power = "**";
         public const string BitwiseNot = "~";
         public const string BeginGroup = "(";
