@@ -11,22 +11,27 @@ namespace Ancestry.QueryProcessor
 {
 	public class Connection : IConnection
 	{
+		private int _adHocMaximumTime;
+		private int _adHocMaximumRows;
 		private QueryOptions _defaultOptions;
 
 		public Connection(QueryOptions defaultOptions = null)
 		{
+			// TODO: Load from policies
 			_defaultOptions = defaultOptions ?? new QueryOptions();
+			_adHocMaximumTime = 3000;
+			_adHocMaximumRows = 5000;
 		}
 
 		public void Execute(string text, JObject args = null, QueryOptions options = null)
 		{
-			InternalCall((ao, ct) => { InternalExecute(text, args, ao, ct); }, options);
+			AdHocCall((ao, ct) => { InternalExecute(text, args, ao, ct); }, options);
 		}
 
 		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null)
 		{
 			JToken result = null;
-			InternalCall((ao, ct) => { result = InternalExecute(text, args, ao, ct); }, options);
+			AdHocCall((ao, ct) => { result = InternalExecute(text, args, ao, ct); }, options);
 			return result;
 		}
 
@@ -53,9 +58,10 @@ namespace Ancestry.QueryProcessor
 		/// <summary> All calls pass through this method. </summary>
 		/// <remarks> This handles enforcement of SLA and other cross-cutting concerns. </remarks>
 		/// <param name="options"> Optional option overrides. </param>
-		private void InternalCall(Action<QueryOptions, CancellationToken> makeCall, QueryOptions options)
+		private void AdHocCall(Action<QueryOptions, CancellationToken> makeCall, QueryOptions options)
 		{
 			var actualOptions = options ?? _defaultOptions;
+			EnforceLimits(actualOptions);
 			var token = new CancellationTokenSource();
 			var task = Task.Run
 			(
@@ -67,11 +73,7 @@ namespace Ancestry.QueryProcessor
 			);
 			try
 			{
-				var timeout = 
-					actualOptions != null && actualOptions.Sla != null 
-						? actualOptions.Sla.MaximumTime 
-						: QuerySla.DefaultMaximumTime;
-
+				var timeout = actualOptions.QueryLimits.MaximumTime;
 				if (!task.Wait(timeout))
 				{
 					token.Cancel();
@@ -82,6 +84,15 @@ namespace Ancestry.QueryProcessor
 			{
 				task.Dispose();
 			}
+		}
+
+		/// <summary> Adjusts the limits according to policy. </summary>
+		private void EnforceLimits(QueryOptions actualOptions)
+		{
+			var limits = actualOptions.QueryLimits ?? new QueryLimits();
+			limits.MaximumTime = Math.Min(limits.MaximumTime, _adHocMaximumTime);
+			limits.MaximumRows = Math.Min(limits.MaximumRows, _adHocMaximumRows);
+			actualOptions.QueryLimits = limits;
 		}
 
 		private static JToken InternalExecute(string text, JObject args, QueryOptions actualOptions, CancellationToken cancelToken)

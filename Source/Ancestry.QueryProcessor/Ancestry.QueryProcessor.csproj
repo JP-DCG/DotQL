@@ -52,7 +52,8 @@
     <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Planner.cs" />
     <Compile Include="QueryOptions.cs" />
-    <Compile Include="QuerySla.cs" />
+    <Compile Include="QueryLimits.cs" />
+    <Compile Include="RequestedSla.cs" />
     <Compile Include="Storage\Interfaces.cs" />
     <Compile Include="Parse\Keywords.cs" />
     <Compile Include="Parse\Parser.cs" />

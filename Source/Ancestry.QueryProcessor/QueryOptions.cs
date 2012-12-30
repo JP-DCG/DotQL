@@ -11,6 +11,7 @@ namespace Ancestry.QueryProcessor
 	{
 		public List<Using> DefaultUsings = new List<Using>();
 		public List<IStorageModule> StorageModules = new List<IStorageModule>();
-		public QuerySla Sla;
+		public RequestedSla RequestedSla;
+		public QueryLimits QueryLimits;
 	}
 }
