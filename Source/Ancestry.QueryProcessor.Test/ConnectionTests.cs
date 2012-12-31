@@ -14,8 +14,8 @@ namespace Ancestry.QueryProcessor.Test
 			var result = connection.Evaluate("return 'Hello world.'");
 			Assert.AreEqual("Hello world.", result);
 
-			result = connection.Evaluate("return 5 + 10");
-			Assert.AreEqual(15, result);
+			result = connection.Evaluate("return 5 - 10 * 3");
+			Assert.AreEqual(-25, result);
 		}
 	}
 }

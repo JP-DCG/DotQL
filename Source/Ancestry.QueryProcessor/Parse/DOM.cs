@@ -212,11 +212,11 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class BinaryExpression : PathExpression
 	{
-		private List<Expression> _expressions = new List<Expression>();
-		public List<Expression> Expressions { get { return _expressions; } }
+		public Expression Left { get; set; }
 
-		private List<Operator> _operators = new List<Operator>();
-		public List<Operator> Operators { get { return _operators; } }
+		public Expression Right { get; set; } 
+
+		public Operator Operator { get; set; }
 	}
 
 	public class UnaryExpression : PathExpression

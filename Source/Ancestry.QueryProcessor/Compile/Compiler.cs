@@ -79,35 +79,31 @@ namespace Ancestry.QueryProcessor.Compile
 		private Expression CompileBinaryExpression(Parse.BinaryExpression expression)
 		{
 			// TODO: if intrinsic type...
-			var result = CompileExpression(expression.Expressions[expression.Expressions.Count - 1]);
-			for (int i = expression.Operators.Count - 1; i >= 0; i--)
+			var result = CompileExpression(expression.Left);
+			switch (expression.Operator)
 			{
-				switch (expression.Operators[i])
-				{
-					case Parse.Operator.Addition : result = Expression.Add(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Subtract : result = Expression.Subtract(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Multiply : result = Expression.Multiply(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Modulo: result = Expression.Modulo(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Divide: result = Expression.Divide(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.BitwiseAnd:
-					case Parse.Operator.And : result = Expression.And(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.BitwiseOr:
-					case Parse.Operator.Or: result = Expression.Or(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.BitwiseXor:
-					case Parse.Operator.Xor: result = Expression.ExclusiveOr(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Equal: result = Expression.Equal(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.NotEqual : result = Expression.NotEqual(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.ShiftLeft: result = Expression.LeftShift(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.ShiftRight: result = Expression.RightShift(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Power: result = Expression.Power(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.InclusiveGreater: result = Expression.GreaterThanOrEqual(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.InclusiveLess: result = Expression.LessThanOrEqual(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Greater: result = Expression.GreaterThan(CompileExpression(expression.Expressions[i]), result); break;
-					case Parse.Operator.Less: result = Expression.LessThan(CompileExpression(expression.Expressions[i]), result); break;
-					default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operators[i]));
-				}
+				case Parse.Operator.Addition : return Expression.Add(result, CompileExpression(expression.Right));
+				case Parse.Operator.Subtract : return Expression.Subtract(result, CompileExpression(expression.Right));
+				case Parse.Operator.Multiply : return Expression.Multiply(result, CompileExpression(expression.Right));
+				case Parse.Operator.Modulo: return Expression.Modulo(result, CompileExpression(expression.Right));
+				case Parse.Operator.Divide: return Expression.Divide(result, CompileExpression(expression.Right));
+				case Parse.Operator.BitwiseAnd:
+				case Parse.Operator.And : return Expression.And(result, CompileExpression(expression.Right));
+				case Parse.Operator.BitwiseOr:
+				case Parse.Operator.Or: return Expression.Or(result, CompileExpression(expression.Right));
+				case Parse.Operator.BitwiseXor:
+				case Parse.Operator.Xor: return Expression.ExclusiveOr(result, CompileExpression(expression.Right));
+				case Parse.Operator.Equal: return Expression.Equal(result, CompileExpression(expression.Right));
+				case Parse.Operator.NotEqual : return Expression.NotEqual(result, CompileExpression(expression.Right));
+				case Parse.Operator.ShiftLeft: return Expression.LeftShift(result, CompileExpression(expression.Right));
+				case Parse.Operator.ShiftRight: return Expression.RightShift(result, CompileExpression(expression.Right));
+				case Parse.Operator.Power: return Expression.Power(result, CompileExpression(expression.Right));
+				case Parse.Operator.InclusiveGreater: return Expression.GreaterThanOrEqual(result, CompileExpression(expression.Right));
+				case Parse.Operator.InclusiveLess: return Expression.LessThanOrEqual(result, CompileExpression(expression.Right));
+				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(expression.Right));
+				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(expression.Right));
+				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
-			return result;
 		}
 
 		private Expression CompileLiteral(Parse.LiteralExpression expression)

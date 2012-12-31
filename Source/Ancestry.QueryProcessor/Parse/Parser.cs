@@ -136,17 +136,15 @@ namespace Ancestry.QueryProcessor.Parse
 
 		#region Expression Helpers
 
-		protected void AppendToBinaryExpression(Lexer lexer, Expression expression, LexerToken next, ref BinaryExpression result)
+		protected BinaryExpression AppendToBinaryExpression(Lexer lexer, Expression expression, BinaryExpression soFar)
 		{
-			lexer.NextToken();
-			if (result == null)
-			{
-				result = new BinaryExpression();
-				result.SetPosition(lexer);
-				result.Expressions.Add(expression);
-			}
-			result.Operators.Add(BinaryKeywordToOperator(next.Token));
-			result.Expressions.Add(LogicalAndExpression(lexer));
+			var token = lexer.NextToken();
+			var result = new BinaryExpression();
+			result.SetPosition(lexer);
+			result.Left = soFar ?? expression;
+			result.Operator = BinaryKeywordToOperator(token.Token);
+			result.Right = LogicalAndExpression(lexer);
+			return result;
 		}
 
 		public static Operator UnaryKeywordToOperator(string keyword)
@@ -284,7 +282,7 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Like:
 					case Keywords.Matches:
 					case Keywords.IfNull:
-						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						result = AppendToBinaryExpression(lexer, expression, result);
 						break;
 					default:
 						return result ?? expression;
@@ -302,7 +300,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			BinaryExpression result = null;
 			while (lexer[1].IsSymbol(Keywords.And))
-				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+				result = AppendToBinaryExpression(lexer, expression, result);
 
 			return result ?? expression;
 		}
@@ -324,7 +322,7 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.BitwiseXor:
 					case Keywords.ShiftLeft:
 					case Keywords.ShiftRight:
-						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						result = AppendToBinaryExpression(lexer, expression, result);
 						break;
 					default:
 						return result ?? expression;
@@ -352,7 +350,7 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.InclusiveLess:
 					case Keywords.InclusiveGreater:
 					case Keywords.Compare:
-						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						result = AppendToBinaryExpression(lexer, expression, result);
 						break;
 					default:
 						return result ?? expression;
@@ -375,7 +373,7 @@ namespace Ancestry.QueryProcessor.Parse
 				{
 					case Keywords.Addition:
 					case Keywords.Subtract:
-						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						result = AppendToBinaryExpression(lexer, expression, result);
 						break;
 					default:
 						return result ?? expression;
@@ -399,7 +397,7 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Multiply:
 					case Keywords.Divide:
 					case Keywords.Modulo:
-						AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+						result = AppendToBinaryExpression(lexer, expression, result);
 						break;
 					default:
 						return result ?? expression;
@@ -436,7 +434,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			BinaryExpression result = null;
 			while (lexer[1].IsSymbol(Keywords.Power))
-				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+				result = AppendToBinaryExpression(lexer, expression, result);
 			return result ?? expression;
 		}
 
@@ -476,7 +474,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			BinaryExpression result = null;
 			while (lexer[1].IsSymbol(Keywords.Dereference))
-				AppendToBinaryExpression(lexer, expression, lexer[1], ref result);
+				result = AppendToBinaryExpression(lexer, expression, result);
 			return result ?? expression;
 		}
 
