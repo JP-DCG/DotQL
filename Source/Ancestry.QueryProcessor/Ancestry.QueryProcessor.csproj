@@ -48,11 +48,13 @@
     <Compile Include="Connection.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
     <Compile Include="Parse\QualifiedIdentifier.cs" />
+    <Compile Include="Parse\Visitor.cs" />
     <Compile Include="Plan\Frame.cs" />
     <Compile Include="IConnection.cs" />
     <Compile Include="JsonInterop.cs" />
     <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Planner.cs" />
+    <Compile Include="Plan\PlanningException.cs" />
     <Compile Include="QueryOptions.cs" />
     <Compile Include="QueryLimits.cs" />
     <Compile Include="RequestedSla.cs" />
@@ -83,6 +85,7 @@
     <EmbeddedResource Include="Parse\LexerException.resx" />
     <EmbeddedResource Include="Parse\ParserException.resx" />
     <EmbeddedResource Include="Parse\SyntaxException.resx" />
+    <EmbeddedResource Include="Plan\PlanningException.resx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Parse\DotQL.g4" />
