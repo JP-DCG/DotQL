@@ -7,6 +7,16 @@ namespace Ancestry.QueryProcessor.Test
 	public class ConnectionTests
 	{
 		[TestMethod]
+		public void EmptyScript()
+		{
+			var connection = new Connection();
+			
+			connection.Execute("\\Nothing but a comment");
+			var result = connection.Evaluate("\\Nothing but a comment");
+			Assert.AreEqual(new Newtonsoft.Json.Linq.JValue((object)null), result);
+		}
+		
+		[TestMethod]
 		public void BasicEvaluate()
 		{
 			var connection = new Connection();

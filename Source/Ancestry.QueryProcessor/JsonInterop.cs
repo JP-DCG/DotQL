@@ -71,6 +71,9 @@ namespace Ancestry.QueryProcessor
 
 		public static JToken NativeToJson(object result)
 		{
+			if (result == null)
+				return new JValue((object)null);
+
 			// TODO: handle set, list, tuple, and custom types
 			switch (result.GetType().Name)
 			{

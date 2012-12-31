@@ -47,16 +47,21 @@ namespace Ancestry.QueryProcessor.Compile
 		private Expression CompileScript(ScriptPlan plan, Expression args, Expression cancelToken)
 		{
 			// Compute result and convert to object (box if needed)
-			var result = CompileClausedExpression(plan.Script.Expression);
-			if (result.Type.IsValueType)
-				result = Expression.Convert(result, typeof(object));
+			if (plan.Script.Expression != null)
+			{
+				var result = CompileClausedExpression(plan.Script.Expression);
+				if (result.Type.IsValueType)
+					result = Expression.Convert(result, typeof(object));
 
-			return 
-				Expression.Block
-				(
-					// TODO: usings, modules, vars (with arg overrides), assignments
-					plan.Script.Expression != null ? result : null
-				);
+				return 
+					Expression.Block
+					(
+						// TODO: usings, modules, vars (with arg overrides), assignments
+						plan.Script.Expression != null ? result : null
+					);
+			}
+			else
+				return Expression.Constant(null, typeof(object));
 		}
 
 		private Expression CompileClausedExpression(Parse.ClausedExpression clausedExpression)

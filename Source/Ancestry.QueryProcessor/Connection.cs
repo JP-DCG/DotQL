@@ -31,7 +31,14 @@ namespace Ancestry.QueryProcessor
 		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null)
 		{
 			JToken result = null;
-			AdHocCall((ao, ct) => { result = InternalExecute(text, args, ao, ct); }, options);
+			AdHocCall
+			(
+				(ao, ct) => 
+				{ 
+					result = JsonInterop.NativeToJson(InternalExecute(text, args, ao, ct)); 
+				}, 
+				options
+			);
 			return result;
 		}
 
@@ -95,7 +102,7 @@ namespace Ancestry.QueryProcessor
 			actualOptions.QueryLimits = limits;
 		}
 
-		private static JToken InternalExecute(string text, JObject args, QueryOptions actualOptions, CancellationToken cancelToken)
+		private static object InternalExecute(string text, JObject args, QueryOptions actualOptions, CancellationToken cancelToken)
 		{
 			// Convert arguments
 			var convertedArgs = JsonInterop.JsonArgsToNative(args);
@@ -113,10 +120,7 @@ namespace Ancestry.QueryProcessor
 			var executable = compiler.CreateExecutable(plan);
 
 			// Run
-			var result = executable(convertedArgs, cancelToken);
-
-			// Convert results
-			return JsonInterop.NativeToJson(result);
+			return executable(convertedArgs, cancelToken);
 		}
 	}
 }
