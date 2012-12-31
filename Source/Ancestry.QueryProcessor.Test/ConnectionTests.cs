@@ -25,7 +25,10 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual("Hello world.", result);
 
 			result = connection.Evaluate("return 5 - 10 * 3");
-			Assert.AreEqual(-25, result);
+            Assert.AreEqual( ( 5 - 10 * 3 ), result );
+
+            result = connection.Evaluate( "return 5 * 3 + 1" );
+            Assert.AreEqual( ( 5 * 3 + 1 ), result );
 		}
 
 		[TestMethod]
