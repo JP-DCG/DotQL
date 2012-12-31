@@ -814,7 +814,7 @@ namespace Ancestry.QueryProcessor.Parse
 			if (lexer[1].IsSymbol(Keywords.Where))
 				result.WhereClause = Expression(lexer);
 			if (lexer[1].IsSymbol(Keywords.Order))
-				result.OrderDimensions = OrderDimensions(lexer);
+				result.OrderDimensions = OrderClause(lexer);
 			lexer.NextToken().CheckSymbol(Keywords.Return);
 			result.Expression = Expression(lexer);
 
@@ -826,7 +826,18 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public LetClause LetClause(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().DebugCheckSymbol(Keywords.Let);
+
+			var result = new LetClause();
+			result.SetPosition(lexer);
+
+			result.Name = QualifiedIdentifier(lexer);
+			
+			lexer.NextToken().CheckSymbol(Keywords.Assignment);
+
+			result.Expression = Expression(lexer);
+
+			return result;
 		}
 
 		/*
@@ -834,15 +845,46 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public ForClause ForClause(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().DebugCheckSymbol(Keywords.For);
+
+			var result = new ForClause();
+			result.SetPosition(lexer);
+
+			result.Name = QualifiedIdentifier(lexer);
+
+			lexer.NextToken().CheckSymbol(Keywords.In);
+
+			result.Expression = Expression(lexer);
+
+			return result;
 		}
 
 		/*
-			( Expression : Expression [ Direction : ( "asc" | "desc" ) ] )*
+				"order" "(" OrderDimensions : OrderDimension* ")"
+
+			OrderDimension :=
+				Expression : Expression [ Direction : ( "asc" | "desc" ) ]
 		*/
-		public List<OrderDimension> OrderDimensions(Lexer lexer)
+		public List<OrderDimension> OrderClause(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().DebugCheckSymbol(Keywords.Order);
+
+			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+
+			var results = new List<OrderDimension>();
+			while (!lexer[1].IsSymbol(Keywords.EndGroup))
+			{
+				var result = new OrderDimension();			
+				result.SetPosition(lexer);
+				result.Expression = Expression(lexer);
+
+				bool asc;
+				if (asc = lexer[1].IsSymbol(Keywords.Asc) || lexer[1].IsSymbol(Keywords.Desc))
+					result.Ascending = asc;
+
+				results.Add(result);
+			}
+			return results;
 		}
 
 		public bool IsValidIdentifier(string subject)
@@ -857,11 +899,10 @@ namespace Ancestry.QueryProcessor.Parse
 			return true;
 		}
 
-		protected bool IsReservedWord(string AIdentifier)
+		protected bool IsReservedWord(string identifier)
 		{
-			// TODO: reserved words
-			//return ReservedWords.Contains(AIdentifier);
-			return false;
+			// TODO: limit to just reserved words
+			return Keywords.Contains(identifier);
 		}
 	}
 }

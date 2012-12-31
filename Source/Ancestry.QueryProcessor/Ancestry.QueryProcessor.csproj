@@ -47,6 +47,8 @@
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
+    <Compile Include="Parse\QualifiedIdentifier.cs" />
+    <Compile Include="Plan\Frame.cs" />
     <Compile Include="IConnection.cs" />
     <Compile Include="JsonInterop.cs" />
     <Compile Include="Parse\LexerToken.cs" />

@@ -21,13 +21,6 @@ namespace Ancestry.QueryProcessor.Parse
 		public ClausedExpression Expression { get; set; }
 	}
 
-	public struct QualifiedIdentifier
-	{
-		public bool IsRooted;
-		public string[] Components;
-	}
-
-
 	public class Using : Statement
 	{
 		public QualifiedIdentifier Alias { get; set; }
