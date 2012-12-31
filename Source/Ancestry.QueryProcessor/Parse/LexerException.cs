@@ -45,6 +45,9 @@ namespace Ancestry.QueryProcessor.Parse
 
 			/// <summary>Error code 102110: "Unsupported escape character ({0})."</summary>
 			InvalidEscapeCharacter = 102110,
+
+			/// <summary>Error code 102111: "Invalid type declaration."</summary>
+			InvalidTypeDeclaration = 102111
 		}
 
 		// Resource manager for this exception class

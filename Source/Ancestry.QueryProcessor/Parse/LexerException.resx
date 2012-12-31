@@ -150,4 +150,7 @@
   <data name="102110" xml:space="preserve">
     <value>Unsupported escape character ({0}).</value>
   </data>
+  <data name="102111" xml:space="preserve">
+    <value>Invalid type declaration.</value>
+  </data>
 </root>

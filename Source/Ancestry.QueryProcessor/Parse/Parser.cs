@@ -83,8 +83,56 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public TypeDeclaration TypeDeclaration(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer[1].CheckType(TokenType.Symbol);
+			switch (lexer[1].Token)
+			{
+				case Keywords.Function: return FunctionType(lexer); break;
+				default: throw new LexerException(LexerException.Codes.InvalidTypeDeclaration);
+			}
 		}
+
+		/*
+			FunctionType :=
+				"function" [ "<" TypeParameters : TypeDeclaration* ">" ] "(" Parameters : [ FunctionParameter ]* ")" ":" ReturnType : TypeDeclaration
+			
+			FunctionParameter :=
+				Name : QualifiedIdentifier ":" Type : TypeDeclaration
+		*/
+		public FunctionType FunctionType(Lexer lexer)
+		{
+			lexer[1].DebugCheckSymbol(Keywords.Function);
+			lexer.NextToken();
+
+			var result = new FunctionType();
+			result.SetPosition(lexer);
+
+			if (lexer[1].IsSymbol(Keywords.Less))
+			{
+				lexer.NextToken();
+				while (!lexer[1].IsSymbol(Keywords.Greater))
+					result.TypeParameters.Add(TypeDeclaration(lexer));
+				lexer.NextToken();
+			}
+
+			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+			
+			while (!lexer[1].IsSymbol(Keywords.EndGroup))
+			{
+				var param = new FunctionParameter();
+				param.SetPosition(lexer);
+				param.Name = QualifiedIdentifier(lexer);
+				lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
+				param.Type = TypeDeclaration(lexer);
+				result.Parameters.Add(param);
+			}
+
+			lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
+
+			result.ReturnType = TypeDeclaration(lexer);
+
+			return result;
+		}
+
 
 		#region Expression Helpers
 
@@ -703,9 +751,16 @@ namespace Ancestry.QueryProcessor.Parse
 			return result;
 		}
 
+		/*
+			Type : FunctionType Expression : ClausedExpression
+		*/
 		private Expression FunctionSelector(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			var result = new FunctionSelector();
+			result.SetPosition(lexer);
+			result.Type = FunctionType(lexer);
+			result.Expression = ClausedExpression(lexer);
+			return result;
 		}
 
 		private Expression CaseExpression(Lexer lexer)

@@ -40,6 +40,6 @@ For a by-example introduction to DotQL, read [DotQLByExample](DotQL/blob/master/
 Federated Query Processor
 -------------------------
 
-A query processor is a system that provides access to shared data (what we call a database) via a language (aka data model).  A federated query processor, allows queries and manipulation over multiple, even disparate, data sources.  Architecturally, a federated query processor provides a mechanism whereby an organization can insulate one set of systems, such as application servers, from another set of systems, such as database, indexing, and caching systems.  
+A query processor is a system that provides access to shared data (what we call a database) via a language (aka data model).  A federated query processor allows queries and manipulation over multiple, even disparate, data sources.  Architecturally, a federated query processor provides a mechanism whereby an organization can insulate one set of systems, such as application servers, from another set of systems, such as database, indexing, and caching systems.  
 
 For more, visit the [Overview](DotQL/wiki/Overview).

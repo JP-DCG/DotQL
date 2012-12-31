@@ -755,7 +755,7 @@ return DatePart('2011/03/2 12:30:00'dt)
 // result: '2011/03/2'd
 
 // Getting the time part of a DateTime:
-return DatePart('2011/03/2 12:30:00'dt)
+return TimePart('2011/03/2 12:30:00'dt)
 // result: '12:30:00't
 
 /* GUID Operations */
@@ -795,7 +795,7 @@ return { Neg: Floor(-3.2) Pos: Floor(3.2) }
 // result: { -4 3 }
 
 // Frac:
-return 12.34
+return Frac(12.34)
 // result: 0.34
 
 // Factorial:
@@ -843,9 +843,9 @@ return { r1.Value Random(r1.Seed).Value }
 return Random(Seed() 99)
 // result: <pseudo-random integer between 0-99>
 
-// Generating in range:
+// Generating in integer range:
 return Random(Seed() 5..10)
-// result: <pseudo-random integer between 5-10>
+// result: <pseudo-random integer between 5-10 inclusive>
 
 /* Generators */
 
@@ -888,4 +888,4 @@ let i := 5..10
 return { Contains(i 6) Before(i 10) After(i 11) Meets(i 11..13) Overlaps(i 10..15) Merges(i 1..4) Begins(i 5) Ends(i 10) }
 // result { true false true true true true true true }
 
-// TODO: Interval operators
+// TODO: Additional interval operators...
