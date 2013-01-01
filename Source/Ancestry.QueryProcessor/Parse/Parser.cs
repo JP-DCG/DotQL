@@ -136,14 +136,14 @@ namespace Ancestry.QueryProcessor.Parse
 
 		#region Expression Helpers
 
-		protected BinaryExpression AppendToBinaryExpression(Lexer lexer, Expression expression, BinaryExpression soFar)
+		protected BinaryExpression AppendToBinaryExpression(Lexer lexer, Expression expression, Func<Lexer, Expression> next)
 		{
 			var token = lexer.NextToken();
 			var result = new BinaryExpression();
 			result.SetPosition(lexer);
-			result.Left = soFar ?? expression;
+			result.Left = expression;
 			result.Operator = BinaryKeywordToOperator(token.Token);
-			result.Right = LogicalAndExpression(lexer);
+			result.Right = next(lexer);
 			return result;
 		}
 
@@ -271,7 +271,6 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = LogicalAndExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].Type == TokenType.Symbol)
 			{
 				switch (lexer[1].Token)
@@ -282,13 +281,13 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Like:
 					case Keywords.Matches:
 					case Keywords.IfNull:
-						result = AppendToBinaryExpression(lexer, expression, result);
+						expression = AppendToBinaryExpression(lexer, expression, LogicalAndExpression);
 						break;
 					default:
-						return result ?? expression;
+						return expression;
 				}
 			}
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -298,11 +297,11 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = BitwiseBinaryExpression(lexer);
 
-			BinaryExpression result = null;
+			
 			while (lexer[1].IsSymbol(Keywords.And))
-				result = AppendToBinaryExpression(lexer, expression, result);
+				expression = AppendToBinaryExpression(lexer, expression, BitwiseBinaryExpression);
 
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -312,7 +311,6 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = ComparisonExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].Type == TokenType.Symbol)
 			{
 				switch (lexer[1].Token)
@@ -322,13 +320,13 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.BitwiseXor:
 					case Keywords.ShiftLeft:
 					case Keywords.ShiftRight:
-						result = AppendToBinaryExpression(lexer, expression, result);
+						expression = AppendToBinaryExpression(lexer, expression, ComparisonExpression);
 						break;
 					default:
-						return result ?? expression;
+						return expression;
 				}
 			}
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -338,7 +336,6 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = AdditiveExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].Type == TokenType.Symbol)
 			{
 				switch (lexer[1].Token)
@@ -350,13 +347,13 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.InclusiveLess:
 					case Keywords.InclusiveGreater:
 					case Keywords.Compare:
-						result = AppendToBinaryExpression(lexer, expression, result);
+						expression = AppendToBinaryExpression(lexer, expression, AdditiveExpression);
 						break;
 					default:
-						return result ?? expression;
+						return expression;
 				}
 			}
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -366,20 +363,19 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = MultiplicativeExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].Type == TokenType.Symbol)
 			{
 				switch (lexer[1].Token)
 				{
 					case Keywords.Addition:
 					case Keywords.Subtract:
-						result = AppendToBinaryExpression(lexer, expression, result);
+						expression = AppendToBinaryExpression(lexer, expression, MultiplicativeExpression);
 						break;
 					default:
-						return result ?? expression;
+						return expression;
 				}
 			}
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -389,7 +385,6 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = IntervalSelector(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].Type == TokenType.Symbol)
 			{
 				switch (lexer[1].Token)
@@ -397,13 +392,13 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Multiply:
 					case Keywords.Divide:
 					case Keywords.Modulo:
-						result = AppendToBinaryExpression(lexer, expression, result);
+						expression = AppendToBinaryExpression(lexer, expression, IntervalSelector);
 						break;
 					default:
-						return result ?? expression;
+						return expression;
 				}
 			}
-			return result ?? expression;
+			return expression;
 		}
 
 		/*
@@ -432,10 +427,9 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = UnaryExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].IsSymbol(Keywords.Power))
-				result = AppendToBinaryExpression(lexer, expression, result);
-			return result ?? expression;
+				expression = AppendToBinaryExpression(lexer, expression, UnaryExpression);
+			return expression;
 		}
 
 		/*
@@ -472,10 +466,9 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = IndexerExpression(lexer);
 
-			BinaryExpression result = null;
 			while (lexer[1].IsSymbol(Keywords.Dereference))
-				result = AppendToBinaryExpression(lexer, expression, result);
-			return result ?? expression;
+				expression = AppendToBinaryExpression(lexer, expression, IndexerExpression);
+			return expression;
 		}
 
 		/*
