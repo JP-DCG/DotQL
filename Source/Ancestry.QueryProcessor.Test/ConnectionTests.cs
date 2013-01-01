@@ -32,7 +32,7 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
-		public void LetEvaluate()
+		public void LocalSymbolEvaluate()
 		{
 			var connection = new Connection();
 			

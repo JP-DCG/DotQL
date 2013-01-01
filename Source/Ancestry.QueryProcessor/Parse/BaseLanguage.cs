@@ -127,5 +127,10 @@ namespace Ancestry.QueryProcessor.Parse
 				EndLinePos = lineInfo.EndLinePos;
 			}
 		}
+
+		public virtual IEnumerable<Statement> GetChildren()
+		{
+			yield break;
+		}
 	}
 }

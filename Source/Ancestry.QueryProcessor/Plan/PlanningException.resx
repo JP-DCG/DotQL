@@ -120,4 +120,7 @@
   <data name="103100" xml:space="preserve">
     <value>Invalid rooted identifier.  Rooted identifiers are only allowed in references.</value>
   </data>
+  <data name="103101" xml:space="preserve">
+    <value>Identifier conflict.  There is already an identifier by this name in scope.</value>
+  </data>
 </root>

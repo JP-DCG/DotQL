@@ -9,7 +9,7 @@ Script :=
 	Expression : [ ClausedExpression ]
 
 UsingClause :=
-	"using" [ Alias: QualifiedIdentifier "=" ] Target : QualifiedIdentifier
+	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier
 
 ModuleDeclaration :=
 	"module" Name : QualifiedIdentifier "{" Members : [ ModuleMember ]* "}"
@@ -67,7 +67,7 @@ IntervalType :=
 	"interval" Type : TypeDeclaration
 
 NamedType :=
-	Name : QualifiedIdentifier
+	Target : QualifiedIdentifier
 
 Expression 1 =
 	OfExpression : ( Expression : Expression "of" Type : TypeDeclaration )
@@ -147,7 +147,7 @@ FunctionSelector :=
 	Type : FunctionType Expression : ClausedExpression
 
 IdentifierExpression := 
-	Name : QualifiedIdentifier
+	Target : QualifiedIdentifier
 
 IntegerLiteral :=
 	_ (digit* | '0x' { '0'..'9', 'a'..'f', 'A'..'F' }*)+ _

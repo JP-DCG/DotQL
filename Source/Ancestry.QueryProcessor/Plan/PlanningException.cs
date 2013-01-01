@@ -11,6 +11,8 @@ namespace Ancestry.QueryProcessor.Plan
 			/// <summary>Error code 103100: "Invalid rooted identifier.  Rooted identifiers are only allowed in references."</summary>
 			InvalidRootedIdentifier = 103100,
 
+			/// <summary>Error code 103101: "Identifier conflict.  There is already an identifier by this name in scope."</summary>
+			IdentifierConflict = 103101,
 		}
 
 		// Resource manager for this exception class

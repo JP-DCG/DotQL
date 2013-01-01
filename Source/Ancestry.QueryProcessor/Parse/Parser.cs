@@ -86,7 +86,7 @@ namespace Ancestry.QueryProcessor.Parse
 			lexer[1].CheckType(TokenType.Symbol);
 			switch (lexer[1].Token)
 			{
-				case Keywords.Function: return FunctionType(lexer); break;
+				case Keywords.Function: return FunctionType(lexer); 
 				default: throw new LexerException(LexerException.Codes.InvalidTypeDeclaration);
 			}
 		}
@@ -658,7 +658,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 					// Manually construct the first attribute and add it
 					var attribute = new AttributeSelector();
-					attribute.Name = identifier.Name;
+					attribute.Name = identifier.Target;
 					attribute.LineInfo = identifier.LineInfo;
 					attribute.Value = Expression(lexer);
 					var result = new TupleSelector();
@@ -776,7 +776,7 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var result = new IdentifierExpression();
 			result.SetPosition(lexer[1]);
-			result.Name = QualifiedIdentifier(lexer);
+			result.Target = QualifiedIdentifier(lexer);
 			return result;
 		}
 
@@ -807,7 +807,7 @@ namespace Ancestry.QueryProcessor.Parse
 			if (lexer[1].IsSymbol(Keywords.Where))
 				result.WhereClause = Expression(lexer);
 			if (lexer[1].IsSymbol(Keywords.Order))
-				result.OrderDimensions = OrderClause(lexer);
+				OrderClause(lexer, result.OrderDimensions);
 			lexer.NextToken().CheckSymbol(Keywords.Return);
 			result.Expression = Expression(lexer);
 
@@ -858,13 +858,12 @@ namespace Ancestry.QueryProcessor.Parse
 			OrderDimension :=
 				Expression : Expression [ Direction : ( "asc" | "desc" ) ]
 		*/
-		public List<OrderDimension> OrderClause(Lexer lexer)
+		public void OrderClause(Lexer lexer, List<OrderDimension> results)
 		{
 			lexer.NextToken().DebugCheckSymbol(Keywords.Order);
 
 			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
 
-			var results = new List<OrderDimension>();
 			while (!lexer[1].IsSymbol(Keywords.EndGroup))
 			{
 				var result = new OrderDimension();			
@@ -877,7 +876,6 @@ namespace Ancestry.QueryProcessor.Parse
 
 				results.Add(result);
 			}
-			return results;
 		}
 
 		public bool IsValidIdentifier(string subject)

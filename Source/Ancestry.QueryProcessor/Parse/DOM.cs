@@ -19,6 +19,34 @@ namespace Ancestry.QueryProcessor.Parse
 		public List<Assignment> Assignments { get { return _assignments; } }
 
 		public ClausedExpression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return 
+				String.Join
+				(
+					"\r\n",
+					(from u in Usings select u.ToString())
+						.Union(from m in Modules select m.ToString())
+						.Union(from v in Vars select v.ToString())
+						.Union(from a in Assignments select a.ToString())
+				)
+					+ "\r\n" + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var u in Usings)
+				yield return u;
+			foreach (var m in Modules)
+				yield return m;
+			foreach (var v in Vars)
+				yield return v;
+			foreach (var a in Assignments)
+				yield return a;
+			if (Expression != null)
+				yield return Expression;
+		}
 	}
 
 	public class Using : Statement
@@ -26,17 +54,41 @@ namespace Ancestry.QueryProcessor.Parse
 		public QualifiedIdentifier Alias { get; set; }
 		
 		public QualifiedIdentifier Target { get; set; }
+
+		public override string ToString()
+		{
+			return "using " + (Alias == null ? "" : Alias + " := ") + Target;
+		}
 	}
 
 	public class ModuleDeclaration : Statement
 	{
 		public QualifiedIdentifier Name { get; set; }
 
+		public Version Version { get; set; }
+
 		private List<ModuleMember> _members = new List<ModuleMember>();
 		public List<ModuleMember> Members { get { return _members; } }
+
+		public override string ToString()
+		{
+			return "module " + Name + " " + Version + "{\r\n\t" 
+				+ String.Join("\r\n\t", (from m in Members select m.ToString()).ToArray()) + "\r\n}";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var m in Members)
+				yield return m;
+		}
 	}
 
-	public abstract class ModuleMember : Statement
+	public interface ISymbol
+	{
+		QualifiedIdentifier Name { get; set; }
+	}
+
+	public abstract class ModuleMember : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 	}
@@ -44,38 +96,95 @@ namespace Ancestry.QueryProcessor.Parse
 	public class TypeMember : ModuleMember
 	{
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Type.ToString();
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class EnumMember : ModuleMember
 	{
 		private List<QualifiedIdentifier> _values = new List<QualifiedIdentifier>();
 		public List<QualifiedIdentifier> Values { get { return _values; } }
+
+		public override string ToString()
+		{
+			return Name + " : " + String.Join(" ", from v in Values select v.ToString());
+		}
 	}
 
 	public class ConstMember : ModuleMember
 	{
 		public Expression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
 	}
 
 	public class VarMember : ModuleMember
 	{
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
-	public class VarDeclaration : Statement
+	public class VarDeclaration : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 		
-		public Expression Initializer { get; set; }		
+		public Expression Initializer { get; set; }
+
+		public override string ToString()
+		{
+			return "var " + Name + (Type != null ? " : " + Type : "") + (Initializer != null ? " := " + Initializer : "");
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+			yield return Initializer;
+		}
 	}
 
 	public class Assignment : Statement
 	{
-		public PathExpression Target { get; set; }
+		public Expression Target { get; set; }
 
 		public Expression Source { get; set; }
+
+		public override string ToString()
+		{
+			return "set " + Target + " := " + Source;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Target;
+			yield return Source;
+		}
 	}
 
 	public abstract class TypeDeclaration : Statement { }
@@ -83,11 +192,31 @@ namespace Ancestry.QueryProcessor.Parse
 	public class ListType : TypeDeclaration
 	{
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return "[" + Type + "]";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class SetType : TypeDeclaration
 	{
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return "{ " + Type + " }";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class TupleType : TypeDeclaration
@@ -100,16 +229,53 @@ namespace Ancestry.QueryProcessor.Parse
 
 		private List<TupleKey> _keys = new List<TupleKey>();
 		public List<TupleKey> Keys { get { return _keys; } }
+
+		public override string ToString()
+		{
+			return "{ " 
+				+ 
+				(
+					Attributes.Count == 0
+						? ":"
+						: String.Join
+						(
+							" ", 
+							(from a in Attributes select a.ToString())
+							.Union(from r in References select r.ToString())
+							.Union(from k in Keys select k.ToString())
+						)
+				) + " }";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var a in Attributes)
+				yield return a;
+			foreach (var r in References)
+				yield return r;
+			foreach (var k in Keys)
+				yield return k;
+		}
 	}
 
-	public class TupleAttribute : Statement
+	public class TupleAttribute : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
-	public class TupleReference : Statement
+	public class TupleReference : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
@@ -120,12 +286,23 @@ namespace Ancestry.QueryProcessor.Parse
 
 		private List<QualifiedIdentifier> _targetAttributeNames = new List<QualifiedIdentifier>();
 		public List<QualifiedIdentifier> TargetAttributeNames { get { return _targetAttributeNames; } }
+
+		public override string ToString()
+		{
+			return "ref " + Name + "(" + String.Join(" ", from n in SourceAttributeNames select n.ToString()) 
+				+ ") " + Target + "(" + String.Join(" ", from n in TargetAttributeNames select n.ToString()) + ")";
+		}
 	}
 
 	public class TupleKey : Statement
 	{
 		private List<QualifiedIdentifier> _attributeNames = new List<QualifiedIdentifier>();
 		public List<QualifiedIdentifier> AttributeNames { get { return _attributeNames; } }
+
+		public override string ToString()
+		{
+			return "key (" + String.Join(" ", from a in AttributeNames select a.ToString()) + ")";
+		}
 	}
 
 	public class FunctionType : TypeDeclaration
@@ -137,23 +314,65 @@ namespace Ancestry.QueryProcessor.Parse
 		public List<FunctionParameter> Parameters { get { return _parameters; } }
 
 		public TypeDeclaration ReturnType { get; set; }
+
+		public override string ToString()
+		{
+			return "function" 
+				+ (TypeParameters.Count > 0 ? "<" + String.Join(" ", from tp in TypeParameters select tp.ToString()) + ">" : "")
+				+ "(" + String.Join(" ", from p in Parameters select p.ToString()) 
+				+ ") : " + ReturnType.ToString();
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var tp in TypeParameters)
+				yield return tp;
+			foreach (var p in Parameters)
+				yield return p;
+			yield return ReturnType;
+		}
 	}
 
-	public class FunctionParameter : Statement
+	public class FunctionParameter : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class IntervalType : TypeDeclaration
 	{
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return "interval " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class NamedType : TypeDeclaration
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public QualifiedIdentifier Target { get; set; }
+
+		public override string ToString()
+		{
+			return Target.ToString();
+		}
 	}
 
 	public abstract class Expression : Statement { }
@@ -168,23 +387,71 @@ namespace Ancestry.QueryProcessor.Parse
         
         public Expression WhereClause { get; set; }
 
-        public List<OrderDimension> OrderDimensions { get; set; }
+		private List<OrderDimension> _orderDimensions = new List<OrderDimension>();
+        public List<OrderDimension> OrderDimensions { get { return _orderDimensions; } }
 
         public Expression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return 
+				String.Join
+				(
+					"\r\n",
+					(from f in ForClauses select f.ToString())
+						.Union(from l in LetClauses select l.ToString())
+						.Union(WhereClause != null ? new[] { "where" + WhereClause.ToString() } : new string[] {})
+						.Union(OrderDimensions.Count > 0 ? new[] { "order (" + String.Join(" ", from o in OrderDimensions select o.ToString()) + ")" } : new string[] {})
+						.Union(Expression != null ? new[] { "return " + Expression } : new string[] {})
+				);
+		}
+
+		public IEnumerable<Statement> GetChildren()
+		{
+			foreach (var f in ForClauses)
+				yield return f;
+			foreach (var l in LetClauses)
+				yield return l;
+			if (WhereClause != null)
+				yield return WhereClause;
+			foreach (var od in OrderDimensions)
+				yield return od;
+			yield return Expression;
+		}
     }
 
-	public class ForClause : Statement
+	public class ForClause : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return "for " + Name + " in " + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
 	}
 
-	public class LetClause : Statement
+	public class LetClause : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return "let " + Name + " := " + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
 	}
 
 	public class OrderDimension : Statement
@@ -192,41 +459,92 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression Expression { get; set; }
 
 		public bool Ascending { get; set; }
+
+		public override string ToString()
+		{
+			return Expression + (Ascending ? "" : " desc");
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
 	}
 
-	public abstract class PathExpression : Expression { }
-
-	public class OfExpression : PathExpression
+	public class OfExpression : Expression
 	{
 		public Expression Expression { get; set; }
 
 		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Expression + " of " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			yield return Type;
+		}
 	}
 
-	public class BinaryExpression : PathExpression
+	public class BinaryExpression : Expression
 	{
 		public Expression Left { get; set; }
 
 		public Expression Right { get; set; } 
 
 		public Operator Operator { get; set; }
+
+		public override string ToString()
+		{
+			return Left + " " + Operator.ToString() + " " + Right;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Left;
+			yield return Right;
+		}
 	}
 
-	public class UnaryExpression : PathExpression
+	public class UnaryExpression : Expression
 	{
 		public Expression Expression { get; set; }
 
 		public Operator Operator { get; set; }
+
+		public override string ToString()
+		{
+			return Operator.ToString() + " " + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
 	}
 
-	public class IndexerExpression : PathExpression
+	public class IndexerExpression : Expression
 	{
 		public Expression Expression { get; set; }
 
 		public Expression Indexer { get; set; }
+
+		public override string ToString()
+		{
+			return Expression.ToString() + "[" + Indexer + "]";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			yield return Indexer;
+		}
 	}
 
-	public class CallExpression : PathExpression
+	public class CallExpression : Expression
 	{
 		public Expression Expression { get; set; }
 
@@ -238,15 +556,49 @@ namespace Ancestry.QueryProcessor.Parse
 
 		/// <summary> Single tuple argument (mutex with arguments). </summary>
 		public Expression Argument { get; set; }
+
+		public override string ToString()
+		{
+			return Expression.ToString() 
+				+ (TypeArguments.Count > 0 ? "<" + String.Join(" ", from ta in TypeArguments select ta.ToString()) + ">" : "")
+				+ 
+				(
+					Argument != null
+						? "=>" + Argument
+						: ("(" + String.Join(" ", from a in Arguments select a.ToString()) + ")")
+				);
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			foreach (var ta in TypeArguments)
+				yield return ta;
+			foreach (var a in Arguments)
+				yield return a;
+			if (Argument != null)
+				yield return Argument;
+		}
 	}
 
-	public class ListSelector : PathExpression
+	public class ListSelector : Expression
 	{
 		private List<Expression> _items = new List<Expression>();
 		public List<Expression> Items { get { return _items; } }
+
+		public override string ToString()
+		{
+			return "{ " + String.Join(" ", from i in Items select i.ToString()) + " }";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var i in Items)
+				yield return i;
+		}
 	}
 
-	public class TupleSelector : PathExpression
+	public class TupleSelector : Expression
 	{
 		private List<AttributeSelector> _attributes = new List<AttributeSelector>();
 		public List<AttributeSelector> Attributes { get { return _attributes; } }
@@ -256,46 +608,132 @@ namespace Ancestry.QueryProcessor.Parse
 
 		private List<TupleKey> _keys = new List<TupleKey>();
 		public List<TupleKey> Keys { get { return _keys; } }
+
+		public override string ToString()
+		{
+			return "{ " 
+				+ 
+				(
+					Attributes.Count == 0
+						? ":"
+						: String.Join
+						(
+							" ", 
+							(from a in Attributes select a.ToString())
+							.Union(from r in References select r.ToString())
+							.Union(from k in Keys select k.ToString())
+						)
+				) + " }";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var a in Attributes)
+				yield return a;
+			foreach (var r in References)
+				yield return r;
+			foreach (var k in Keys)
+				yield return k;
+		}
 	}
 
-	public class AttributeSelector : Statement
+	public class AttributeSelector : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
 
 		public Expression Value { get; set; }
+
+		public override string ToString()
+		{
+ 			 return Name.ToString() + " : " + Value;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Value;
+		}
 	}
 
-	public class SetSelector : PathExpression
+	public class SetSelector : Expression
 	{
 		private List<Expression> _items = new List<Expression>();
 		public List<Expression> Items { get { return _items; } }
+
+		public override string ToString()
+		{
+			return "{ " + String.Join(" ", from i in Items select i.ToString()) + " }";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var i in Items)
+				yield return i;
+		}
 	}
 
-	public class FunctionSelector : PathExpression
+	public class FunctionSelector : Expression
 	{
 		public FunctionType Type { get; set; }
 
 		public ClausedExpression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return Type.ToString() + "\r\n\t" + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+			yield return Expression;
+		}
 	}
 
-	public class IntervalSelector : PathExpression
+	public class IntervalSelector : Expression
 	{
 		public Expression Begin { get; set; }
 
 		public Expression End { get; set; }
+
+		public override string ToString()
+		{
+			return Begin.ToString() + ".." + End.ToString();
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Begin;
+			yield return End;
+		}
 	}
 
-	public class IdentifierExpression : PathExpression
+	public class IdentifierExpression : Expression
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public QualifiedIdentifier Target { get; set; }
+
+		public override string ToString()
+		{
+			return Target.ToString();
+		}
 	}
 
-	public class LiteralExpression : PathExpression
+	public class LiteralExpression : Expression
 	{
 		public object Value { get; set; }
+
+		public override string ToString()
+		{
+			switch (Value.GetType().Name)
+			{
+				case "String": return "'" + ((String)Value).Replace("'", "''") + "'";
+				case "Char": return "'" + ((Char)Value).ToString().Replace("'", "''") + "'c";
+				// TODO: Complete this
+				default: return Value.ToString();
+			}
+		}
 	}
 
-	public class CaseExpression : PathExpression
+	public class CaseExpression : Expression
 	{
 		public Expression TestExpression { get; set; }
 
@@ -303,6 +741,23 @@ namespace Ancestry.QueryProcessor.Parse
 		public List<CaseItem> Items { get { return _items; } }
 
 		public Expression ElseExpression { get; set; }
+
+		public override string ToString()
+		{
+			return "case" + (TestExpression != null ? " " + TestExpression : "")
+				+ String.Concat(from i in Items select "\r\n\t" + i.ToString())
+				+ "\r\n\t" + ElseExpression
+				+ "\r\nend";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			if (TestExpression != null)
+				yield return TestExpression;
+			foreach (var i in Items)
+				yield return i;
+			yield return ElseExpression;
+		}
 	}
 
 	public class CaseItem : Statement
@@ -310,22 +765,56 @@ namespace Ancestry.QueryProcessor.Parse
 		public Expression WhenExpression { get; set; }
 
 		public Expression ThenExpression { get; set; }
+
+		public override string ToString()
+		{
+			return "when " + WhenExpression + " then " + ThenExpression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return WhenExpression;
+			yield return ThenExpression;
+		}
 	}
 
-	public class IfExpression : PathExpression
+	public class IfExpression : Expression
 	{
 		public Expression Expression { get; set; }
 
 		public Expression ThenExpression { get; set; }
 
 		public Expression ElseExpression { get; set; }
+
+		public override string ToString()
+		{
+			return "if " + Expression + " then " + ThenExpression + " else " + ElseExpression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			yield return ThenExpression;
+			yield return ElseExpression;
+		}
 	}
 
-	public class TryCatchExpression : PathExpression
+	public class TryCatchExpression : Expression
 	{
 		public Expression TryExpression { get; set; }
 
 		public Expression CatchExpression { get; set; }
+
+		public override string ToString()
+		{
+			return "try " + TryExpression + " catch " + CatchExpression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return TryExpression;
+			yield return CatchExpression;
+		}
 	}
 }
 

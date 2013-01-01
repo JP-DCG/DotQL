@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Plan
 {
-	public class Frame : Dictionary<QualifiedIdentifier, Statement>
+	public class Frame : Dictionary<QualifiedIdentifier, ISymbol>
 	{
 		private Frame _baseFrame;
 		public Frame BaseFrame { get { return _baseFrame; } }
@@ -16,13 +16,25 @@ namespace Ancestry.QueryProcessor.Plan
 			_baseFrame = baseFrame;
 		}
 
-		public Statement this[QualifiedIdentifier id]
+		public void Add(QualifiedIdentifier name, ISymbol symbol)
+		{
+			var existing = this[name];
+			if (existing != null)
+				throw new PlanningException(PlanningException.Codes.IdentifierConflict, existing.Name);
+		}
+
+		public ISymbol this[QualifiedIdentifier id]
 		{
 			get
 			{
-				Statement result = null;
-				//var current = id;
-				//while (result == null && current.IsQualified
+				// TODO: attempt with dequalified names
+				ISymbol result = null;
+				var current = this;
+				while (result == null && current != null)
+				{
+					current.TryGetValue(id, out result);
+					current = current.BaseFrame;
+				}
 				return result;
 			}
 		}
