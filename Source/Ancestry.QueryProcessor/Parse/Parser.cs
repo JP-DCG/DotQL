@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-	// given an arbitrary input string, return a syntactically valid AQL parse tree
+	// given an arbitrary input string, return a syntactically valid DotQL parse tree
 	public class Parser
 	{
 		public static R ParseFrom<R>(Func<Lexer, R> func, string input)
@@ -55,7 +55,23 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public Using Using(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().DebugCheckSymbol(Keywords.Using);
+
+			var @using = new Using();
+			@using.SetPosition(lexer);
+
+			var qualifiedIdentifier = QualifiedIdentifier(lexer);
+
+			if (lexer[1].IsSymbol(Keywords.Equal))
+			{
+				@using.Alias = qualifiedIdentifier;
+				lexer.NextToken();
+				qualifiedIdentifier = QualifiedIdentifier(lexer);
+			}
+
+			@using.Target = qualifiedIdentifier;
+
+			return @using;
 		}
 
 		public ModuleDeclaration Module(Lexer lexer)

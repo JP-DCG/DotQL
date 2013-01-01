@@ -23,5 +23,19 @@ namespace Ancestry.QueryProcessor.Test
 //			);
 		}
 
+		[TestMethod]
+		public void Using()
+		{
+			Using @using = new Parser().Using(new Lexer("using Something"));
+			Assert.IsNull(@using.Alias.Components);
+			Assert.IsNotNull(@using.Target.Components);
+			Assert.AreEqual("Something", string.Join("\\", @using.Target.Components));
+
+			@using = new Parser().Using(new Lexer("using SomeAlias = Something"));
+			Assert.IsNotNull(@using.Alias.Components);
+			Assert.AreEqual("SomeAlias", string.Join("\\", @using.Alias.Components));
+			Assert.IsNotNull(@using.Target.Components);
+			Assert.AreEqual("Something", string.Join("\\", @using.Target.Components));
+		}
 	}
 }
