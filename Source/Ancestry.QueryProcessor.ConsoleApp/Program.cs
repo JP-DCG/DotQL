@@ -72,6 +72,11 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 						{
 							sb.AppendLine( );
 						}
+						else if( info.Key == ConsoleKey.Backspace )
+						{
+							Console.Write( " \b" );
+							sb.Remove( sb.Length - 1, 1 );
+						}
 						else
 						{
 							sb.Append( info.KeyChar );
