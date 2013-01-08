@@ -28,14 +28,13 @@ return
 return Person[Count(Attributes.Event) > 2]
 
 //* Persons with their preferred names
-for p in Person
-let on :=
-	for n in p.Attributes.Name
-	let ap := n.Attribute.Priority
-	order ap.Priority ?? 0 desc, n.ID
-	return n
-let pn := on[Index = 0]
-return { PersonID: p.ID, First: pn.First, Last: pn.Last }
+let PreferredName := function(CustomerID: Long): Names.MemberType
+	let orderedn :=
+		for n in Attributes(value.CustomerID = args.CustomerID).Name
+		let ap := n.Attribute.Priority
+		order (ap.Priority ? 0 desc  n.ID)
+		return n
+	return orderedn[0]
 
 //* Embedding: Persons and their attributes
 let PwithA :=

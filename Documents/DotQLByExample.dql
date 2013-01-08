@@ -1,891 +1,1292 @@
-/* DotQL By Example */
+DotQL By Example
+================
 
-/* Types: */
+Types:
+------
 
-// List - sequential:
-return [1 2 3]
-// Set - unordered, unique:
-return { 1 2 3 }
-// Tuple:
-return { Name: "Sally" Age: 23 }
-// Interval:
-return 2..6
-// Enumerations:
-return Red	
-// Void:
-return void
-// Scalar - intrinsic types:
-return 456	// Integer (32bit), Long (64bit)
-return true	// Boolean
-return "Hello\r\nWorld"	// C-style string (UTF16)
-return 'Hello'#13#10'World' // Pascal-style string ('' escapes, captures whitespace) (UTF16)
-return 'H'c	// Character
-return '2012-12-12'd	// Date
-return '15:30.2't // Time
-return '2012-12-12'dt	// DateTime
-return 2.4	// Double
-return '84edd204-4b7d-45d0-9a3f-18f2fccc9732'g	// GUID
-return '5d3h'ts	// TimeSpan
-return 1.2.0	// Version (up to 4 components)
+List - sequential:
 
-// Note: Commas and semi-colons are absent from expressions (noise-reduction)
-// Note: The convention is to use a single space inside of single-line braces (e.g. { x }), but no space for brackets (e.g. [x])
+	return [1 2 3]
 
-/* Declaration */
+Set - unordered, unique:
 
-// "Table" variable declaration:
-Person: 
-{
-	{ 
-		ID : Integer 
-		Origin : String 
-		ref Attributes(ID) Attribute(PersonID) 
-		key (ID) 
+	return { 1 2 3 }
+
+Tuple:
+
+	return { OrderItems: "Sally"  Age: 23 }
+
+Interval:
+	
+	return 2..6
+
+Enumeration:
+
+	return Red	
+
+Void:
+
+	return void
+
+Scalar - intrinsic types:
+
+	return 456	Integer (32bit), Long (64bit)
+	return true	Boolean
+	return "Hello\r\nWorld"	C-style string (UTF16)
+	return 'Hello'#13#10'World' Pascal-style string ('' escapes, captures whitespace) (UTF16)
+	return 'H'c	Character
+	return '2012-12-12'd	Date
+	return '15:30.2't Time
+	return '2012-12-12'dt	DateTime
+	return 2.4	Double
+	return '84edd204-4b7d-45d0-9a3f-18f2fccc9732'g	GUID
+	return '5d3h'ts	TimeSpan
+	return 1.2.0	Version (up to 4 components)
+
+**Note:** Commas and semi-colons are absent from expressions (noise-reduction)
+
+**Note:** The convention is to use a single space inside of single-line braces (e.g. { x }), but no space for brackets (e.g. [x])
+
+Declaration
+-----------
+
+"Table" variable declaration:
+
+	Customers: 
+	{
+		{ 
+			ID : Integer 
+			City : String 
+			ref Orders(ID) Orders(CustomerID) 
+			key (ID) 
+		}
 	}
-}
-
-// Reads: The person member is a set of tuples, each having an ID, Origin, reference to Attributes, and identified by ID
-
-// Note: The terms: tuple set, table, and relation are all synonymous
-
-// Declaration of a variable of a set of integers:
-Things: { Integer }
-
-// Qualified name:
-Height\Value: Integer
-// ...if not ambiguous, may be accessed as:
-return Value
-// ...or
-return Height\Value
-
-/* Claused Expressions */
-
-// FLWOR:
-for ...
-let ...
-where ...
-order ...
-return ...
-// All but return are optional, let may be repeated any number of times
-
-// Simple cardinality 1 FLWOR
-return 5
-
-// Iterator - all clauses are per iteration:
-for i in 1..5
-return i
-// returns [1 2 3 4 5]
-
-// Let provides reuse:
-let x := 5**5
-return { Num: x Other: x + 1 }
-
-// Where restricts result cardinality:
-for i in 1..6
-where i % 2 = 0
-return i
-// returns [2 4 6]
-
-// Order specifies result ordering:
-for i in 1..3
-order (i desc)
-return i
-// returns [3 2 1]
-
-/* Dotted Path Expressions */
-
-// Base table access:
-return Person
-// returns entire person table. e.g. { { ID: 123 Origin: "R" } { ID: 124 ...
-
-// "Point" restriction:
-return Person(ID = 234)
-// e.g. { ID: 234 Origin: "R" }
-// Note: Result not in a set because cardinality 1 is detected due to equality restriction on entire key
-
-// Regular restriction:
-return Person(Origin = "T")
-// e.g. { { ID: 125 Origin: "T" } { ID: 126...
-// Result is a set (not a tuple) because Origin is not a key
-
-// Restriction is arbitrary boolean expression:
-return Gender(not IsFemale)
-// e.g. { { ID: 456 IsFemale: false } ...
-
-// Reference following (dereferencing):
-return Person(ID = 123).Attributes
-// e.g. { { ID: 456 PersonID: 123 Type: "NG" } { ID: 457 PersonID: 123 Type: "G" } ...
-// Attributes is a reference on the person tuple; accessing it gives attributes for all matching persons
-
-// Equivalent query:
-return Attributes(PersonID = 123)
-
-// Doesn't matter if left side of dot is many:
-return Person(Origin = "R").Attributes
-// reads: all attributes associated with persons that have origin of "R"
-// logically same as this:
-return Attributes(exists Person(Origin = "R" and ID = PersonID))
-
-// Note: only the last table in a path sequence is returned, the prior tables serve to logically restrict said table
-
-// Dotting through Extention (one to zero or one) relationships: 
-return Person(ID = 123).Attributes.Name
-// e.g. { { ID: 123 First: "Bob" Last: "Smith" ... } 
-// Still a set cardinality because there can be any number of name attributes under a 
-//  person (any n cardinality table along the path causes subsequent tables to be n cardinality)
-
-// Single cardinality Extension:
-return Attribute(ID = 456).Name
-// e.g. { ID: 123 First: "Bob" Last: "Smith" ...  or null
-// Singular cardinality because the Attribute query
-
-/* Embedded Path Expressions */
-
-// Embedded reference:
-return Person(ID = 123)+Attributes
-// e.g. { ID: 123 Origin: "R" Attributes: { { ID: 234 PersonID: 123 Type: "NG" } ... } 
-// Note: A row from the Person table already has an Attributes member, but it is a reference, not an attribute;
-//  this operator acts to "materialize" the reference as an embedded table attribute
-
-// Dot paths following an embedded path:
-return Person(ID = 123)+Attributes.Name
-// e.g. { ID: 123 Origin: "R" Attributes\Name: { { ID: 456 First: "Bob" Last: "Smith" } ... } }
-// NOTE: remember that because Attributes\Name is a qualified name, it may be accessed as just Name if not ambiguous
-
-// Dot paths preceeding an embedded path:
-return Person(ID = 123).Attributes+Name
-// e.g. { ID: 456 PersonID: 123 Type: "NG" Name: { ID: 456 First: "Bob" Last: "Smith" } }
-
-// Embedding multiple tables:
-return Person(ID = 123).Attributes+(Name Gender)
-// e.g.
-//{
-//	{ ID: 234 Type: "NG" Name: { ID: 234 First: "Bob" Last: "Smith" } Gender: null }
-//	{ ID: 345 Type: "G" Name: null Gender: { ID: 345 IsFemale: false } }
-//}
-
-// Dereferencing multiple tables
-return Person(ID = 123).Attributes.(Name Gender)
-// Causes the table names to be nested as attributes in a new tuple.  e.g.
-//{
-//	{ Name: { ID: 234 First: "Bob" Last: "Smith" } Gender: null }
-//	{ Name: null Gender: { ID: 345 IsFemale: false } }
-// ...
-//}
-
-// Paths within claused expressions:
-for a in Person(ID = 123).Attributes
-return { ID: a.ID }
-// e.g. { { ID: 456 } { ID: 457 } ... }
-
-// Ordering always produces lists rather than sets (not for distinct purposes but for representing sequence):
-for a in Person(ID = 123).Attributes
-order (a.ID)
-return { ID: a.ID }
-// e.g. [{ ID: 456 } { ID: 457 } ...]
-
-// Per the Relational Model, there is an implicit key over all attributes, so the following results in a list:
-for a in Attributes
-order (a.Type)
-return { Type: a.Type }
-// e.g. [{ Type: "EB" } { Type: "EM" } ...]
-
-// Path restriction works on lists too:
-return [{ ID: 123 } { ID: 124 }](ID > 123)
-// returns [{ ID: 124 }]
-
-// Reuse within paths:
-for a in Person.Attributes
-let n := ToLower(a.Type)
-where n = "ng"
-return { ID: a.ID TypeUpper: ToUpper(n) TypeLower: n }
-
-/* Item Extraction */
-
-// List member extraction:
-return [2 4 6 8][0]
-// returns: 2
-
-// Single member extraction:
-return [2][]	// from list
-// result: 2
-
-return { 2 }[]	// from set
-// result: 2
-
-return [][]
-// result null
-
-return [2 4][]
-// n cardinality results in runtime exception!
-
-/* Explicit Typing */
-
-// Empty list type selection:
-return [] of [Integer]
-
-// Explicitly designating type of list:
-return [4] of [Long]
-
-// Similar for sets
-return { } of { String }
-
-// Types for nulls:
-return null of Integer
-
-// Types for tuples:
-return { ID: 135 } of { ID: Long }
-
-/* Nulls */
-
-// Resolving nulls:
-return ([] of Integer)[0] ? 5;
-// returns: 5
-// The parentheses are not necessary, they are merely to clarify that the [0] is not part of the Integer type definition
-// Note: out of range list extraction results in null, not error
-
-// Determining null:
-return ??Name[ID = 1212][].Prefix
-// e.g. true if null either because there was no such row, or there was a row but the prefix wasn't present
-
-// Tuple with optional attribute
-return { First: "Bob" } of { Prefix: String? First: String }
-// result: { Prefix: null First: "Bob" } 
-
-/* Functions */
-
-// Complex query needing reuse:
-for p in Person
-let orderedn :=
-	for n in p.Attributes.Name
-	let ap := n.Attribute.Priority
-	order (ap.Priority ? 0 desc n.ID)
-	return n
-let pn := orderedn(Index = 0)
-return { PersonID: p.ID  First: pn.First Last: pn.Last }
-// returns perons ID's and the associated highest priority first and last name
-// Need reuse...
-
-// Function declaration:
-let PreferredName := function(PersonID: Long): Name.MemberType
-	let orderedn :=
-		for n in Attributes(PersonID = args.PersonID).Name
-		let ap := n.Attribute.Priority
-		order (ap.Priority ? 0 desc n.ID)
-		return n
-	return orderedn[0]
-
-// Calling Functions:
-for p in Person
-let pn := PreferredName(p.ID)
-return { ID: p.ID FName: pn.First LName: pn.Last  }
-
-// Recursive function:
-let SequentialSum := function(x: Integer): Integer
-	return if x = 0 then 0 else x + SequentialSum(x - 1)
-return SequentialSum(5)
-// result: 15
-
-// Accessing arguments as a tuple:
-let Point := function(x: Integer y: Integer) 
-	return { x: args.x y: args.y }
-return Point(5 7)
-// result: { x: 5 y: 7 }
-// Alternatively, the Point function can be just this:
-let Point := function(x: Integer y: Integer) 
-	return args
-// "args" is a tuple representation of the function's arguments
-
-// Passing arguments as a tuple:
-let Point := function(x: Integer y: Integer) 
-	return args
-return Point=>{ y: 5 x: 7 }
-// result: { x: 7 y: 5 }  (attribute order never matters)
-
-/* Conditions and cases */
-
-// Conditional expression:
-return if true then "Hello" else "Goodbye"
-// returns "Hello"
-
-// Value based case expression:
-let n := 123
-return 
-	case n 
-		when 123 then "Hello"
-		when 234 then "Goodbye"
-		else "Speechless"
-	end
-// returns "Hello"
-
-// Condition base case expression
-let x := 123
-let y := 234
-return
-	case
-		when x = 135 and y = 231 then "Hello"
-		when true then "Goodbye"
-		else "Speechless"
-	end
-// returns "Goodbye"
-
-// Strict cases:
-Colors: enum { Green Red Blue }
-return 
-	case strict x // Error: this case statement must handle all colors
-		when Green then 1 
-		when Red then 2 
-	end
-
-/* Enumerations */
-
-// Enumeration declaration:
-Colors: enum { Red Yellow }
-
-// Enumeration usage:
-let PickOpposite := function(Color: Colors)
-	return if Color = Red then Yellow else Red
-return PickOpposite(Red)
-// returns Yellow
-
-// Dealing with enumeration symbol ambiguity:
-let Colors := enum { Red Yellow }
-let Personality := enum { Red Yellow Blue White }
-return Red	
-// ERROR: this conflicts with the Color Red
-return Personality\Red
-// returns Red (of type Personality)
-
-/* Default Values */
-
-// Defaults for each type are as follows:
-// Numerics: 0
-// String: ""
-// Tuple: <each attribute defaulted>
-// Set: <empty>
-// List: <empty>
-// Function: <function that returns default of return type>
-// Interval: default..(default--)
-// GUID: '00000000-0000-0000-0000-000000000000'g
-// Enumerations: <first member>
-// Version: 0.0.0
-// Boolean: false
-
-// TODO: Passing a tuple, casting a tuple, variables
-
-/* Type Definitions */
-
-// Type Definitions provide type description reuse:
-SetOfNumbers: typedef { Integer }
-
-// Type Definitions are pure short-hands though; for instance, these represent the same type:
-PersonTuple1: typedef { Name: String Age: Integer }
-PersonTuple2: typedef { Age: Integer Name: String }
-// (order of attributes doesn't matter in a tuple, so these two typedefs are equivalent)
-// Tuples, lists, and sets don't have meaningful names; their type description is their name
-
-/* Modules */
-
-// Declaring a module:
-Ancestry\FamilyPaths: module 1.0.0
-{
-	Code: enum { Parent Sibling Child Spouse }
-	Modifier: enum { Male Female Elder Younger Legal God Former Practical }
-	Component: typedef { Code: Code Multiplier: Integer Modifiers: { Modifier } }
-	Path: typedef [Component]
-	Normalize: function(Path: Path) : Path
-		return ...
+
+Reads: Customers is a set of tuples, each having an ID, City, reference to Orders, and identified by ID
+
+Tables really are just sets of tuples:
+
+	Order: typedef 
+	{ 
+		ID: Integer  
+		CustomerID: Integer  
+		On: DateTime  
+		ref Customer(CustomerID) Customers(ID)  
+		ref Items(ID) OrderItems(OrderID) 
+		key(ID)
+	}
+	Orders: { Order }
+
+Defines a tuple type called Order with some columns and references, then a variable called Orders which is a set of Order tuples.
+
+References are not bidirectional; they must be designated from each direction:
+
+	OrderItems: 
+	{ 
+		{ 
+			OrderID: Integer  
+			PartID: Integer  
+			Quantity: Integer
+			ref Order(OrderID) Orders(ID)  
+			ref Part(PartID) Parts(ID)
+			key(OrderID PartID)
+		}
+	}
+
+**Note:** The terms: tuple set, table, and relation are all synonymous
+
+The last of the structures to be used in examples:
+
+	Parts:
+	{
+		{
+			ID: Integer
+			Name: Quantity
+			ref OrderItems(ID) OrderItems(PartID)
+			key(ID)
+		}
+	}
+
+Sets may be over any type.  A set of integers:
+
+	Things: { Integer }
+
+Identifiers may have a qualified (compound) name:
+
+	Height\Value: Integer
+
+...if Value not ambiguous, may be accessed as:
+	
+	return Value
+
+...or
+
+	return Height\Value
+
+Claused Expressions
+-------------------
+
+FLWOR syntax:
+
+	for ...
+	let ...
+	where ...
+	order ...
+	return ...
+
+All but return are optional, let may be repeated any number of times
+
+Simple cardinality 1 FLWOR:
+
+	return 5
+
+Iterator - all clauses are per iteration:
+
+	for i in 1..5
+	return i
+
+Returns `[1 2 3 4 5]`
+
+Let provides reuse:
+	
+	let x := 5**5
+	return { Num: x  Other: x + 1 }
+
+Return: `{ Num: 3125  Other: 3126 }`
+
+Where restricts result cardinality:
+
+	for i in 1..6
+	where i % 2 = 0
+	return i
+
+Returns `[2 4 6]`
+
+Order specifies result ordering:
+
+	for i in 1..3
+	order (i desc)
+	return i
+
+Returns `[3 2 1]`
+
+"Path" Queries
+--------------
+
+Base table access:
+
+	return Customer
+
+Result: entire person table. e.g. `{ { ID: 123  City: "Nephi" } { ID: 124 ...`
+
+Restriction on a key attribute:
+
+	return Customer(ID = 234)
+
+e.g. `{ { ID: 234  City: "Provo" } }`
+
+**Note:** Result remains a set even though cardinality one.
+
+Restriction of tables:
+
+	return Customer(City = "Orem")
+
+e.g. `{ { ID: 125  City: "Orem" } { ID: 126... `
+
+The result may have n rows because City is not a key.
+
+Restriction is arbitrary boolean expression:
+
+	return Order(not IsShipped)
+
+e.g. `{ { ID: 456  IsShipped: false } ... `
+
+Reference following with restriction:
+
+	return Customer(ID = 123).Orders
+
+e.g. `{ { ID: 456  CustomerID: 123  On: '2/3/2003 5:30:00'dt } { ID: 457  CustomerID: 123  On: '2/7/2003 7:30:00'dt } ... `
+
+Orders is a reference on the customer tuple; accessing it gives attributes for all matching persons
+
+Equivalent query:
+
+	return Orders(CustomerID = 123)
+
+Doesn't matter if left side of dot is many:
+
+	return Customer(City = "Orem").Orders
+
+...reads: all attributes associated with persons that have City of "Orem"
+Logically the same as this:
+
+	return Orders(exists Customer(City = "Orem" and ID = CustomerID))
+
+**Note:** only the last table in a path sequence is returned, the prior tables serve to logically restrict said table
+
+Dotting through an Extention (one to zero or one) relationship: 
+
+	return Customer(ID = 123).Orders.OrderItems.Part
+
+e.g. `{ { ID: 123  Name: "Frogalbadge" ... }` 
+
+Any query that "dots" through an n-cardinality table will produce an n-cardinality result unless restricted.
+
+Embedded Path Expressions
+-------------------------
+
+Embedded reference:
+
+	return Customer(ID = 123)+Orders
+
+e.g. `{ ID: 123 City: "Provo" Orders: { { ID: 234  CustomerID: 123  On: '1/23/2002 4:20:00'dt } ... }`
+
+A row from the Customer table already has an Orders member, but it is a reference, not an attribute;
+ this operator acts to "materialize" the reference as an embedded table attribute
+
+Dot paths following an embedded path:
+
+	return Customer(ID = 123)+Orders.OrderItems
+
+e.g. `{ ID: 123 City: "Provo" Orders\OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } ... } }`
+
+Remember... because Orders\OrderItems is a qualified name, it may be accessed as just OrderItems if not ambiguous
+
+Dot paths preceding an embedded path:
+
+	return Customer(ID = 123).Orders+OrderItems
+e.g. `{ ID: 456  CustomerID: 123  On: '1/23/2002 4:20:00'dt  OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } }`
+
+Embedding multiple tables:
+
+	return OrderItems+(Order Part)
+
+e.g. result:
+
+	{ { 
+		OrderID: 234  
+		PartID: 112  
+		Order: { ID: 234  CustomerID: 123  On: '1/23/2002 4:20:00'dt } 
+		Part: { ID: 112  Name: 'Whatzit' } 
+	} }
+
+Dereferencing multiple tables:
+
+	return Customer(ID = 123).Orders.(Customer OrderItems)
+
+This causes the table names to be nested as attributes in a new tuple.  e.g.:
+
+	{ { 
+		Customer: { ID: 123 City: "Provo" } 
+		OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } } 
+	} }
+
+Paths within claused expressions:
+
+	for c in Customer(ID = 123).Orders
+	return { ID: c.ID }
+
+e.g. `{ { ID: 456 } { ID: 457 } ... }`
+
+Ordering always produces lists rather than sets (not for distinct purposes but for representing sequence):
+
+	for c in Customer(ID = 123).Orders
+	order (c.ID)
+	return { ID: c.ID }
+
+e.g. `[{ ID: 456 } { ID: 457 } ...]`
+
+Path restriction works on lists too:
+
+	return [{ ID: 123 } { ID: 124 }](ID > 123)
+
+Result: `[{ ID: 124 }]`
+
+Reuse within paths:
+
+	for c in Customer
+	let lc := ToLower(c.City)
+	where lc = 'orem' or lc = 'lehi'
+	return { City: lc }
+
+Item Extraction
+---------------
+
+List member extraction:
+
+	return [2 4 6 8][0]
+
+returns: `2`
+
+Single member extraction from list:
+
+	return [2][]	
+
+Result: `2`
+
+Single member extraction from set:
+
+	return { 2 }[]
+
+Result: `2`
+
+Empty list extraction:
+
+	return [][]
+
+result `null`
+
+Invalid single member extraction:
+
+	return [2 4][]
+
+Runtime exception!  Cannot extract single member from a set or list with more than one item.
+
+Explicit Typing
+---------------
+
+Empty list type selection:
+
+	return [] of [Integer]
+
+Explicitly designating type of list:
+
+	return [4] of [Long]
+
+Similar for sets
+
+	return { } of { String }
+
+Types for nulls:
+
+	return null of Integer
+
+Types for tuples:
+
+	return { ID: 135 } of { ID: Long }
+
+Nulls
+-----
+
+Resolving nulls:
+
+	return ([] of [Integer])[0] ? 5;
+
+Returns: `5`
+
+The parentheses are not necessary, they are merely to clarify that the [0] is not part of the Integer type definition
+
+**Note:** out of range list extraction results in null, not error
+
+Determining null:
+
+	return ??OrderItems(ID = 1212)[].Delivered
+
+e.g. result `true` if null either because there was no such row, or there was a row but the hypothetical Delivered attribute doesn't have a value
+
+Tuple with optional attribute:
+
+	return { First: "Bob" } of { Prefix: String?  First: String }
+
+Result: `{ Prefix: null First: "Bob" }` 
+
+Functions
+---------
+
+Function declaration:
+
+	let Sign := function(x : Integer) : Integer
+		return ToInteger(0 < x) - ToInteger(x < 0)
+
+Calling Functions:
+
+	for n in [5 0 -8]
+	return Sign(n)
+
+Result: `[1 0 -1]`
+
+Recursive function:
+
+	let SequentialSum := function(x: Integer): Integer
+		return if x = 0 then 0 else x + SequentialSum(x - 1)
+	return SequentialSum(5)
+
+Result: `15`
+
+Postfix invocation:
+
+	return 3->Sign()
+
+Result: `1`
+
+**Note:** The first argument of any function can be used to postfix invoke the function using `->`.
+
+Accessing arguments as a tuple:
+
+	let Point := function(x: Integer y: Integer) 
+		return { x: args.x  y: args.y }
+	return Point(5 7)
+
+Result: `{ x: 5 y: 7 }`
+
+Alternatively, the Point function could be just this:
+
+	let Point := function(x: Integer y: Integer) 
+		return args
+
+`args` is a tuple representation of the function's arguments
+
+Passing arguments as a tuple:
+
+	let Point := function(x: Integer y: Integer) 
+		return args
+	let p1 := { y: 5 x: 7 }
+	return Point=>p1  // or just: return Point=>{ y: 5 x: 7 }
+
+Result: `{ x: 7 y: 5 }`  (attribute order never matters)
+
+Complex function example:
+
+	let PreferredName := function(PersonID: Long): Names.MemberType
+		let orderedn :=
+			for n in Attributes(value.PersonID = args.PersonID).Name
+			let ap := n.Attribute.Priority
+			order (ap.Priority ? 0 desc  n.ID)
+			return n
+		return orderedn[0]
+
+Enumerations
+------------
+
+Enumeration declaration:
+
+	Colors: enum { Red Yellow }
+
+Enumeration usage:
+
+	let PickOpposite := function(Color: Colors)
+		return if Color = Red then Yellow else Red
+	return PickOpposite(Red)
+
+Result: `Yellow`
+
+Dealing with enumeration symbol ambiguity:
+
+	let Colors := enum { Red Yellow }
+	let Personality := enum { Red Yellow Blue White }
+	return Red	
+
+ERROR: this conflicts with the Color Red
+
+To correct:
+
+	return Personality\Red
+
+Result: `Personality\Red`
+
+Conditions and cases
+--------------------
+
+Conditional expression:
+
+	return if true then "Hello" else "Goodbye"
+
+Result: `"Hello"`
+
+Value based case expression:
+
+	let n := 123
+	return 
+		case n 
+			when 123 then "Hello"
+			when 234 then "Goodbye"
+			else "Speechless"
+		end
+
+Result: `"Hello"`
+
+Condition base case expression:
+
+	let x := 123
+	let y := 234
+	return
+		case
+			when x = 135 and y = 231 then "Hello"
+			when true then "Goodbye"
+			else "Speechless"
+		end
+
+Result: `"Goodbye"`
+
+Strict cases:
+
+	Colors: enum { Green Red Blue }
 	...
-}
+	return 
+		case strict x // Error: this case statement must handle all colors
+			when Green then 1 
+			when Red then 2 
+		end
 
-// Using a module:
-using Ancestry\FamilyPaths 1.0.0
-return Normalize([{ Code: Parent } { Code: Parent }])
-// returns [{ Code: Parent Multiplier: 2 }]
+Default Values
+--------------
 
-// Module ambiguity:
-using Ancestry\FamilyPaths 1.0.0
-using Police 1.0.0
-return Code\Fire	// ERROR: Code is ambiguous
-// Valid:
-return Police\Code\Fire
-// NOTE: all module declaration and usage must include explicit version number
+Defaults for each type are as follows:
+* Numerics: `0`
+* String: `""`
+* Tuple: each attribute defaulted
+* Set: empty
+* List: empty
+* Function: function that returns default of return type
+* Interval: default..default
+* GUID: `'00000000-0000-0000-0000-000000000000'g`
+* Enumerations: first member
+* Version: `0.0.0`
+* Boolean: `false`
 
-// Module aliases:
-using fp := Ancestry\FamilyPaths 1.0.0
-return fp\Code\Parent
-// ... or just Code if not ambiguous
+TODO: Passing a tuple, casting a tuple, variables
 
-// Modules may contain the following members:
-module ...
-{
-	Current: Integer // Variables
-	Code: typedef Integer	// Type Definitions
-	Colors: enum { Red Green }	// Enumerations
-	BestNumber: const 5	// Constants
-	Square: const function(x : Integer) return x * x	// Functions (as variables or consts)
-}
+Type Definitions
+----------------
 
-/* Scripts */
+Type Definitions provide type description reuse:
 
-// A script is composed of the following:
-using Colors 1.2.0	// Any number of usings
-module Cars 1.2.1 ...	// Any number of module declarations
-var NewID := 123	// Any number of variable declarations
-set NewID := GenerateID()	// Any number of assignment executions
-return NewID	// Zero or one terminating claused expression
-// NOTE: Non-determinism is allowed in any expression
+	SetOfNumbers: typedef { Integer }
 
-// A script not ending in a claused expression implicitly has a result of void, but this can be explicit too:
-using ...
-...
-return void
+Type Definitions are pure short-hands though; for instance, these represent the same type:
 
-/* Updates */
+	CustomerTuple1: typedef { OrderItems: String Age: Integer }
+	CustomerTuple2: typedef { Age: Integer OrderItems: String }
 
-// All mutation (side-effects) happens within Set assignments:
-set	FavoriteColor := Green
+(order of attributes doesn't matter in a tuple, so these two typedefs are equivalent)
 
-// The left-hand side of assignments may contain reference-based path expressions:
-set Person(ID = 123).Origin := "R"
-// effect: Updates the Origin attribute of the specified tuple of the Person table
+Tuples, lists, and sets don't have meaningful names; their type description *is* their name
 
-// Set statements follow the FLWOR pattern except for Return becomes Set (FLWOS), and there may be any number of set clauses:
-let p = Person(ID = 123)
-set p := { ID: p.ID Origin: "R" }
-// effect: Updates the specified tuple of the Person table
-// NOTE: Assignment of table references is logically a deletion of all matching tuples, followed by insertion of the given value(s)
+Modules
+-------
 
-// Insert using the restriction predicate for defaulting:
-set Person(ID = 123) := { Origin: "R" }
-// Ensures that the given row is in the Person table
+Declaring a module:
 
-// Deletion is enabled by assignment of nothing:
-set Person(ID = 123) := null
+	Ancestry\FamilyPaths: module 1.0.0
+	{
+		Code: enum { Parent Sibling Child Spouse }
+		Modifier: enum { Male Female Elder Younger Legal God Former Practical }
+		Component: typedef { Code: Code  Multiplier: Integer?  Modifiers: { Modifier }? }
+		Path: typedef [Component]
+		Normalize: function(Path: Path) : Path
+			return ...
+		...
+	}
 
-// Insertion:
-var newID: Long
-set newID := GenerateID("Person")
-set Person(ID = newID) := { Origin: "R" }
-return newID
-// effect: Generates a new ID, inserts a person tuple based on that ID, and returns the new ID
+Using a module:
 
-// Updating with iteration:
-for i in 1..6
-set Person(ID = i).Origin := "R"
-// effect: Sets the Origin attribute of a range of person tuples in the person table variable
+	using Ancestry\FamilyPaths 1.0.0
+	return Normalize([{ Code: Parent } { Code: Parent }])
 
-/* Scope */
+Result: `[{ Code: Parent  Multiplier: 2  Modifiers: { } }]`
 
-// Each script has a local frame, which hides any imported context:
-using Ancestry\FamilyPaths 1.0.0
-var Code: Integer	// Hides the Code in FamilyPaths
+Module ambiguity:
 
-// Module members can access other module members, and in any order
-Selfish: module
-{
-	Current: Code
-	Code: typedef Integer
-}
+	using Ancestry\FamilyPaths 1.0.0
+	using Police 1.0.0
+	return Code\Fire	// ERROR: Code is ambiguous
 
-// Usings are global to the script, including within modules
-using Ancestry\FamilyPaths 1.0.0
-PeopleFinder: module 1.2.0
-{
-	Connection: typedef { SourceID: Long TargetID: Long Path: Path }
-}
+Valid:
+	
+	return Police\Code\Fire
 
-/* Exceptions */
+**Note:** all module declaration and usage must include explicit version number
 
-// Try expression:
-return try 1 / 0 catch -1
-// returns -1
+Module aliases:
 
-/* Nullological Cases */
+	using fp := Ancestry\FamilyPaths 1.0.0
+	return fp\Code\Parent
 
-// Empty set of attribute carrying tuples:
-return { } of { { ID: Integer } }
+... or just `Code` if not ambiguous
 
-// Empty lists of normal tuples:
-return [] of [{ ID: Integer }]
+Modules may contain the following members:
+	module ...
+	{
+		Current: Integer Variables
+		Code: typedef Integer	Type Definitions
+		Colors: enum { Red Green }	Enumerations
+		BestNumber: const 5	Constants
+		Square: const function(x : Integer) return x * x	Functions (as variables or consts)
+	}
 
-// Empty tuple of attribute carrying tuple:
-return { : } of { ID: Integer key (ID) }
-// result: { ID: 0 }
+Scripts
+-------
 
-// In an expression context { } means empty set; for a no-attribute tuple specify a ":" to distinguish that it is a tuple
-// In a type context { : } means a no-attribute tuple because a set requires a member type ( { } is a set of type void in a type context )
+A script is composed of the following:
 
-// Set of type void:
-return { }
+`using Colors 1.2.0`	Any number of usings  
+`module Cars 1.2.1 ...`	Any number of module declarations  
+`var NewID := 123`	Any number of variable declarations  
+`set NewID := GenerateID()`	Any number of assignment executions  
+`return NewID`	Zero or one terminating claused expression  
 
-// Set containing one no-attribute tuple ("table dee"):
-return { { : } }
+**Note:** Non-determinism is allowed in any expression
 
-// Set containing zero no-attribute tuples ("table dum"):
-return { } of { { : } }
+A script not ending in a claused expression implicitly has a result of void, but this can be explicit too:
 
-// List of no-attribute tuples:
-return [{ : } null { : }]
+	using ...
+	...
+	return void
 
-// Set of type set of lists of no-attribute tuples:
-return { [{ : }] [] [{ : } { : }] } of { [{ : }] }
+Updates
+-------
 
-/* Generics */
+All mutation (side-effects) happens within Set assignments:
 
-// Functions may take type arguments:
-let Add = function<T>(x: T y: T)
-	return x + y
-return Add<Integer>(5 10)
-// result: 15
+	set	FavoriteColor := Green
+
+The left-hand side of assignments may contain reference-based path expressions:
+
+	set Customer(ID = 123).City := "American Fork"
+
+Effect: Updates the City attribute of the specified tuple of the Customer table
+
+Set statements follow the FLWOR pattern except for Return becomes Set (FLWOS), and there may be any number of set clauses:
+
+	let p = Customer(ID = 123)
+	set p := { ID: p.ID  City: "Cedar City" }
+
+Effect: Updates the specified tuple of the Customer table
+
+**Note:** Assignment of table references is logically a deletion of all matching tuples, followed by insertion of the given value(s)
+
+Insert using the restriction predicate for defaulting:
+
+	set Customer(ID = 123) := { City: "Spanish Fork" }
+
+Effect: Ensures that the given row is in the Customer table.
+
+Deletion is enabled by assignment to nothing:
+
+	set Customer(ID = 123) := null
+
+Insertion:
+
+	var newID: Long
+	set newID := GenerateID("Customer")
+	set Customer(ID = newID) := { City: "Saratoga Springs" }
+	return newID
+
+Effect: Generates a new ID, inserts a person tuple based on that ID, and Result: the new ID
+
+Updating with iteration:
+
+	for i in 1..6
+	set Customer(ID = i).City := "Vinyard"
+
+Effect: Sets the City attribute of a range of person tuples in the person table variable
+
+Scope
+-----
+
+Each script has a local frame, which hides any imported context:
+
+	using Ancestry\FamilyPaths 1.0.0
+	var Code: Integer	Hides the Code in FamilyPaths
+
+Module members can access other module members, and in any order
+
+	Selfish: module
+	{
+		Current: Code
+		Code: typedef Integer
+	}
+
+Usings are global to the script, including within modules
+
+	using Ancestry\FamilyPaths 1.0.0
+	PeopleFinder: module 1.2.0
+	{
+		Connection: typedef { SourceID: Long  TargetID: Long  Path: Path }
+	}
+
+Exceptions
+----------
+
+Try expression:
+
+	return try 1 / 0 catch -1
+
+Result: `-1`
+
+Nullological Cases
+------------------
+
+Empty set of attribute carrying tuples:
+
+	return { } of { { ID: Integer } }
+
+Empty lists of normal tuples:
+
+	return [] of [{ ID: Integer }]
+
+Empty tuple of attribute carrying tuple:
+
+	return { : } of { ID: Integer key (ID) }
+
+Result: `{ ID: 0 }`
+
+In an expression context `{ }` means empty set; for a no-attribute tuple specify a ":" to distinguish that it is a tuple. 
+In a type context `{ : }` means a no-attribute tuple because a set requires a member type (`{ }` is a set of type void in a type context)
+
+Set of type void:
+
+	return { }
+
+Set containing one no-attribute tuple (aka "table dee"):
+
+	return { { : } }
+
+Set containing zero no-attribute tuples (aka "table dum"):
+
+	return { } of { { : } }
+
+List of no-attribute tuples:
+
+	return [{ : } null { : }]
+
+Set of type set of lists of no-attribute tuples:
+
+	return { [{ : }] [] [{ : } { : }] } of { [{ : }] }
+
+Generics
+--------
+
+Functions may take type arguments:
+
+	let Add = function<T>(x: T y: T)
+		return x + y
+	return Add<Integer>(5 10)
+
+Result: `15`
 
 The type parameter can be inferred:
-return Add(5.0 10.0)
-// result: 15.0
 
-/* List Operations */
+	return Add(5.0 10.0)
 
-// Union:
-return [1 2] | [2 3]
-// result: [1 2 2 3]
+Result: `15.0`
 
-// Push:
-return Push([1 2] 3)
-// result: [1 2 3]
+List Operations
+---------------
 
-// Pop:
-return Pop([1 2 3])
-// result: { Item: 3 Remaining: [1 2] }
+Union:
+	
+	return [1 2] | [2 3]
 
-// Enqueue:
-return Enqueue([2 3] 1)
-// result: [1 2 3]
+Result: `[1 2 2 3]`
 
-// Dequeue is exactly the same as pop:
-return Dequeue([1 2 3])
-// result: { Item: 3 Remaining: [1 2] }
+Push:
 
-// Insert:
-return Insert([1 3] 1 2)
-// result: [1 2 3]
-// 1 is the zero-based position, 2 is the value
-
-// Remove at index:
-return Remove([1 2 3] 1)
-// result: [1 3]
-
-// Removing based on value:
-for i in [1 2 2 3]
-where i <> 2
-return i
-// result: [1 3]
-
-// Conversion to set:
-return ToSet([5 5 6 6])
-// result: { 5 6 }
-
-// List membership:
-return 5 in [1 3 5]
-// result: true
-
-// Detection of empty list:
-return { exists [1] exists [] }
-// result: { true false }
-
-// Quota:
-return [30 40 10 20](index < 2)
-// result: [30 40]
-
-/* Set Operations */
-
-// Intersection:
-return { 1 2 } & { 2 3 }
-// result: { 2 }
-
-// Union:
-return { 1 2 } | { 2 3 }
-// result: { 1 2 3 }
-
-// Subtraction:
-return { 1 2 3 } - { 3 4 }
-// result: { 1 2 }
-
-// Conversion to list:
-return ToList({ 2 1 3 })
-// result: [1 2 3] (in sorted order)
-
-// Ordered conversion from set to list:
-for i in { 2 3 1 }
-order (i desc)
-return i
-// result: [3 2 1]
+	return Push([1 2] 3)
 
-// Set membership:
-return 5 in { 1 3 5 }
-// result: true
+Result: `[1 2 3]`
 
-// Detection of empty set:
-return { exists { 1 } exists { } }
-// result: { true false }
+Pop:
 
-// Quota:
-return { 30 40 10 20 }(index < 2)
-// result: { 10 20 }
+	return Pop([1 2 3])
 
-// Note: quota forces sorting for determinism; use list quote to control ordering
-
-/* Attribute Extraction */
+Result: `{ Item: 3 Remaining: [1 2] }`
 
-// Extraction of an attribute set from a tuple set:
-return { { ID: 123 } { ID: 234 } { ID: 345 } }.ID
-// result: { 123 234 345 ... }
+Enqueue:
 
-// Extraction of an attribute list from a tuple set:
-let Items := { { ID: 123 Color: Red } { ID: 234 Color: Red } } of { { ID: Integer Color: Color key (ID) } }
-return Items.Color
-// result: [Red Red]  
-// If the extracted attribute is not a key, the result is a list, not a set.  A Set result would be distinct, but this may not be desired (e.g. when counting)
-
-// Extracting multiple attributes:
-return { { x: 50 y: 100 z: 0 } { x: 75 y: 125 z:25 } }.(x y)
-// result: [{ x: 50 y: 100 } { x: 75 y: 125 }]
-// Again, because x and y don't represent a superset of a key (not necessarily proper) the result is a list
-
-/* Aggregate Operations */
-
-// Count function on a set: 
-return Count({ 1 2 3 })
-// result: 3
-// This is a short-hand for Count<Integer>({ 1 2 3 })
-
-// Count function on a list:
-return Count([1 1 2 2])
-// result: 4
-
-// More aggregate functions:
-var i := { 1 3 5 }
-return { Min: Min(i) Max: Max(i) Avg: Avg(i) }
-// result: { Min: 1 Max: 5 Avg: 3 }
-
-// Logical aggregates:
-var i := { true true false }
-return { All: All(i) Any: Any(i) }
-// result: { All: false Any: true }
-// Logically equivalent to iterated AND and OR respectively
+	return Enqueue([2 3] 1)
 
-// Grouped aggregation:
-for p in Person
-return { Person: p NumAttributes: Count(p.Attributes) }
-// e.g. { Person: { ID: 123 Origin: "R" } NumAttributes: 12 }
-
-// Count of distinct
-return Count(ToSet(Person.Origin))
-// The result is the number of distinct origins in the Person table
-
-// String concatenation
-return { Concat({ "Zebra" "Invasion" }) Concat(["Zebra" "Invastion"]) }
-// result { "InvastionZebra" "ZebraInvasion" }
-
-// Concatenation with delimiter
-return { Concat(["Zebra" "Invastion"] " ") }
-// result "Zebra Invasion"
-
-// Aggregates and nulls
-return { S: Count({ 1 null 2 }) L: Count([1 null 2]) }
-// result: { S: 2 L: 3 }
-
-// Note: Nulls are not ever treated as existing in sets
+Result: `[1 2 3]`
 
-/* Time/Date Operations */
-
-// Selecting a Date from components:
-return Date(1955 3 25)
-// result: '1955/03/25'd
-
-// Selecting a Time from components:
-return Time(10, 15, 5.2)
-// result: '10:15:5.2't
-
-// Selecting a TimeSpan from components:
-return TimeSpan(2, 1, 23, 100.1)
-// result: '2d 1h 23m 100.1s'ts
-
-// Selecting a Date from a tuple:
-return Date({ Year: 1955 Month: 3 Day: 25 })
-// result: '1955/03/25'd
-
-// Adding Months:
-return AddMonth(Date(1955 3 25) 2)
-// result: '1955/05/25'd
-
-// Adding Years:
-return AddYear(Date(1955 3 25) 3)
-// result: '1958/03/25'd
-
-// Getting day-of-week:
-return DayOfWeek('2004/04/19'd)
-// result: 0 (Sunday)
-
-// Getting day-of-year:
-return DayOfYear('2004/11/18'd)
-// result: 323
+Dequeue is exactly the same as pop:
 
-// Getting days in month:
-return DaysInMonth(2004 2)
-// result: 29
-
-// Getting a time-span from dates:
-return '1955/03/25'd - '1955/03/27'd
-// result: '-2d'ts
-
-// Getting the absolute duration:
-return Abs('-2d'ts)
-// result: '2d'ts
-
-// Converting a Date to a tuple:
-return ToTuple('1955/03/25'd)
-// result: { Year: 1955 Month: 3 Day: 25 }
-
-// Determining leap-year:
-return IsLeapYear(2000)
-// result: true
+	return Dequeue([1 2 3])
 
-// Getting the date part of a DateTime:
-return DatePart('2011/03/2 12:30:00'dt)
-// result: '2011/03/2'd
+Result: `{ Item: 3 Remaining: [1 2] }`
 
-// Getting the time part of a DateTime:
-return TimePart('2011/03/2 12:30:00'dt)
-// result: '12:30:00't
+Insert:
 
-/* GUID Operations */
+	return Insert([1 3] 1 2)
 
-// Generate a new GUID:
-return NewGUID() = NewGUID()
-// result: extremely high probably of false
-// NewGUID is not deterministic, watch out!
+Result: `[1 2 3]`  
+1 is the zero-based position, 2 is the value
 
-/* Bitwise Operations */
+Remove at index:
 
-// Bitwise operators:
-let n := 2;
-return { Shl: n << 1 Shr: n >> 1 Inv: ~n Or: n | 1 And: n & 3 Xor: n ^ 3 }
-// result: { Shl: 4 Shr: 1 Inv: -3 Or: 3 And: 2 Xor: 1 }
+	return Remove([1 2 3] 1)
 
-/* Numeric Operations */
+Result: `[1 3]`
 
-// Arithmetic operators:
-return { Add: 1 + 2 Sub: 4 - 1 IDiv: 3 / 2 DDiv: 3.0 / 2.0 Mul: 10 * 3 Neg: -55 Pow: 5**5 IMod: 5 % 3 FMod: 1.2 % 0.35 }
-// result: { Add: 3 Sub: 3 IDiv: 1 DDiv: 1.5 Mul: 30 Neg: -55 Pow: 25 IMod: 2 FMod: 0.15 }
+Removing based on value:
 
-// Successor and predecessor for ordinal types:
-return { Succ: ++1 Pred: --1 }
-// result { Succ: 2 Pred: 0 }
+	for i in [1 2 2 3]
+	where i <> 2
+	return i
 
-// Absolute value:
-return Abs(-3.2)
-// result: 3.2
+Result: `[1 3]`
 
-// Ceiling value:
-return { Neg: Ceiling(-3.2) Pos: Ceiling(3.2) }
-// result: { -3 4 }
+Conversion to set:
 
-// Floor value:
-return { Neg: Floor(-3.2) Pos: Floor(3.2) }
-// result: { -4 3 }
+	return ToSet([5 5 6 6])
 
-// Frac:
-return Frac(12.34)
-// result: 0.34
+Result: `{ 5 6 }`
 
-// Factorial:
-return Factorial(10)
-// result: 3628800
+List membership:
 
-// Natural logarithm:
-return Ln(6)
-// result: 1.79175946922806
+	return 5 in [1 3 5]
 
-// Logarithm:
-return Log(27 2)
-// result: 4.75488750216347
+Result: `true`
 
-// Base 10 logarithm:
-return Log10(1000)
-// result: 3
+Detection of empty list:
 
-// Rounding:
-let n := 3141.59265
-return { Round(n 0) Round(n 2) Round(n -2) }
-// result: { 3142 3141.59 3100 }
+	return { exists [1] exists [] }
 
-// Converting double's to integers:
-return ToInteger(5.6)
-// result: 5
+Result: `{ true false }`
 
-// Comparisons:
-return { Equal: 1 = 0 Compare1: 1 ?= 0 Compare2: 0 ?= 1 Compare3: 1 ?= 1 NotEqual: 1 <> 0 }
-// result: { Equal: false Compare1: 1 Compare2: -1 Compare3: 0 NotEqual: true }
+Restriction over scalar:
 
-/* Random */
+	return [30 40 50](value > 30)
+	
+Result: `[40 50]`
 
-// Create random generator and getting number:
-return Random(Seed()).Value
-// result: { Seed: <mutated seed value> Value: <pseudo-random double between 0 and 1> }
-// Note: Seed() is non-deterministic, but Random() is deterministic
+Restriction over tuple:
 
-// Generating multiple from the same seed:
-let r1 := Random(Seed())
-return { r1.Value Random(r1.Seed).Value }
-// { <random value> <random value }
+	return [{ Name: 'Ray' } { Name: 'Nelly' }](Name = 'Ray')
 
-// Generating integers:
-return Random(Seed() 99)
-// result: <pseudo-random integer between 0-99>
+...which is equivalent to:
 
-// Generating in integer range:
-return Random(Seed() 5..10)
-// result: <pseudo-random integer between 5-10 inclusive>
+	return [{ Name: 'Ray' } { Name: 'Nelly' }](value.Name = 'Ray')
 
-/* Generators */
+Result: `[{ Name: 'Ray' }]`
 
-// Generate an individual ID
-return GenerateID("token")
-// result: <next ID for given token> of Long
+Quota:
 
-// Note: Generators start at 1
+	return [30 40 10 20](index < 2)
 
-// ID Blocks
-let n := GenerateID("token" 100)
-return { n GenerateID("token") }
-// result: { <next ID> <number at least 100 greater than prior }
+Result: [30 40]  
+`index` is a reserved word which indicates the zero-based ordinal position in the list.
 
-// GenerateID is non-deterministic
+Set Operations
+--------------
+
+Intersection:
+
+	return { 1 2 } & { 2 3 }
+
+Result: `{ 2 }`
+
+Union:
+
+	return { 1 2 } | { 2 3 }
+
+Result: `{ 1 2 3 }`
+
+Subtraction:
+
+	return { 1 2 3 } - { 3 4 }
+
+Result: `{ 1 2 }`
+
+Conversion to list:
+
+	return ToList({ 2 1 3 })
+
+Result: `[1 2 3]` (in sorted order)
+
+Ordered conversion from set to list:
+	
+	for i in { 2 3 1 }
+	order (i desc)
+	return i
+
+Result: `[3 2 1]`
+
+Set membership:
+
+	return 5 in { 1 3 5 }
+
+Result: `true`
+
+Detection of empty set:
+
+	return { exists { 1 } exists { } }
+
+Result: `{ true false }`
+
+Quota:
+
+	return { 30 40 10 20 }(index < 2)
+
+Result: `{ 10 20 }`
+
+**Note:** quota on a set forces sorting for determinism; use list quote to control ordering
+
+Attribute Extraction
+--------------------
+
+Extraction of an attribute set from a tuple set:
+
+	return { { ID: 123 } { ID: 234 } { ID: 345 } }.ID
+
+Result: `{ 123 234 345 ... }`
+
+Extraction of an attribute list from a tuple set:
+
+	let Items := { { ID: 123 Color: Red } { ID: 234 Color: Red } } of { { ID: Integer Color: Color key (ID) } }
+	return Items.Color
+
+Result: `[Red Red]`  
+If the extracted attribute is not a key, the result is a list, not a set.  A Set result would be distinct, but this may not be desired (e.g. when counting)
+
+Extracting multiple attributes:
+
+	return { { x: 50 y: 100 z: 0 } { x: 75 y: 125 z:25 } }.(x y)
+
+Result: `[{ x: 50 y: 100 } { x: 75 y: 125 }]`  
+Again, because x and y don't represent a superset of a key (not necessarily proper) the result is a list
+
+Aggregate Operations
+--------------------
+
+Count function on a set: 
+
+	return Count({ 1 2 3 })
+
+Result: `3`  
+This is a short-hand for `Count<Integer>({ 1 2 3 })`
+
+Count function on a list:
+
+	return Count([1 1 2 2])
+
+Result: `4`
+
+More aggregate functions:
+
+	let i := { 1 3 5 }
+	return { Min: Min(i) Max: Max(i) Avg: Avg(i) }
+
+Result: `{ Min: 1 Max: 5 Avg: 3 }`
+
+Logical aggregates:
+
+	var i := { true true false }
+	return { All: All(i) Any: Any(i) }
+
+Result: `{ All: false Any: true }`  
+Logically equivalent to iterated AND and OR respectively
+
+Grouped aggregation:
+	
+	for p in Customer
+	return { Customer: p NumOrders: Count(p.Orders) }
+
+e.g. result: `{ Customer: { ID: 123 City: "Springville" } NumOrders: 12 }`
+
+Count of distinct:
+
+	return Count(ToSet(Customer.City))
+
+The result is the number of distinct cities in the Customer table
+
+String concatenation:
+
+	return { Concat({ "Zebra" "Invasion" }) Concat(["Zebra" "Invastion"]) }
+
+Result: `{ "InvastionZebra" "ZebraInvasion" }`
+
+Concatenation with delimiter:
+
+	return { Concat(["Zebra" "Invastion"] " ") }
+
+Result: `"Zebra Invasion"`
+
+Aggregates and nulls:
+
+	return { S: Count({ 1 null 2 }) L: Count([1 null 2]) }
+
+Result: `{ S: 2 L: 3 }`
+
+**Note:** Nulls are not ever treated as existing in sets
+
+Time/Date Operations
+--------------------
+
+Selecting a Date from components:
+
+	return Date(1955 3 25)
+
+Result: `'1955/03/25'd`
+
+Selecting a Time from components:
+
+	return Time(10, 15, 5.2)
+
+Result: `'10:15:5.2't`
+
+Selecting a TimeSpan from components:
+
+	return TimeSpan(2, 1, 23, 100.1)
+
+Result: `'2d 1h 23m 100.1s'ts`
+
+Selecting a Date from a tuple:
+
+	return Date({ Year: 1955 Month: 3 Day: 25 })
+
+Result: `'1955/03/25'd`
+
+Adding Months:
+
+	return AddMonth(Date(1955 3 25) 2)
+
+Result: `'1955/05/25'd`
+
+Adding Years:
+
+	return AddYear(Date(1955 3 25) 3)
+
+Result: `'1958/03/25'd`
+
+Getting day-of-week:
+
+	return DayOfWeek('2004/04/19'd)
+
+Result: `0` (Sunday)
+
+Getting day-of-year:
+
+	return DayOfYear('2004/11/18'd)
+
+Result: `323`
+
+Getting days in month:
+
+	return DaysInMonth(2004 2)
+
+Result: `29`
+
+Getting a time-span from dates:
+
+	return '1955/03/25'd - '1955/03/27'd
+
+Result: `'-2d'ts`
+
+Getting the absolute duration:
+
+	return Abs('-2d'ts)
+
+Result: `'2d'ts`
+
+Converting a Date to a tuple:
+
+	return ToTuple('1955/03/25'd)
+
+Result: `{ Year: 1955 Month: 3 Day: 25 }`
+
+Determining leap-year:
+
+	return IsLeapYear(2000)
+
+Result: `true`
+
+Getting the date part of a DateTime:
+
+	return DatePart('2011/03/2 12:30:00'dt)
+
+Result: `'2011/03/2'd`
+
+Getting the time part of a DateTime:
+
+	return TimePart('2011/03/2 12:30:00'dt)
+
+Result: `'12:30:00't`
+
+GUID Operations
+---------------
+
+Generate a new GUID:
+
+	return NewGUID() = NewGUID()
+
+Result: extremely high probably of `false`  
+NewGUID is not deterministic, watch out!
+
+Bitwise Operations
+------------------
+
+Bitwise operators:
+
+	let n := 2;
+	return { Shl: n << 1 Shr: n >> 1 Inv: ~n Or: n | 1 And: n & 3 Xor: n ^ 3 }
+
+Result: `{ Shl: 4 Shr: 1 Inv: -3 Or: 3 And: 2 Xor: 1 }`
+
+Numeric Operations
+------------------
+
+Arithmetic operators:
+
+	return { Add: 1 + 2 Sub: 4 - 1 IDiv: 3 / 2 DDiv: 3.0 / 2.0 Mul: 10 * 3 Neg: -55 Pow: 5**5 IMod: 5 % 3 FMod: 1.2 % 0.35 }
+
+Result: `{ Add: 3 Sub: 3 IDiv: 1 DDiv: 1.5 Mul: 30 Neg: -55 Pow: 25 IMod: 2 FMod: 0.15 }`
+
+Successor and predecessor for ordinal types:
+
+	return { Succ: ++1 Pred: --1 }
+
+Result: `{ Succ: 2 Pred: 0 }`
+
+Absolute value:
+
+	return Abs(-3.2)
+
+Result: `3.2`
+
+Ceiling value:
+
+	return { Neg: Ceiling(-3.2) Pos: Ceiling(3.2) }
+
+Result: `{ -3 4 }`
+
+Floor value:
+
+	return { Neg: Floor(-3.2) Pos: Floor(3.2) }
+
+Result: `{ -4 3 }`
+
+Frac:
+
+	return Frac(12.34)
+
+Result: `0.34`
+
+Factorial:
+
+	return Factorial(10)
+
+Result: `3628800`
+
+Natural logarithm:
+
+	return Ln(6)
+
+Result: `1.79175946922806`
+
+Logarithm:
+
+	return Log(27 2)
+
+Result: `4.75488750216347`
+
+Base 10 logarithm:
+
+	return Log10(1000)
+
+Result: `3`
+
+Rounding:
+
+	let n := 3141.59265
+	return { Round(n 0) Round(n 2) Round(n -2) }
+
+Result: `{ 3142 3141.59 3100 }`
+
+Converting double's to integers:
+
+	return ToInteger(5.6)
+
+Result: `5`
+
+Comparisons:
+
+	return { Equal: 1 = 0 Compare1: 1 ?= 0 Compare2: 0 ?= 1 Compare3: 1 ?= 1 NotEqual: 1 <> 0 }
+
+Result: `{ Equal: false Compare1: 1 Compare2: -1 Compare3: 0 NotEqual: true }`
+
+Random
+------
+
+Create random generator and getting number:
+
+	return Random(Seed()).Value
+
+Result: `{ Seed: `mutated seed value` Value: `pseudo-random double between 0 and 1` }`  
+**Note:** Seed() is non-deterministic, but Random() is deterministic
+
+Generating multiple from the same seed:
+
+	let r1 := Random(Seed())
+	return { r1.Value Random(r1.Seed).Value }
+
+Result: `{ `random value` `random value` }`
+
+Generating integers:
+
+	return Random(Seed() 99)
+
+Result: `pseudo-random integer between 0-99`
+
+Generating in integer range:
+
+	return Random(Seed() 5..10)
+
+Result: `pseudo-random integer between 5-10 inclusive`
+
+Generators
+----------
+
+Generate an individual ID:
+
+	return GenerateID("token")
+
+Result: next ID for given token` of Long`
+
+**Note:** Generator values start at 1
+
+ID Blocks:
+
+	let n := GenerateID("token" 100)
+	return { n GenerateID("token") }
+
+Result: `{ `next ID` `number at least 100 greater than prior` }`
+
+**Note:** GenerateID is non-deterministic.
  
-/* String Operations */
+String Operations
+-----------------
 
-// String concatenation:
-return "engine" + "-hitch-" + "caboose\r\n"
-// result: "engine-hitch-caboose\r\n"
+String concatenation:
 
-// Alternative concatenation:
-return Concat(["engine" "-hitch-" "caboose\r\n"])
+	return "engine" + "-hitch-" + "caboose\r\n"
 
-// TODO: rest of string operators...
+Result: "engine-hitch-caboose\r\n"
 
-/* Interval Operations */
+Alternative concatenation:
 
-// Interval type declaration:
-var i : interval Date
+	return Concat(["engine" "-hitch-" "caboose\r\n"])
 
-// Interval selector:
-let dow := DayOfWeek(Today())
-return (Today() - dow)..(Today() + (6 - dow))
-// result: <dates of enveloping week, from Sunday to Sunday>
+TODO: remaining string operations
 
-// Interval functions:
-let i := 5..10
-return { Contains(i 6) Before(i 10) After(i 11) Meets(i 11..13) Overlaps(i 10..15) Merges(i 1..4) Begins(i 5) Ends(i 10) }
-// result { true false true true true true true true }
+Interval Operations
+-------------------
 
-// TODO: Additional interval operators...
+Interval type declaration:
+
+	var i : interval Date
+
+Interval selector:
+
+	let dow := DayOfWeek(Today())
+	return (Today() - dow)..(Today() + (6 - dow))
+
+Result: dates of enveloping week, from Sunday to Sunday
+
+Interval functions:
+
+	let i := 5..10
+	return { Contains(i 6) Before(i 10) After(i 11) Meets(i 11..13) Overlaps(i 10..15) Merges(i 1..4) Begins(i 5) Ends(i 10) }
+
+Result: `{ true false true true true true true true }`
+
+TODO: remaining interval operations
