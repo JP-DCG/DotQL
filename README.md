@@ -6,10 +6,10 @@ DotQL is a *functional language* and *federated query processor* implemented in 
 Approximate Status:
 * Front-end / SLA: 25% (only enforces time-based SLAs)
 * Grammar: 100%
-* Lexer: 99%
-* Parser: 70%
-* Planner: 1%
-* Compiler: 3% (functioning for very basic expressions)
+* Lexer: 100%
+* Parser: 100%
+* Planner: 10%
+* Compiler: 5% (functioning for very basic expressions)
 * Functions and types: 1%
 * Pre-prepared query library: 0%
 * Module library: 0%
@@ -35,7 +35,7 @@ This is equivalent to the following SQL query:
 			join Customer as C on C.CustomerID = O.CustomerID
 		where C.ZipCode = '84604'
 
-For a by-example introduction to DotQL, read [DotQLByExample](DotQL/blob/master/Documents/DotQLByExample.dql).
+For a by-example introduction to DotQL, read [DotQL By Example](https://github.com/Ancestry/DotQL/wiki/DotQL%20By%20Example).
 
 Federated Query Processor
 -------------------------

@@ -1,54 +1,61 @@
-/* DotQL v1.0 Grammar - G4 syntax + (double quote whitespace elimination, :=, + group suffix for capture) */
+/* DotQL Grammar v1.0 */
 
+grammar DotQL
+	sensitive : true
+	prefix : _
+	suffix : _
 
 Script :=
 	Usings : [ UsingClause ]*
 	Modules : [ ModuleDeclaration ]*
 	Vars : [ VarDeclaration ]*
-	Assignments : [ Assignment ]*
+	Assignments : [ ClausedAssignment ]*
 	Expression : [ ClausedExpression ]
 
 UsingClause :=
 	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier
 
 ModuleDeclaration :=
-	"module" Name : QualifiedIdentifier "{" Members : [ ModuleMember ]* "}"
+	"module" Name : QualifiedIdentifier "{" Members : [ moduleMember ]* "}"
 
-ModuleMember =
+moduleMember =
 	TypeMember | EnumMember	| ConstMember | VarMember
 
 TypeMember :=
-	Name : QualifiedIdentifier ":" "typedef" Type : TypeDeclaration
+	Name : QualifiedIdentifier ":" "typedef" Type : typeDeclaration
 
 EnumMember :=
 	Name : QualifiedIdentifier ":" "enum" "{" Values : QualifiedIdentifier* "}"
 
 ConstMember :=
-	Name : QualifiedIdentifier ":" "const" Expression : Expression
+	Name : QualifiedIdentifier ":" "const" Expression : expression
 
 VarMember :=
-	Name : QualifiedIdentifier ":" Type: TypeDeclaration
+	Name : QualifiedIdentifier ":" Type: typeDeclaration
 
 VarDeclaration :=
-	"var" Name : QualifiedIdentifier [ ":" Type : TypeDeclaration ] [ ":=" Initializer : Expression )
+	"var" Name : QualifiedIdentifier [ ":" Type : typeDeclaration ] [ ":=" Initializer : expression )
 
-Assignment :=
-	"set" Target : Expression ":=" Source : Expression
+ClausedAssignment :=
+	ForClauses : [ ForClause ]*
+	LetClauses : [ LetClause ]*
+	[ "where" WhereClause : expression ]
+	Assignments : ("set" Target : expression ":=" Source : expression)*
 
-TypeDeclaration =
-	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType
+typeDeclaration =
+	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType | TypeOf
 
 ListType :=
-	"[" Type : [ TypeDeclaration ] "]"
+	"[" Type : [ typeDeclaration ] "]" [ IsOptional : ( "?" | "!" ) ]
 
 SetType :=
-	"{" Type : [ TypeDeclaration ] "}"
+	"{" Type : [ typeDeclaration ] "}" [ IsOptional : ( "?" | "!" ) ]
 
 TupleType :=
-	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}"
+	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}" [ IsOptional : ( "?" | "!" ) ]
 
 TupleAttribute :=
-	Name : QualifiedIdentifier ":" Type : TypeDeclaration
+	Name : QualifiedIdentifier ":" Type : typeDeclaration
 
 TupleReference :=
 	"ref" Name : QualifiedIdentifier "(" SourceAttributeNames : QualifiedIdentifier* ")" 
@@ -58,62 +65,72 @@ TupleKey :=
 	"key" "(" AttributeNames : [ QualifiedIdentifier ]* ")"
 
 FunctionType :=
-	"function" [ "<" TypeParameters : TypeDeclaration* ">" ] "(" Parameters : [ FunctionParameter ]* ")" ":" ReturnType : TypeDeclaration
+	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration [ IsOptional : ( "?" | "!" ) ]
+
+functionParameters =
+	"(" Parameters : [ FunctionParameter ]* ")"
 
 FunctionParameter :=
-	Name : QualifiedIdentifier ":" Type : TypeDeclaration
+	Name : QualifiedIdentifier ":" Type : typeDeclaration
 
 IntervalType :=
-	"interval" Type : TypeDeclaration
+	"interval" Type : typeDeclaration [ IsOptional : ( "?" | "!" ) ]
 
 NamedType :=
-	Target : QualifiedIdentifier
+	Target : QualifiedIdentifier [ IsOptional : ( "?" | "!" ) ]
 
-Expression 1 =
-	OfExpression : ( Expression : Expression "of" Type : TypeDeclaration )
+TypeOf :=
+	"typeof" Expression : expression [ IsOptional : ( "?" | "!" ) ]
 
-Expression 2 =
-    LogicalBinaryExpression : ( Expressions : Expression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" | "?" ) )
+expression 1 =
+	OfExpression : ( Expression : expression "of" Type : typeDeclaration )
 
-Expression 3 =
-	LogicalAndExpression : ( Expressions : Expression )^"and"
+expression 2 =
+    LogicalBinaryExpression : ( Expressions : expression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" | "??" ) )
 
-Expression 4 =
-	BitwiseBinaryExpression : ( Expressions : Expression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
+expression 3 =
+	LogicalAndExpression : ( Expressions : expression )^"and"
 
-Expression 5 =
-	ComparisonExpression : ( Expressions : Expression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
+expression 4 =
+	BitwiseBinaryExpression : ( Expressions : expression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
 
-Expression 6 =
-	AdditiveExpression : ( Expressions : Expression )^( Operators : ( "+" | "-" ) )
+expression 5 =
+	ComparisonExpression : ( Expressions : expression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
 
-Expression 7 =
-	MultiplicativeExpression : ( Expressions : Expression )^( Operators : ( "*" | "/" | "%" | ".." ) )
+expression 6 =
+	AdditiveExpression : ( Expressions : expression )^( Operators : ( "+" | "-" ) )
 
-Expression 8 :=
-	IntervalSelector : ( Begin : Expression ".." End : Expression )
+expression 7 =
+	MultiplicativeExpression : ( Expressions : expression )^( Operators : ( "*" | "/" | "%" ) )
 
-Expression 9 =
-	ExponentExpression : ( Expressions : Expression )^"**"
+expression 8 :=
+	IntervalSelector : ( Begin : expression ".." End : expression )
 
-Expression 10 =
-	UnaryExpression : ( Operator : ( "++" | "--" | "-" | "~" | "not" | "exists" | "??" ) Expression : Expression )
+expression 9 =
+	ExponentExpression : ( Expressions : expression )^"**"
 
-Expression 11 =
-	DereferenceExpression : ( Expressions : Expression )^"."
-
-Expression 12 =
-	IndexerExpression : ( Expression : Expression "[" Indexer : [ Expression ] "]" )
-
-Expression 13 =
+expression 10 =
 	CallExpression : 
 	( 
-		Expression : Expression [ "<" TypeArguments : TypeDeclaration* ">" ]
-			( "(" Arguments : [ Expression ]* ")" ) | ( "=>" Argument : Expression ) 
+		Expression : expression 
+		(
+			( "->" [ "<" TypeArguments : typeDeclaration* ">" ] "(" Arguments : [ expression ]* ")" )
+				| ( "=>" Argument : expression )
+		)
 	)
 
-Expression =
-	"(" Expression ")"
+expression 11 =
+	UnaryExpression : 
+	(
+		( Operator : ( "-" | "~" | "not" | "exists" ) Expression : expression )
+			| ( Expression : expression Operator : ( "@@" | "++" | "--" ) )
+	)
+
+expression 12 =
+	DereferenceExpression : ( Expression : expression Operator : ( "." | "@" | "," ) Member : QualifiedIdentifier )
+
+expression =
+	"(" expression ")"
 		| ListSelector
 		| TupleSelector
 		| SetSelector
@@ -132,19 +149,19 @@ Expression =
 		| ClausedExpression
 
 ListSelector :=
-	"[" Items : [ Expression ]* "]"
+	"[" Items : [ expression ]* "]"
 
 TupleSelector :=
 	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
 
 TupleAttributeSelector :=
-	Name : QualifiedIdentifier ":" Value : Expression
+	Name : QualifiedIdentifier ":" Value : expression
 
 SetSelector :=
-	"{" Items : [ Expression ]* "}"
+	"{" Items : [ expression ]* "}"
 
 FunctionSelector :=
-	Type : FunctionType Expression : ClausedExpression
+	( functionParameters | TypeName : QualifiedIdentifier ) "=>" Expression : ClausedExpression
 
 IdentifierExpression := 
 	Target : QualifiedIdentifier
@@ -156,59 +173,58 @@ DoubleLiteral :=
 	_ (digit* '.' digit* [( 'e' | 'E' ) [ '+' | '-' ] digit*])+ _
 
 CharacterLiteral :=
-	_ PascalString+ 'c' _
+	_ pascalString+ 'c' _
 
 StringLiteral :=
-	_ ( PascalSegments : ( [ '#' LeadingChars : digit* ]* PascalString [ '#' TrailingChars : digit* ]* )* ) 
+	_ ( PascalSegments : ( Leadings : [ '#' Digits : digit* ]* [ Strings : pascalString ]^( BetweenChars: ( '#' Digits : digit* )* ) EndingChars : [ '#' Digits : digit* ]* ) 
 		| ( '"' ( [ '\\' as '\' | '\"' as '"' | '\r' as #13 | '\n' as #10 | '\t' as #9 | {?} &! '"' ]* )+ '"' ) _
 
 CaseExpression :=
-    "case" [ TestExpression : Expression ]
-        Items : ( "when" WhenExpression : Expression "then" ThenExpression : Expression )*
-        "else" ElseExpression : Expression
+    "case" [ [ IsStrict : "strict" ] TestExpression : expression ]
+        Items : ( "when" WhenExpression : expression "then" ThenExpression : expression )*
+        "else" ElseExpression : expression
     "end"
 
 IfExpression :=
-	"if" TestExpression : Expression
-        "then" ThenExpression : Expression
-        "else" ElseExpression : Expression 
+	"if" TestExpression : expression
+        "then" ThenExpression : expression
+        "else" ElseExpression : expression 
 
 TryExpression :=
-	"try" TryExpression : Expression "catch" CatchExpression : Expression
+	"try" TryExpression : expression "catch" CatchExpression : expression
 
 ClausedExpression :=
 	ForClauses : [ ForClause ]*
 	LetClauses : [ LetClause ]*
-	[ "where" WhereClause : Expression ]
+	[ "where" WhereClause : expression ]
 	[ "order" "(" OrderDimensions : OrderDimension* ")" ]
-	"return" Expression : Expression
+	"return" Expression : expression
 
 ForClause :=
-	"for" Name : QualifiedIdentifier "in" Expression : Expression
+	"for" Name : QualifiedIdentifier "in" Expression : expression
 
 LetClause :=
-	"let" Name : QualifiedIdentifier ":=" Expression : Expression
+	"let" Name : QualifiedIdentifier ":=" Expression : expression
 	
 OrderDimension :=
-	Expression : Expression [ Direction : ( "asc" | "desc" ) ]
+	Expression : expression [ Direction : ( "asc" | "desc" ) ]
 
-PascalString =
+pascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''
 
-QualifiedIdentifier =
-	IsRooted : [ '\' ] Items : Identifier^'\'
+QualifiedIdentifier :=
+	IsRooted : [ '\' ] Items : identifier^'\'
 
-Identifier =
+identifier =
 	_ ( letter | '_' [ letter | digit | '_' ]* )+ _
 
-// Whitespace
-_ =
-	[{ ' ', #9..#13 } | LineComment | BlockComment ]*
+_ =	// Whitespace
+	[{ ' ', #9..#13 } | lineComment | blockComment ]*
 		
-BlockComment =
-	'/*' [ BlockComment | {?} &! '*/' ]* '*/'
+blockComment =
+	'/*' [ blockComment | {?} &! '*/' ]* '*/'
 		
-LineComment =
+lineComment =
 	'//' [ {! #10, #13 } ]*
 
 letter =
