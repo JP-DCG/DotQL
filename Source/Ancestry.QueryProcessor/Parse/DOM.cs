@@ -15,8 +15,8 @@ namespace Ancestry.QueryProcessor.Parse
 		private List<VarDeclaration> _vars = new List<VarDeclaration>();
 		public List<VarDeclaration> Vars { get { return _vars; } }
 
-		private List<Assignment> _assignments = new List<Assignment>();
-		public List<Assignment> Assignments { get { return _assignments; } }
+		private List<ClausedAssignment> _assignments = new List<ClausedAssignment>();
+		public List<ClausedAssignment> Assignments { get { return _assignments; } }
 
 		public ClausedExpression Expression { get; set; }
 
@@ -169,6 +169,45 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
+	public class ClausedAssignment : Statement
+	{
+		private List<ForClause> _forClauses = new List<ForClause>();
+		public List<ForClause> ForClauses { get { return _forClauses; } }
+
+		private List<LetClause> _letClauses = new List<LetClause>();
+		public List<LetClause> LetClauses { get { return _letClauses; } }
+
+		public Expression WhereClause { get; set; }
+
+		private List<Assignment> _assignments = new List<Assignment>();
+		public List<Assignment> Assignments { get { return _assignments; } }
+
+		public override string ToString()
+		{
+			return
+				String.Join
+				(
+					"\r\n",
+					(from f in ForClauses select f.ToString())
+						.Union(from l in LetClauses select l.ToString())
+						.Union(WhereClause != null ? new[] { "where" + WhereClause.ToString() } : new string[] { })
+						.Union(from a in Assignments select a.ToString())
+				);
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var f in ForClauses)
+				yield return f;
+			foreach (var l in LetClauses)
+				yield return l;
+			if (WhereClause != null)
+				yield return WhereClause;
+			foreach (var a in Assignments)
+				yield return a;
+		}
+	}
+
 	public class Assignment : Statement
 	{
 		public Expression Target { get; set; }
@@ -188,6 +227,13 @@ namespace Ancestry.QueryProcessor.Parse
 	}
 
 	public abstract class TypeDeclaration : Statement { }
+
+	public class OptionalType : TypeDeclaration
+	{
+		public TypeDeclaration Type { get; set; }
+
+		public bool IsRequired { get; set; }
+	}
 
 	public class ListType : TypeDeclaration
 	{
@@ -239,7 +285,7 @@ namespace Ancestry.QueryProcessor.Parse
 						? ":"
 						: String.Join
 						(
-							" ", 
+							"  ", 
 							(from a in Attributes select a.ToString())
 							.Union(from r in References select r.ToString())
 							.Union(from k in Keys select k.ToString())
@@ -375,6 +421,22 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
+	public class TypeOf : TypeDeclaration
+	{
+		public Expression Expression { get; set; }
+
+		public override string ToString()
+		{
+			return "typeof " + Expression;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+		}
+	}
+
+
 	public abstract class Expression : Statement { }
 
     public class ClausedExpression : Expression
@@ -406,7 +468,7 @@ namespace Ancestry.QueryProcessor.Parse
 				);
 		}
 
-		public IEnumerable<Statement> GetChildren()
+		public override IEnumerable<Statement> GetChildren()
 		{
 			foreach (var f in ForClauses)
 				yield return f;
@@ -559,14 +621,16 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Expression.ToString() 
-				+ (TypeArguments.Count > 0 ? "<" + String.Join(" ", from ta in TypeArguments select ta.ToString()) + ">" : "")
-				+ 
+			return 
 				(
 					Argument != null
-						? "=>" + Argument
-						: ("(" + String.Join(" ", from a in Arguments select a.ToString()) + ")")
-				);
+						? Argument.ToString()
+						: (Arguments.Count > 0 ? Arguments[0].ToString() : "{ : }")
+				)
+					+ (Argument != null ? "=>" : "->")
+					+ Expression
+					+ (TypeArguments.Count > 0 ? "<" + String.Join(" ", from ta in TypeArguments select ta.ToString()) + ">" : "")
+					+ (Argument == null ? "(" + String.Join(" ", (from a in Arguments select a.ToString()).Skip(1)) + ")" : "");
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -618,7 +682,7 @@ namespace Ancestry.QueryProcessor.Parse
 						? ":"
 						: String.Join
 						(
-							" ", 
+							"  ", 
 							(from a in Attributes select a.ToString())
 							.Union(from r in References select r.ToString())
 							.Union(from k in Keys select k.ToString())
@@ -736,6 +800,8 @@ namespace Ancestry.QueryProcessor.Parse
 	public class CaseExpression : Expression
 	{
 		public Expression TestExpression { get; set; }
+
+		public bool IsStrict { get; set; }
 
 		private List<CaseItem> _items = new List<CaseItem>();
 		public List<CaseItem> Items { get { return _items; } }

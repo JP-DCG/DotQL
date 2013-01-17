@@ -123,4 +123,10 @@
   <data name="103101" xml:space="preserve">
     <value>Identifier conflict.  There is already an identifier by this name in scope.</value>
   </data>
+  <data name="103102" xml:space="preserve">
+    <value>Unknown identifier ({0}).</value>
+  </data>
+  <data name="103103" xml:space="preserve">
+    <value>Expecting a reference of type '{0}'; actual: '{1}'.</value>
+  </data>
 </root>

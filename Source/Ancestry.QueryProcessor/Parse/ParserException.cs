@@ -15,8 +15,8 @@ namespace Ancestry.QueryProcessor.Parse
 	{
 		public enum Codes : int
 		{
-			/// <summary>Error code 109100: "Statement expected."</summary>
-			StatementExpected = 109100,
+			/// <summary>Error code 109100: "Expression expected."</summary>
+			ExpressionExpected = 109100,
 
 			/// <summary>Error code 109101: "Unknown token type "{0}"."</summary>
 			UnknownTokenType = 109101,
@@ -104,6 +104,15 @@ namespace Ancestry.QueryProcessor.Parse
 
 			/// <summary>Error code 109129: "Invalid attribute name."</summary>
 			InvalidAttributeName = 109129,
+
+			/// <summary>Error code 109130: "Invocation arguments expected."</summary>
+			InvocationArgumentsExpected = 109130,
+
+			/// <summary>Error code 109131: "Order clause is only valid with accompanying For clause."</summary>
+			OrderOnlyValidWithForClause = 109131,
+
+			/// <summary>Error code 102132: "Tuple member expected."</summary>
+			TupleMemberExpected = 109132,
 		}
 
 		// Resource manager for this exception class

@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="109100" xml:space="preserve">
-    <value>Statement expected.</value>
+    <value>Expression expected.</value>
   </data>
   <data name="109101" xml:space="preserve">
     <value>Unknown token type "{0}".</value>
@@ -206,5 +206,14 @@
   </data>
   <data name="109129" xml:space="preserve">
     <value>Invalid attribute name.</value>
+  </data>
+  <data name="109130" xml:space="preserve">
+    <value>Invocation arguments expected.</value>
+  </data>
+  <data name="109131" xml:space="preserve">
+    <value>Order clause is only valid with accompanying For clause.</value>
+  </data>
+  <data name="109132" xml:space="preserve">
+    <value>Tuple member expected.</value>
   </data>
 </root>

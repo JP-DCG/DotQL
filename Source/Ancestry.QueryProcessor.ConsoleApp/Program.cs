@@ -15,26 +15,25 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 			Stop
 		}
 
-		static void Main( string[] args )
+		static void Main(string[] args)
 		{
-			Console.WriteLine( "Execute: Control Enter or F5" );
-			Console.WriteLine( "Stop: Control C or Control F5" );
+			Console.WriteLine("DotQL Console.  Execute: Control Enter or F5.  Exit: Control C or Control F5");
 
-			StringBuilder sb = new StringBuilder( );
+			StringBuilder sb = new StringBuilder();
 			bool done = false;
 
 			Command command = Command.None;
 
-			while( !done )
+			while (!done)
 			{
 				command = Command.None;
 
-				ConsoleKeyInfo info = Console.ReadKey( false );
+				ConsoleKeyInfo info = Console.ReadKey(false);
 
-				switch( info.Key )
+				switch (info.Key)
 				{
 					case ConsoleKey.F5:
-						if( info.Modifiers == ConsoleModifiers.Control )
+						if (info.Modifiers == ConsoleModifiers.Control)
 						{
 							command = Command.Stop;
 						}
@@ -45,7 +44,7 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 						break;
 
 					case ConsoleKey.Enter:
-						if( info.Modifiers == ConsoleModifiers.Control )
+						if (info.Modifiers == ConsoleModifiers.Control)
 						{
 							command = Command.Execute;
 						}
@@ -56,30 +55,26 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 						break;
 				}
 
-				switch( command )
+				switch (command)
 				{
 					case Command.Execute:
-						Execute( sb );
+						Execute(sb);
 						break;
 
 					case Command.Stop:
 						done = true;
-						Console.WriteLine( "Stop" );
+						Console.WriteLine("Stopped");
 						break;
 
 					case Command.None:
-						if( info.Key == ConsoleKey.Enter )
+						if (info.Key == ConsoleKey.Backspace)
 						{
-							sb.AppendLine( );
-						}
-						else if( info.Key == ConsoleKey.Backspace )
-						{
-							Console.Write( " \b" );
-							sb.Remove( sb.Length - 1, 1 );
+							sb.Remove(sb.Length - 1, 1);
+							Console.Write("\b \b");
 						}
 						else
 						{
-							sb.Append( info.KeyChar );
+							sb.Append(info.KeyChar);
 						}
 						break;
 
@@ -87,36 +82,36 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 						break;
 				}
 
-				if( info.Key == ConsoleKey.Enter )
+				if (info.Key == ConsoleKey.Enter)
 				{
-					Console.WriteLine( );
+					Console.WriteLine();
 				}
 
 			}
 		}
 
-		private static void Execute( StringBuilder sb )
+		private static void Execute(StringBuilder sb)
 		{
-			Console.WriteLine( );
-			Console.WriteLine( "Executing:" );
-			Console.WriteLine( "\"{0}\"", sb.ToString( ) );
-			Console.WriteLine( );
+			Console.WriteLine();
+			Console.WriteLine("Executing:");
+			Console.WriteLine("\"{0}\"", sb.ToString());
+			Console.WriteLine();
 
 			try
 			{
 
-				var connection = new Connection( );
+				var connection = new Connection();
 
-				var result = connection.Evaluate( sb.ToString( ) );
-				Console.WriteLine( "Results: {0}", result.ToString( ) );
+				var result = connection.Evaluate(sb.ToString());
+				Console.WriteLine("Results: {0}", result.ToString());
 			}
-			catch( Exception e )
+			catch (Exception e)
 			{
-				Console.WriteLine( e.ToString( ) );
+				Console.WriteLine(e.ToString());
 			}
 			finally
 			{
-				sb.Clear( );
+				sb.Clear();
 			}
 		}
 	}

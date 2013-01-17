@@ -10,12 +10,13 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Using = "using";
         public const string Module = "module";
         public const string TypeDef = "typedef";
+		public const string TypeOf = "typeof";
         public const string Enum = "enum";
 		public const string Ref = "ref";
+		public const string Key = "key";
 		public const string Const = "const";
         public const string Var = "var";
         public const string Set = "set";
-		public const string Function = "function";
 		public const string IntervalType = "interval";
 		public const string Try = "try";
 		public const string Catch = "catch";
@@ -24,7 +25,6 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Where = "where";
 		public const string Order = "order";
 		public const string Return = "return";
-		public const string Index = "index";
         public const string In = "in";
         public const string Asc = "asc";
         public const string Desc = "desc";
@@ -70,21 +70,28 @@ namespace Ancestry.QueryProcessor.Parse
         public const string BitwiseNot = "~";
         public const string BeginGroup = "(";
         public const string EndGroup = ")";
-        public const string BeginIndexer = "[";
-        public const string EndIndexer = "]";
-		public const string BeginListSelector = "[";
-		public const string EndListSelector = "]";
+        public const string Extract = "@";
+        public const string ExtractSingleton = "@@";
+		public const string Dereference = ".";
+		public const string Embed = ",";
+		public const string BeginList = "[";
+		public const string EndList = "]";
 		public const string BeginTupleSet = "{";
 		public const string EndTupleSet = "}";
-		public const string Dereference = ".";
-		public const string Embed = "#";
 		public const string Qualifier = "\\";
 		public const string IntervalValue = "..";
 		public const string Assignment = ":=";
-		public const string IsNull = "??";
-		public const string IfNull = "?";
-		public const string Call = "=>";
+		public const string IfNull = "??";
+		public const string Function = "=>";
+		public const string Invoke = "->";
 		public const string AttributeSeparator = ":";
+		public const string Optional = "?";
+		public const string Required = "!";
+
+		// Reserved
+		public const string Args = "args";
+		public const string Value = "value";
+		public const string Index = "index";
         
         private static string[] FKeywords;
         

@@ -41,6 +41,8 @@ namespace Ancestry.QueryProcessor.Parse
 		IfNull,
 		Dereference,
 		Successor,
-		Predicessor
+		Predicessor,
+		Extract,
+		Embed
 	}
 }

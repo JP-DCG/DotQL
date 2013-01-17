@@ -43,16 +43,22 @@ ClausedAssignment :=
 	Assignments : ("set" Target : expression ":=" Source : expression)*
 
 typeDeclaration =
+	OptionalType | requiredTypes
+
+OptionalType :=
+	Type : requiredTypes IsRequired : ( "?" | "!" )
+
+requiredTypes =
 	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType | TypeOf
 
 ListType :=
-	"[" Type : [ typeDeclaration ] "]" [ IsOptional : ( "?" | "!" ) ]
+	"[" Type : typeDeclaration "]"
 
 SetType :=
-	"{" Type : [ typeDeclaration ] "}" [ IsOptional : ( "?" | "!" ) ]
+	"{" Type : typeDeclaration "}"
 
 TupleType :=
-	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}" [ IsOptional : ( "?" | "!" ) ]
+	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}"
 
 TupleAttribute :=
 	Name : QualifiedIdentifier ":" Type : typeDeclaration
@@ -65,7 +71,7 @@ TupleKey :=
 	"key" "(" AttributeNames : [ QualifiedIdentifier ]* ")"
 
 FunctionType :=
-	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration [ IsOptional : ( "?" | "!" ) ]
+	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration
 
 functionParameters =
 	"(" Parameters : [ FunctionParameter ]* ")"
@@ -74,48 +80,48 @@ FunctionParameter :=
 	Name : QualifiedIdentifier ":" Type : typeDeclaration
 
 IntervalType :=
-	"interval" Type : typeDeclaration [ IsOptional : ( "?" | "!" ) ]
+	"interval" Type : typeDeclaration
 
 NamedType :=
-	Target : QualifiedIdentifier [ IsOptional : ( "?" | "!" ) ]
+	Target : QualifiedIdentifier
 
 TypeOf :=
-	"typeof" Expression : expression [ IsOptional : ( "?" | "!" ) ]
+	"typeof" Expression : expression 
 
 expression 1 =
 	OfExpression : ( Expression : expression "of" Type : typeDeclaration )
 
 expression 2 =
-    LogicalBinaryExpression : ( Expressions : expression )^( Operators : ( "in" | "or" | "xor" | "like" | "matches" | "??" ) )
+    LogicalBinaryExpression : ( Left : expression Operator : ( "in" | "or" | "xor" | "like" | "matches" | "??" ) Right : expression )
 
 expression 3 =
-	LogicalAndExpression : ( Expressions : expression )^"and"
+	LogicalAndExpression : ( Left : expression "and" Right : expression )
 
 expression 4 =
-	BitwiseBinaryExpression : ( Expressions : expression )^( Operators : ( "^" | "&" | "|" | "<<" | ">>" ) )
+	BitwiseBinaryExpression : ( Left : expression Operator : ( "^" | "&" | "|" | "<<" | ">>" ) Right : expression )
 
 expression 5 =
-	ComparisonExpression : ( Expressions : expression )^( Operators : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) )
+	ComparisonExpression : ( Left : expression Operator : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) Right : expression )
 
 expression 6 =
-	AdditiveExpression : ( Expressions : expression )^( Operators : ( "+" | "-" ) )
+	AdditiveExpression : ( Left : expression Operator : ( "+" | "-" ) Right : expression )
 
 expression 7 =
-	MultiplicativeExpression : ( Expressions : expression )^( Operators : ( "*" | "/" | "%" ) )
+	MultiplicativeExpression : ( Left : expression Operator : ( "*" | "/" | "%" ) Right : expression )
 
 expression 8 :=
 	IntervalSelector : ( Begin : expression ".." End : expression )
 
-expression 9 =
-	ExponentExpression : ( Expressions : expression )^"**"
+expression 9 R =
+	ExponentExpression : ( Left : expression "**" Right : expression )
 
 expression 10 =
 	CallExpression : 
 	( 
-		Expression : expression 
+		Argument : expression 
 		(
-			( "->" [ "<" TypeArguments : typeDeclaration* ">" ] "(" Arguments : [ expression ]* ")" )
-				| ( "=>" Argument : expression )
+			( "->" Expression : expression [ "<" TypeArguments : typeDeclaration* ">" ] "(" Arguments : [ expression ]* ")" )
+				| ( "=>" Expression : expression )
 		)
 	)
 
@@ -127,7 +133,7 @@ expression 11 =
 	)
 
 expression 12 =
-	DereferenceExpression : ( Expression : expression Operator : ( "." | "@" | "," ) Member : QualifiedIdentifier )
+	DereferenceExpression : ( Left : expression Operator : ( "." | "@" | "," ) Right : expression )
 
 expression =
 	"(" expression ")"
@@ -155,7 +161,7 @@ TupleSelector :=
 	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
 
 TupleAttributeSelector :=
-	Name : QualifiedIdentifier ":" Value : expression
+	[ Name : QualifiedIdentifier ] ":" Value : expression
 
 SetSelector :=
 	"{" Items : [ expression ]* "}"

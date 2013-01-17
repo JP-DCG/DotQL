@@ -13,6 +13,12 @@ namespace Ancestry.QueryProcessor.Plan
 
 			/// <summary>Error code 103101: "Identifier conflict.  There is already an identifier by this name in scope."</summary>
 			IdentifierConflict = 103101,
+
+			/// <summary>Error code 103102: "Unknown identifier ({0})."</summary>
+			UnknownIdentifier = 103102,
+
+			/// <summary>Error code 103103: "Expecting a reference of type '{0}'; actual: '{1}'."</summary>
+			IncorrectTypeReferenced = 103103,
 		}
 
 		// Resource manager for this exception class

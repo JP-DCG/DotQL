@@ -242,7 +242,7 @@ Dot paths following an embedded path:
 
 	return Customers?(ID = 123),Orders.OrderItems
 
-e.g. result: `{ ID: 123 City: "Provo" Orders\OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } ... } }`
+e.g. result: `{ ID: 123  City: "Provo"  Orders\OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } ... } }`
 
 Remember... because Orders\OrderItems is a qualified name, it may be accessed as just OrderItems because in this case it is not ambiguous
 
@@ -254,11 +254,11 @@ e.g. result: `{ ID: 456  CustomerID: 123  On: '1/23/2002 4:20:00'dt  OrderItems:
 
 Embedding multiple tables:
 
-	return OrderItems,{ Order: Order Part: Part }
+	return OrderItems,{ Order: Order  Part: Part }
 
 ...or just:
 
-	return OrderItems,{ :Order :Part }
+	return OrderItems,{ :Order  :Part }
 
 e.g. result:
 
@@ -269,16 +269,16 @@ e.g. result:
 		Part: { ID: 112  Name: 'Whatzit' } 
 	} }
 
-Attribute names can be omitted if they match the expression. e.g. `:Order"
+If an attribute name is omitted, it will be inferred from the expression. e.g. `:Order`.
 
 Dereferencing multiple tables:
 
-	return Customers?(ID = 123).Orders.{ :Customer :OrderItems }
+	return Customers?(ID = 123).Orders.{ :Customer  :OrderItems }
 
 This causes the table names to be nested as attributes in a new tuple.  e.g.:
 
 	{ { 
-		Customer: { ID: 123 City: "Provo" } 
+		Customer: { ID: 123  City: "Provo" } 
 		OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } } 
 	} }
 
@@ -433,7 +433,7 @@ Result: `[1 0 -1]`
 
 The expression to the left of the `->` is passed as the first argument to the function, and additional arguments are passed in the following parenthesis.
 
-Alternate declaration:
+Alternate declaration of Sign function:
 	let Sign := (x : Integer) =>
 		return (0 < x)->ToInteger() - (x < 0)->ToInteger()
 
@@ -781,9 +781,9 @@ Empty tuple of attribute carrying tuple:
 Result: `{ ID: 0 }`
 
 In an expression context `{ }` means empty set; for a no-attribute tuple specify a ":" to distinguish that it is a tuple. 
-In a type context `{ : }` means a no-attribute tuple because a set requires a member type (`{ }` is a set of type void in a type context)
+In a type context `{ : }` means a no-attribute tuple because a set requires a member type
 
-Set of type void:
+Empty set of type void:
 
 	return { }
 

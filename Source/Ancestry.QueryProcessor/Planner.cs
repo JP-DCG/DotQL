@@ -12,10 +12,10 @@ namespace Ancestry.QueryProcessor.Plan
 	{
 		public ScriptPlan PlanScript(Parse.Script script, QueryOptions actualOptions)
 		{
-			// Find all the symbols and frames
-			var plan = DiscoverScript(script);
+			var plan = new ScriptPlan(script);
 
-			// TODO: Resolve all references
+			// Find all the symbols and frames and resolve
+			DiscoverScript(plan);
 
 			// TODO: Determine expression data types and characteristics
 
@@ -26,71 +26,109 @@ namespace Ancestry.QueryProcessor.Plan
 			return plan;
 		}
 
-		private ScriptPlan DiscoverScript(Parse.Script script)
+		private void DiscoverScript(ScriptPlan plan)
 		{
-			var plan = new ScriptPlan(script);
+			// Add root frame
+			var local = new Frame();
+			plan.Frames.Add(plan.Script, local);
 
 			// TODO: import symbols for usings
-			//foreach (var u in script.Usings)
-			//	yield return u;
+			//foreach (var u in plan.Script.Usings)
+			//	u;
 
 			// TODO: manage symbols for modules
-			//foreach (var m in script.Modules)
-			//	yield return m;
+			//foreach (var m in plan.Script.Modules)
+			//	m;
 
-			foreach (var v in script.Vars)
+			foreach (var v in plan.Script.Vars)
 			{
-				if (v.Name.IsRooted)
-					throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
-
-				DiscoverStatement(plan, v.Initializer);
-				plan.Frame.Add(v.Name, v);
+				DiscoverStatement(plan, local, v.Type);
+				DiscoverStatement(plan, local, v.Initializer);
+				local.AddNonRooted(v.Name, v);
 			}
 
-			foreach (var a in script.Assignments)
-				DiscoverStatement(plan, a);
+			foreach (var a in plan.Script.Assignments)
+				DiscoverStatement(plan, local, a);
 
-			if (script.Expression != null)
-				DiscoverStatement(plan, script.Expression);
-			return plan;
+			if (plan.Script.Expression != null)
+				DiscoverStatement(plan, local, plan.Script.Expression);
 		}
 
-		private void DiscoverStatement(BasePlan plan, Parse.Statement statement)
+		private void DiscoverStatement(ScriptPlan plan, Frame frame, Parse.Statement statement)
 		{
 			if (statement is Parse.ClausedExpression)
-				DiscoverClausedExpression(plan, (Parse.ClausedExpression)statement);
+				DiscoverClausedExpression(plan, frame, (Parse.ClausedExpression)statement);
+			if (statement is Parse.TupleType)
+				DiscoverTupleType(plan, frame, (Parse.TupleType)statement);
 			else
 			{
 				foreach (var s in statement.GetChildren())
-					DiscoverStatement(plan, s);
+					DiscoverStatement(plan, frame, s);
 			}
 		}
 
-		private void DiscoverClausedExpression(BasePlan plan, Parse.ClausedExpression expression)
+		private void DiscoverTupleType(ScriptPlan plan, Frame frame, Parse.TupleType tupleType)
 		{
-			var clausePlan = new ExpressionPlan(plan, expression);
+			var local = new Frame(null);
+			plan.Frames.Add(tupleType, local);
+
+			var tuple = new Nodes.TupleType();
+
+			// Discover all attributes as symbols
+			foreach (var a in tupleType.Attributes)
+			{
+				local.AddNonRooted(a.Name, a);
+				tuple.Attributes.Add(a.Name, a);
+			}
+
+			// Resolve source reference columns and key references
+			foreach (var k in tupleType.Keys)
+			{
+				tuple.Keys.Add(new Nodes.TupleKey(local.ResolveEach<Parse.TupleAttribute>(k.AttributeNames)));
+			}
+			foreach (var r in tupleType.References)
+			{
+				var tupleRef = new Nodes.TupleReference();
+				tupleRef.SourceColumns.AddRange(local.ResolveEach<Parse.TupleAttribute>(r.SourceAttributeNames));
+				tupleRef.Target = (Nodes.Variable)plan.Nodes[frame.Resolve<Parse.VarMember>(r.Target)];
+				//tupleRef.Target.
+				tuple.References.Add(r.Name, tupleRef);
+			}
+
+			foreach (var r in tupleType.References)
+			{
+				local.AddNonRooted(r.Name, r);
+				Resolve(plan, r, r.Target, frame);
+			}
+		}
+
+		private void Resolve(ScriptPlan plan, Parse.TupleReference r, Parse.QualifiedIdentifier id, Frame frame)
+		{
+			//var resolved = frame.Resolve(id);
+			//plan.ResolvedLists.Add(list, resolved);
+			//foreach (var i in resolved)
+			//	plan.AddReferencedBy(i, statement);
+		}
+
+		private void DiscoverClausedExpression(ScriptPlan plan, Frame frame, Parse.ClausedExpression expression)
+		{
+			var local = new Frame(frame);
 
 			foreach (var fc in expression.ForClauses)
 			{
-				if (fc.Name.IsRooted)
-					throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
-
-				DiscoverStatement(clausePlan, fc.Expression);
-				clausePlan.Frame.Add(fc.Name, fc);
+				DiscoverStatement(plan, local, fc.Expression);
+				local.AddNonRooted(fc.Name, fc);
 			}
 			foreach (var lc in expression.LetClauses)
 			{
-				if (lc.Name.IsRooted)
-					throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
-
-				DiscoverStatement(clausePlan, lc.Expression);
-				clausePlan.Frame.Add(lc.Name, lc);
+				DiscoverStatement(plan, local, lc.Expression);
+				local.AddNonRooted(lc.Name, lc);
 			}
 			if (expression.WhereClause != null)
-				DiscoverStatement(clausePlan, expression.WhereClause);
+				DiscoverStatement(plan, local, expression.WhereClause);
 			foreach (var od in expression.OrderDimensions)
-				DiscoverStatement(clausePlan, od);
-			DiscoverStatement(clausePlan, expression.Expression); 
+				DiscoverStatement(plan, local, od);
+			DiscoverStatement(plan, local, expression.Expression); 
 		}
 	}
 }
