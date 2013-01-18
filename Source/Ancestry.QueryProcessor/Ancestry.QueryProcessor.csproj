@@ -80,6 +80,8 @@
     <Compile Include="Plan\ScriptPlan.cs" />
     <Compile Include="Plan\PlanTable.cs" />
     <Compile Include="Type\Scalar.cs" />
+    <Compile Include="Type\TupleAttribute.cs" />
+    <Compile Include="Type\TupleReferenceAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />

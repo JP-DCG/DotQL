@@ -74,8 +74,10 @@ namespace Ancestry.QueryProcessor
 			if (result == null)
 				return new JValue((object)null);
 
+			var resultType = result.GetType();
+
 			// TODO: handle set, list, tuple, and custom types
-			switch (result.GetType().Name)
+			switch (resultType.Name)
 			{
 				case "String" : 
 				case "Int32" :
@@ -86,7 +88,11 @@ namespace Ancestry.QueryProcessor
 				case "Double" :
 				case "Char" : return new JValue(result);
 
-				default: return new JValue(result.ToString());
+				default:
+					 if (resultType.GetCustomAttributes(typeof(Type.TupleAttribute), false).Length > 0)
+						return JObject.FromObject(result);
+					 else
+						return new JValue(result.ToString());
 			}
 		}
 	}

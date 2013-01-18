@@ -1081,7 +1081,7 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public void TupleSelectorMembers(Lexer lexer, TupleSelector result)
 		{
-			do
+			while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 			{
 				var member = TupleSelectorMember(lexer);
 				if (member is AttributeSelector)
@@ -1092,7 +1092,7 @@ namespace Ancestry.QueryProcessor.Parse
 					result.Keys.Add((TupleKey)member);
 				else
 					break;
-			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
+			}
 		}
 
 		/*
@@ -1125,7 +1125,15 @@ namespace Ancestry.QueryProcessor.Parse
 				}
 				case Keywords.Ref: return TupleReference(lexer);
 				case Keywords.Key: return TupleKey(lexer);
-				default: throw new ParserException(ParserException.Codes.TupleMemberExpected);
+				default:
+				{
+					var attribute = new AttributeSelector();
+					attribute.SetPosition(lexer[1]);
+					attribute.Name = QualifiedIdentifier(lexer);
+					lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
+					attribute.Value = Expression(lexer);
+					return attribute;
+				} 
 			}
 		}
 

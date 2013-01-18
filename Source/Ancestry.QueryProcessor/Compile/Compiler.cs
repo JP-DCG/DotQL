@@ -2,6 +2,7 @@ using Ancestry.QueryProcessor.Execute;
 using Ancestry.QueryProcessor.Plan;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
@@ -12,6 +13,17 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public class Compiler
 	{
+		private AssemblyName _assemblyName;
+		private AssemblyBuilder _assembly;
+		private ModuleBuilder _module;
+
+		public Compiler()
+		{
+			_assemblyName = new AssemblyName("Dynamic");
+			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndCollect);
+			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll");
+		}
+
 		private Dictionary<Parse.ISymbol, ParameterExpression> _paramsBySymbol = new Dictionary<Parse.ISymbol, ParameterExpression>();
 
 		public ExecuteHandler CreateExecutable(ScriptPlan plan)
@@ -68,10 +80,16 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileClausedExpression(ScriptPlan plan, Parse.ClausedExpression clausedExpression)
 		{
-			// TODO: loops for each for
-
 			var block = new List<Expression>();
 			var vars = new List<ParameterExpression>();
+
+			//if (clausedExpression.ForClauses.Count > 0)
+			//// TODO: foreach (var forClause in clausedExpression.ForClauses)
+			//{
+			//	var forClause = clausedExpression.ForClauses[0];
+			//	var compiledExpression = CompileExpression(plan, forClause.Expression);
+			//	var variable = Expression.Variable(compiledExpression.Type, forClause.Name.ToString());
+			//}
 
 			// Create a variable for each let and initialize
 			foreach (var let in clausedExpression.LetClauses)
@@ -97,8 +115,68 @@ namespace Ancestry.QueryProcessor.Compile
 				case "BinaryExpression": return CompileBinaryExpression(plan, (Parse.BinaryExpression)expression);
 				case "ClausedExpression": return CompileClausedExpression(plan, (Parse.ClausedExpression)expression);
 				case "IdentifierExpression": return CompileIdentifierExpression(plan, (Parse.IdentifierExpression)expression);
+				case "TupleSelector": return CompileTupleSelector(plan, (Parse.TupleSelector)expression);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
+		}
+
+		private Expression CompileTupleSelector(ScriptPlan plan, Parse.TupleSelector tupleSelector)
+		{
+			var typeBuilder = _module.DefineType("Tuple" + tupleSelector.GetHashCode(), TypeAttributes.Public);
+			var bindings = new List<MemberBinding>();
+			var expressions = new Dictionary<Parse.AttributeSelector, Expression>();
+			
+			// Add attributes
+			foreach (var attribute in tupleSelector.Attributes)
+			{
+				var value = CompileExpression(plan, attribute.Value);
+				var field = typeBuilder.DefineField(QualifiedIdentifierToName(attribute.Name), value.Type, FieldAttributes.Public);
+				expressions.Add(attribute, value);
+			}
+
+			// Add references
+			foreach (var reference in tupleSelector.References)
+			{
+				var cab = 
+					new CustomAttributeBuilder
+					(
+						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string[]), typeof(string), typeof(string[]) }), 
+						new object[] 
+						{ 
+							(from san in reference.SourceAttributeNames select QualifiedIdentifierToName(san)).ToArray(),
+							QualifiedIdentifierToName(reference.Target),
+							(from tan in reference.TargetAttributeNames select QualifiedIdentifierToName(tan)).ToArray(),
+						}
+					);
+				typeBuilder.SetCustomAttribute(cab);
+			}
+
+			// Add tuple attribute
+			var attributeBuilder =
+				new CustomAttributeBuilder
+				(
+					typeof(Type.TupleAttribute).GetConstructor(new System.Type[] { }),
+					new object[] { }
+				);
+			typeBuilder.SetCustomAttribute(attributeBuilder);
+
+
+			// Create the type
+			var type = typeBuilder.CreateType();
+			
+			// Create initialization bindings for each field
+			foreach (var attr in tupleSelector.Attributes)
+			{
+				var binding = Expression.Bind(type.GetField(QualifiedIdentifierToName(attr.Name)), expressions[attr]);
+				bindings.Add(binding);
+			}
+
+			return Expression.MemberInit(Expression.New(type), bindings);
+		}
+
+		private string QualifiedIdentifierToName(Parse.QualifiedIdentifier qualifiedIdentifier)
+		{
+			return String.Join("_", qualifiedIdentifier.Components);
 		}
 
 		private Expression CompileIdentifierExpression(ScriptPlan plan, Parse.IdentifierExpression identifierExpression)
