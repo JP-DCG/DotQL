@@ -471,8 +471,8 @@ A function selector may specify a function type name rather than repeat the sign
 
 	InventoryFunctions: const 
 	{ 
-		{ IDs: 1..100  DetermineInventory: InventoryFunc => return 50  key(IDs) }
-		{ IDs: 101..99999  DetermineInventory: InventoryFunc => return 30 }
+		{ IDs: 1..100  DetermineInventory: (PartID : Long) => return 50  key(IDs) }
+		{ IDs: 101..99999  DetermineInventory: (PartID : Long) => return 30 }
 	}
 
 Polymorphic invocation of functions:

@@ -49,17 +49,13 @@
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
-    <Compile Include="Parse\QualifiedIdentifier.cs" />
-    <Compile Include="Plan\Nodes\Expression.cs" />
-    <Compile Include="Plan\Nodes\BaseNode.cs" />
     <Compile Include="Plan\Characteristics.cs" />
     <Compile Include="Plan\Frame.cs" />
     <Compile Include="IConnection.cs" />
     <Compile Include="JsonInterop.cs" />
     <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Planner.cs" />
-    <Compile Include="Plan\Nodes\TupleType.cs" />
-    <Compile Include="Plan\Nodes\Variable.cs" />
+    <Compile Include="Plan\QualifiedID.cs" />
     <Compile Include="Plan\PlannerContext.cs" />
     <Compile Include="Plan\PlanningException.cs" />
     <Compile Include="QueryOptions.cs" />
@@ -83,8 +79,7 @@
     <Compile Include="Parse\TextEmitter.cs" />
     <Compile Include="Plan\ScriptPlan.cs" />
     <Compile Include="Plan\PlanTable.cs" />
-    <Compile Include="Plan\Nodes\TupleKey.cs" />
-    <Compile Include="Plan\Nodes\TupleReference.cs" />
+    <Compile Include="Type\Scalar.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />
@@ -102,9 +97,7 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Type\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

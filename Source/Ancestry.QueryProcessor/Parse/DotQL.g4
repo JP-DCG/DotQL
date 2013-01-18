@@ -167,7 +167,7 @@ SetSelector :=
 	"{" Items : [ expression ]* "}"
 
 FunctionSelector :=
-	( functionParameters | TypeName : QualifiedIdentifier ) "=>" Expression : ClausedExpression
+	functionParameters "=>" Expression : ClausedExpression
 
 IdentifierExpression := 
 	Target : QualifiedIdentifier
@@ -219,7 +219,7 @@ pascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''
 
 QualifiedIdentifier :=
-	IsRooted : [ '\' ] Items : identifier^'\'
+	_ IsRooted : [ '\' ] Items : identifier^'\' _
 
 identifier =
 	_ ( letter | '_' [ letter | digit | '_' ]* )+ _

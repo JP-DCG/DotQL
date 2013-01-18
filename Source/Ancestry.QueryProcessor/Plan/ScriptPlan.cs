@@ -10,6 +10,8 @@ namespace Ancestry.QueryProcessor.Plan
 		public ScriptPlan(Parse.Script script)
 		{ 
 			_script = script;
+			Global = new Frame();
+			Frames.Add(script, Global);
 		}
 
 		private Parse.Script _script;
@@ -18,21 +20,14 @@ namespace Ancestry.QueryProcessor.Plan
 		private Dictionary<Parse.Statement, Frame> _frames = new Dictionary<Parse.Statement, Frame>();
 		public Dictionary<Parse.Statement, Frame> Frames { get { return _frames; } }
 
-		private Dictionary<Parse.Statement, Nodes.BaseNode> _nodes = new Dictionary<Parse.Statement,Nodes.BaseNode>();
-		public Dictionary<Parse.Statement, Nodes.BaseNode> Nodes { get { return _nodes; } }
+		public Frame Global { get; set; }
 
-		private Dictionary<Parse.ISymbol, List<Parse.Statement>> _referencedBy = new Dictionary<Parse.ISymbol,List<Parse.Statement>>();
-		public Dictionary<Parse.ISymbol, List<Parse.Statement>> ReferencedBy { get { return _referencedBy; } }
+		private Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol> _references = new Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol>();
+		public Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol> References { get { return _references; } }
 
-		public void AddReferencedBy(Parse.ISymbol symbol, Parse.Statement statement)
+		public void AddReference(Parse.ISymbol symbol, Parse.QualifiedIdentifier id)
 		{
-			List<Parse.Statement> item;
-			if (!ReferencedBy.TryGetValue(symbol, out item))
-			{
-				item = new List<Parse.Statement>();
-				ReferencedBy.Add(symbol, item);
-			}
-			item.Add(statement);
+			References.Add(id, symbol);
 		}
 	}
 }

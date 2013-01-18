@@ -59,6 +59,12 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			return "using " + (Alias == null ? "" : Alias + " := ") + Target;
 		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Alias;
+			yield return Target;
+		}
 	}
 
 	public class ModuleDeclaration : Statement
@@ -78,6 +84,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			foreach (var m in Members)
 				yield return m;
 		}
@@ -91,6 +98,11 @@ namespace Ancestry.QueryProcessor.Parse
 	public abstract class ModuleMember : Statement, ISymbol
 	{
 		public QualifiedIdentifier Name { get; set; }
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Name;
+		}
 	}
 
 	public class TypeMember : ModuleMember
@@ -104,6 +116,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			base.GetChildren();
 			yield return Type;
 		}
 	}
@@ -116,6 +129,13 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return Name + " : " + String.Join(" ", from v in Values select v.ToString());
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			base.GetChildren();
+			foreach (var v in Values)
+				yield return v;
 		}
 	}
 
@@ -130,6 +150,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			base.GetChildren();
 			yield return Expression;
 		}
 	}
@@ -145,6 +166,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			base.GetChildren();
 			yield return Type;
 		}
 	}
@@ -164,6 +186,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Type;
 			yield return Initializer;
 		}
@@ -233,6 +256,16 @@ namespace Ancestry.QueryProcessor.Parse
 		public TypeDeclaration Type { get; set; }
 
 		public bool IsRequired { get; set; }
+
+		public override string ToString()
+		{
+			return Type.ToString() + (IsRequired ? "!" : "?");
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Type;
+		}
 	}
 
 	public class ListType : TypeDeclaration
@@ -317,6 +350,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Type;
 		}
 	}
@@ -338,6 +372,16 @@ namespace Ancestry.QueryProcessor.Parse
 			return "ref " + Name + "(" + String.Join(" ", from n in SourceAttributeNames select n.ToString()) 
 				+ ") " + Target + "(" + String.Join(" ", from n in TargetAttributeNames select n.ToString()) + ")";
 		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Name;
+			foreach (var sa in SourceAttributeNames)
+				yield return sa;
+			yield return Target;
+			foreach (var ta in TargetAttributeNames)
+				yield return ta;
+		}
 	}
 
 	public class TupleKey : Statement
@@ -348,6 +392,12 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return "key (" + String.Join(" ", from a in AttributeNames select a.ToString()) + ")";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			foreach (var an in AttributeNames)
+				yield return an;
 		}
 	}
 
@@ -363,10 +413,10 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "function" 
-				+ (TypeParameters.Count > 0 ? "<" + String.Join(" ", from tp in TypeParameters select tp.ToString()) + ">" : "")
-				+ "(" + String.Join(" ", from p in Parameters select p.ToString()) 
-				+ ") : " + ReturnType.ToString();
+			return "(" + String.Join(" ", from p in Parameters select p.ToString()) 
+				+ ") => "
+				+ (TypeParameters.Count > 0 ? "<" + String.Join(" ", from tp in TypeParameters select tp.ToString()) + "> " : "")
+				+ ReturnType.ToString();
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -392,6 +442,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Type;
 		}
 	}
@@ -418,6 +469,11 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return Target.ToString();
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Target;
 		}
 	}
 
@@ -495,6 +551,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Expression;
 		}
 	}
@@ -512,6 +569,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Expression;
 		}
 	}
@@ -714,6 +772,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			yield return Name;
 			yield return Value;
 		}
 	}
@@ -737,18 +796,21 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class FunctionSelector : Expression
 	{
-		public FunctionType Type { get; set; }
+		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
+		public List<FunctionParameter> Parameters { get { return _parameters; } }
 
 		public ClausedExpression Expression { get; set; }
 
 		public override string ToString()
 		{
-			return Type.ToString() + "\r\n\t" + Expression;
+			return "(" + String.Join(" ", from p in Parameters select p.ToString()) + ")"
+				+ " =>\r\n\t" + Expression;
 		}
 
 		public override IEnumerable<Statement> GetChildren()
 		{
-			yield return Type;
+			foreach (var p in Parameters)
+				yield return p;
 			yield return Expression;
 		}
 	}
@@ -778,6 +840,11 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return Target.ToString();
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Target;
 		}
 	}
 
@@ -846,7 +913,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class IfExpression : Expression
 	{
-		public Expression Expression { get; set; }
+		public Expression TestExpression { get; set; }
 
 		public Expression ThenExpression { get; set; }
 
@@ -854,12 +921,12 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "if " + Expression + " then " + ThenExpression + " else " + ElseExpression;
+			return "if " + TestExpression + " then " + ThenExpression + " else " + ElseExpression;
 		}
 
 		public override IEnumerable<Statement> GetChildren()
 		{
-			yield return Expression;
+			yield return TestExpression;
 			yield return ThenExpression;
 			yield return ElseExpression;
 		}
@@ -880,6 +947,18 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			yield return TryExpression;
 			yield return CatchExpression;
+		}
+	}
+
+	public class QualifiedIdentifier : Statement
+	{
+		public bool IsRooted { get; set; }
+
+		public string[] Components { get; set; }
+
+		public override string ToString()
+		{
+			return (IsRooted ? "\\" : "") + String.Join("\\", Components);
 		}
 	}
 }

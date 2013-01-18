@@ -405,9 +405,6 @@ namespace Ancestry.QueryProcessor.Parse
 
 			functionParameters =
 				"(" Parameters : [ FunctionParameter ]* ")"
-
-			FunctionParameter :=
-				Name : QualifiedIdentifier ":" Type : typeDeclaration
 		*/
 		public FunctionType FunctionType(Lexer lexer)
 		{
@@ -418,14 +415,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			// Parse parameters
 			while (!lexer[1].IsSymbol(Keywords.EndGroup))
-			{
-				var param = new FunctionParameter();
-				param.SetPosition(lexer);
-				param.Name = QualifiedIdentifier(lexer);
-				lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
-				param.Type = TypeDeclaration(lexer);
-				result.Parameters.Add(param);
-			}
+				result.Parameters.Add(FunctionParameter(lexer));
 			lexer.NextToken().CheckSymbol(Keywords.EndGroup);
 
 			lexer.NextToken().CheckSymbol(Keywords.Function);
@@ -441,6 +431,19 @@ namespace Ancestry.QueryProcessor.Parse
 			result.ReturnType = TypeDeclaration(lexer);
 
 			return result;
+		}
+
+		/*
+				Name : QualifiedIdentifier ":" Type : typeDeclaration
+		*/
+		private FunctionParameter FunctionParameter(Lexer lexer)
+		{
+			var param = new FunctionParameter();
+			param.SetPosition(lexer[1]);
+			param.Name = QualifiedIdentifier(lexer);
+			lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
+			param.Type = TypeDeclaration(lexer);
+			return param;
 		}
 
 		/*
@@ -883,7 +886,7 @@ namespace Ancestry.QueryProcessor.Parse
 						continue;
 					default: break;
 				}
-
+				break;
 			}
 
 			return expression;
@@ -942,7 +945,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 						case Keywords.BeginTupleSet: return SetOrTupleSelector(lexer);
 
-						case Keywords.Function: return FunctionSelector(lexer);
+						case Keywords.BeginGroup: return FunctionSelectorOrGroup(lexer);
 						
 						case Keywords.Case: return CaseExpression(lexer);
 						
@@ -1183,6 +1186,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public QualifiedIdentifier QualifiedIdentifier(Lexer lexer)
 		{
 			var result = new QualifiedIdentifier();
+			result.SetPosition(lexer[1]);
 
 			// Determine if the id is rooted
 			if (lexer[1].IsSymbol(Keywords.Qualifier))
@@ -1223,30 +1227,129 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-			Type : FunctionType Expression : ClausedExpression
+			(group) :=
+				"(" expression ")"
+		
+			FunctionSelector :=
+				functionParameters "=>" Expression : ClausedExpression
 		*/
-		public Expression FunctionSelector(Lexer lexer)
+		public Expression FunctionSelectorOrGroup(Lexer lexer)
 		{
-			var result = new FunctionSelector();
+			lexer.NextToken().DebugCheckSymbol(Keywords.BeginGroup);
+			var startToken = lexer[0];
+			var expressionToken = lexer[1];
+			var expression = Expression(lexer);
+			if (lexer[1].IsSymbol(Keywords.AttributeSeparator))
+			{
+				// We've discovered that this is a function, there is an attribute separator - validate the name
+				if (!(expression is IdentifierExpression))
+					throw new ParserException(ParserException.Codes.InvalidAttributeName);
+				lexer.NextToken();
+
+				// Manually construct the first param
+				var param = new FunctionParameter();
+				param.SetPosition(expressionToken);
+				param.Name = ((IdentifierExpression)expression).Target;
+				param.Type = TypeDeclaration(lexer);
+
+				var result = new FunctionSelector();
+				result.SetPosition(startToken);
+				result.Parameters.Add(param);
+
+				while (!lexer[1].IsSymbol(Keywords.EndGroup))
+					result.Parameters.Add(FunctionParameter(lexer));
+				lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+
+				lexer.NextToken().CheckSymbol(Keywords.Function);
+
+				result.Expression = ClausedExpression(lexer);
+				return result;
+			}
+				
+			lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+			return expression;
+		}
+
+		/*
+				"case" [ [ IsStrict : "strict" ] TestExpression : expression ]
+					Items : ( "when" WhenExpression : expression "then" ThenExpression : expression )*
+					"else" ElseExpression : expression
+				"end"		
+		*/
+		public Expression CaseExpression(Lexer lexer)
+		{
+			lexer.NextToken().DebugCheckSymbol(Keywords.Case);
+
+			var result = new CaseExpression();
 			result.SetPosition(lexer);
-			result.Type = FunctionType(lexer);
-			result.Expression = ClausedExpression(lexer);
+
+			// Strict and test
+			if (lexer[1].IsSymbol(Keywords.Strict))
+			{
+				result.IsStrict = true;
+				lexer.NextToken();
+				result.TestExpression = Expression(lexer);
+			}
+			else if (!lexer[1].IsSymbol(Keywords.When))
+				result.TestExpression = Expression(lexer);
+			
+			// Items
+			do
+			{
+				lexer.NextToken().CheckSymbol(Keywords.When);
+				var item = new CaseItem();
+				item.SetPosition(lexer);
+				item.WhenExpression = Expression(lexer);
+				lexer.NextToken().CheckSymbol(Keywords.Then);
+				item.ThenExpression = Expression(lexer);
+			} while (lexer[1].IsSymbol(Keywords.When));
+
+			// Else
+			if (!result.IsStrict)
+			{
+				lexer.NextToken().CheckSymbol(Keywords.Else);
+				result.ElseExpression = Expression(lexer);
+			}
+
+			lexer.NextToken().CheckSymbol(Keywords.End);
 			return result;
 		}
 
-		public Expression CaseExpression(Lexer lexer)
-		{
-			throw new NotImplementedException();
-		}
-
+		/*
+				"if" TestExpression : expression
+					"then" ThenExpression : expression
+					"else" ElseExpression : expression 
+		*/
 		public Expression IfExpression(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().CheckSymbol(Keywords.If);
+			var result = new IfExpression();
+			result.SetPosition(lexer);
+			result.TestExpression = Expression(lexer);
+			
+			lexer.NextToken().CheckSymbol(Keywords.Then);
+			result.ThenExpression = Expression(lexer);
+
+			lexer.NextToken().CheckSymbol(Keywords.Else);
+			result.ElseExpression = Expression(lexer);
+			
+			return result;
 		}
 
+		/*
+				"try" TryExpression : expression "catch" CatchExpression : expression
+		*/
 		public Expression TryExpression(Lexer lexer)
 		{
-			throw new NotImplementedException();
+			lexer.NextToken().CheckSymbol(Keywords.Try);
+			var result = new TryCatchExpression();
+			result.SetPosition(lexer);
+			result.TryExpression = Expression(lexer);
+			
+			lexer.NextToken().CheckSymbol(Keywords.Catch);
+			result.CatchExpression = Expression(lexer);
+			
+			return result;
 		}
 
 		/*

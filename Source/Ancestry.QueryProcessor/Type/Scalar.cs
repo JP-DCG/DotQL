@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Ancestry.QueryProcessor.Plan.Nodes
+namespace Ancestry.QueryProcessor.Type
 {
-	public class BaseNode
+	public class Scalar
 	{
 		
 	}

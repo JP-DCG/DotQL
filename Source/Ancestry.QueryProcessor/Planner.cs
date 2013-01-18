@@ -29,8 +29,7 @@ namespace Ancestry.QueryProcessor.Plan
 		private void DiscoverScript(ScriptPlan plan)
 		{
 			// Add root frame
-			var local = new Frame();
-			plan.Frames.Add(plan.Script, local);
+			var local = plan.Global;
 
 			// TODO: import symbols for usings
 			//foreach (var u in plan.Script.Usings)
@@ -56,15 +55,60 @@ namespace Ancestry.QueryProcessor.Plan
 
 		private void DiscoverStatement(ScriptPlan plan, Frame frame, Parse.Statement statement)
 		{
-			if (statement is Parse.ClausedExpression)
-				DiscoverClausedExpression(plan, frame, (Parse.ClausedExpression)statement);
-			if (statement is Parse.TupleType)
-				DiscoverTupleType(plan, frame, (Parse.TupleType)statement);
-			else
+			switch (statement.GetType().Name)
 			{
-				foreach (var s in statement.GetChildren())
-					DiscoverStatement(plan, frame, s);
+				case "ClausedExpression" : DiscoverClausedExpression(plan, frame, (Parse.ClausedExpression)statement); break;
+				case "TupleType" : DiscoverTupleType(plan, frame, (Parse.TupleType)statement); break;
+				case "IdentifierExpression" : DiscoverIdentifierExpression(plan, frame, (Parse.IdentifierExpression)statement); break;
+				case "NamedType" : DiscoverNamedType(plan, frame, (Parse.NamedType)statement); break;
+				case "ModuleDeclaration" : DiscoverModuleDeclaration(plan, frame, (Parse.ModuleDeclaration)statement); break;
+				case "FunctionSelector" : DiscoverFunctionSelector(plan, frame, (Parse.FunctionSelector)statement); break;
+				default :
+					foreach (var s in statement.GetChildren())
+						DiscoverStatement(plan, frame, s);
+					break;
 			}
+		}
+
+		private void DiscoverFunctionSelector(ScriptPlan plan, Frame frame, Parse.FunctionSelector functionSelector)
+		{
+			var local = new Frame(frame);
+			plan.Frames.Add(functionSelector, local);
+			
+			foreach (var p in functionSelector.Parameters)
+				local.AddNonRooted(p.Name, p);
+			
+			DiscoverStatement(plan, local, functionSelector.Expression);
+		}
+
+		private void DiscoverModuleDeclaration(ScriptPlan plan, Frame frame, Parse.ModuleDeclaration moduleDeclaration)
+		{
+			var local = new Frame(frame);
+			plan.Frames.Add(moduleDeclaration, local);
+
+			// Gather the module's symbols
+			foreach (var member in moduleDeclaration.Members)
+			{
+				local.AddNonRooted(member.Name, member);
+
+				// Populate qualified enumeration members
+				if (member is Parse.EnumMember)
+					foreach (var e in ((Parse.EnumMember)member).Values)
+						local.AddNonRooted(new QualifiedID() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
+			}
+
+			foreach (var member in moduleDeclaration.Members)
+				DiscoverStatement(plan, local, member);
+		}
+
+		private void DiscoverNamedType(ScriptPlan plan, Frame frame, Parse.NamedType namedType)
+		{
+			plan.AddReference(frame.Resolve(namedType.Target), namedType.Target);
+		}
+
+		private void DiscoverIdentifierExpression(ScriptPlan plan, Frame frame, Parse.IdentifierExpression identifier)
+		{
+			plan.AddReference(frame.Resolve(identifier.Target), identifier.Target);
 		}
 
 		private void DiscoverTupleType(ScriptPlan plan, Frame frame, Parse.TupleType tupleType)
@@ -72,47 +116,32 @@ namespace Ancestry.QueryProcessor.Plan
 			var local = new Frame(null);
 			plan.Frames.Add(tupleType, local);
 
-			var tuple = new Nodes.TupleType();
-
 			// Discover all attributes as symbols
 			foreach (var a in tupleType.Attributes)
 			{
 				local.AddNonRooted(a.Name, a);
-				tuple.Attributes.Add(a.Name, a);
 			}
 
-			// Resolve source reference columns and key references
+			// Resolve source reference columns
 			foreach (var k in tupleType.Keys)
 			{
-				tuple.Keys.Add(new Nodes.TupleKey(local.ResolveEach<Parse.TupleAttribute>(k.AttributeNames)));
-			}
-			foreach (var r in tupleType.References)
-			{
-				var tupleRef = new Nodes.TupleReference();
-				tupleRef.SourceColumns.AddRange(local.ResolveEach<Parse.TupleAttribute>(r.SourceAttributeNames));
-				tupleRef.Target = (Nodes.Variable)plan.Nodes[frame.Resolve<Parse.VarMember>(r.Target)];
-				//tupleRef.Target.
-				tuple.References.Add(r.Name, tupleRef);
+				Resolve(plan, k.AttributeNames, local);
 			}
 
+			// Resolve key reference columns
 			foreach (var r in tupleType.References)
 			{
-				local.AddNonRooted(r.Name, r);
-				Resolve(plan, r, r.Target, frame);
+				Resolve(plan, r.SourceAttributeNames, local);
+				var target = plan.Global.Resolve(r.Target);
+				plan.AddReference(target, r.Target);
+				Resolve(plan, r.TargetAttributeNames, plan.Frames[(Parse.Statement)target]);
 			}
-		}
-
-		private void Resolve(ScriptPlan plan, Parse.TupleReference r, Parse.QualifiedIdentifier id, Frame frame)
-		{
-			//var resolved = frame.Resolve(id);
-			//plan.ResolvedLists.Add(list, resolved);
-			//foreach (var i in resolved)
-			//	plan.AddReferencedBy(i, statement);
 		}
 
 		private void DiscoverClausedExpression(ScriptPlan plan, Frame frame, Parse.ClausedExpression expression)
 		{
 			var local = new Frame(frame);
+			plan.Frames.Add(expression, local);
 
 			foreach (var fc in expression.ForClauses)
 			{
@@ -127,8 +156,19 @@ namespace Ancestry.QueryProcessor.Plan
 			if (expression.WhereClause != null)
 				DiscoverStatement(plan, local, expression.WhereClause);
 			foreach (var od in expression.OrderDimensions)
-				DiscoverStatement(plan, local, od);
+				DiscoverStatement(plan, local, od.Expression);
 			DiscoverStatement(plan, local, expression.Expression); 
+		}
+
+		private void Resolve(ScriptPlan plan, Parse.QualifiedIdentifier id, Frame frame)
+		{
+			plan.AddReference(frame.Resolve(id), id);
+		}
+
+		private void Resolve(ScriptPlan plan, IEnumerable<Parse.QualifiedIdentifier> list, Frame frame)
+		{
+			foreach (var item in list)
+				plan.AddReference(frame.Resolve(item), item);
 		}
 	}
 }
