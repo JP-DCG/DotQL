@@ -88,10 +88,14 @@ namespace Ancestry.QueryProcessor
 				case "Double" :
 				case "Char" : return new JValue(result);
 
+				case "HashSet`1" : return JArray.FromObject(result);
+
 				default:
-					 if (resultType.GetCustomAttributes(typeof(Type.TupleAttribute), false).Length > 0)
+					if (resultType.GetCustomAttributes(typeof(Type.TupleAttribute), false).Length > 0)
 						return JObject.FromObject(result);
-					 else
+					else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(resultType))
+						return JArray.FromObject(result);
+					else
 						return new JValue(result.ToString());
 			}
 		}

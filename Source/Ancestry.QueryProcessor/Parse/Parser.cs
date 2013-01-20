@@ -992,13 +992,11 @@ namespace Ancestry.QueryProcessor.Parse
 			var result = new ListSelector();
 			result.SetPosition(lexer);
 			
-			while (lexer[1].Type != TokenType.EOF && !(lexer[1].Type != TokenType.Symbol && lexer[1].Token != Keywords.EndList))
+			while (!lexer[1].IsSymbol(Keywords.EndList))
 			{
 				result.Items.Add(Expression(lexer));
 			}
-
-			lexer[1].CheckSymbol(Keywords.EndList);
-			lexer.NextToken();
+			lexer.NextToken().CheckSymbol(Keywords.EndList);
 
 			return result;
 		}
@@ -1173,7 +1171,7 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public TupleKey TupleKey(Lexer lexer)
 		{
-			lexer.NextToken().DebugCheckSymbol(Keywords.Ref);
+			lexer.NextToken().DebugCheckSymbol(Keywords.Key);
 
 			var result = new TupleKey();
 			result.SetPosition(lexer);

@@ -1,13 +1,13 @@
 using Ancestry.QueryProcessor.Execute;
 using Ancestry.QueryProcessor.Plan;
-using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
-using System.Linq.Expressions;
-using System.Collections.Generic;
 
 namespace Ancestry.QueryProcessor.Compile
 {
@@ -17,14 +17,16 @@ namespace Ancestry.QueryProcessor.Compile
 		private AssemblyBuilder _assembly;
 		private ModuleBuilder _module;
 
+		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
+		private Dictionary<Parse.ISymbol, ParameterExpression> _paramsBySymbol = new Dictionary<Parse.ISymbol, ParameterExpression>();
+
 		public Compiler()
 		{
 			_assemblyName = new AssemblyName("Dynamic");
-			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndCollect);
+			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
 			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll");
+			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
 		}
-
-		private Dictionary<Parse.ISymbol, ParameterExpression> _paramsBySymbol = new Dictionary<Parse.ISymbol, ParameterExpression>();
 
 		public ExecuteHandler CreateExecutable(ScriptPlan plan)
 		{
@@ -52,6 +54,10 @@ namespace Ancestry.QueryProcessor.Compile
 					args,
 					cancelToken
 				);
+
+			_module.CreateGlobalFunctions();
+			_assembly.Save("qpdebug.dll");
+
 			return execute.Compile();
 
 			//// TODO: Pass debug info
@@ -80,16 +86,66 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileClausedExpression(ScriptPlan plan, Parse.ClausedExpression clausedExpression)
 		{
-			var block = new List<Expression>();
 			var vars = new List<ParameterExpression>();
 
-			//if (clausedExpression.ForClauses.Count > 0)
+			if (clausedExpression.ForClauses.Count > 0)
 			//// TODO: foreach (var forClause in clausedExpression.ForClauses)
-			//{
-			//	var forClause = clausedExpression.ForClauses[0];
-			//	var compiledExpression = CompileExpression(plan, forClause.Expression);
-			//	var variable = Expression.Variable(compiledExpression.Type, forClause.Name.ToString());
-			//}
+			{
+				var forClause = clausedExpression.ForClauses[0];
+				var forExpression = CompileExpression(plan, forClause.Expression);
+				var elementType = 
+					forExpression.Type.IsConstructedGenericType
+						? forExpression.Type.GetGenericArguments()[0]
+						: forExpression.Type.GetElementType();
+				var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+				var enumeratorType = typeof(IEnumerator<>).MakeGenericType(elementType);
+				var enumerator = Expression.Parameter(enumeratorType, "enumerator");
+				vars.Add(enumerator);
+				var forVariable = Expression.Variable(elementType, forClause.Name.ToString());
+				_paramsBySymbol.Add(forClause, forVariable);
+				vars.Add(forVariable);
+
+				var resultIsSet = clausedExpression.OrderDimensions.Count == 0
+					&& forExpression.Type.IsConstructedGenericType
+					&& (forExpression.Type.GetGenericTypeDefinition() == typeof(HashSet<>));
+				var resultType = resultIsSet 
+					? typeof(HashSet<>).MakeGenericType(elementType) 
+					: typeof(List<>).MakeGenericType(elementType);
+				var resultVariable = Expression.Variable(resultType, "result");
+				vars.Add(resultVariable);
+				var resultAddMethod = resultType.GetMethod("Add");
+				var breakLabel = Expression.Label("break");
+
+				var returnBlock = CompileClausedReturn(plan, clausedExpression, vars);
+
+				return Expression.Block
+				(
+					vars,
+					Expression.Assign(enumerator, Expression.Call(forExpression, enumerableType.GetMethod("GetEnumerator"))),
+					Expression.Loop
+					(
+						Expression.IfThenElse
+						(
+							Expression.Call(enumerator, typeof(IEnumerator).GetMethod("MoveNext")),
+							Expression.Block
+							(
+								Expression.Assign(forVariable, Expression.Property(enumerator, enumeratorType.GetProperty("Current"))),
+								Expression.Call(resultVariable, resultAddMethod, returnBlock)
+							),
+							Expression.Break(breakLabel)
+						),
+						breakLabel
+					),
+					resultVariable
+				);
+			}
+
+			return CompileClausedReturn(plan, clausedExpression, vars);
+		}
+
+		private Expression CompileClausedReturn(ScriptPlan plan, Parse.ClausedExpression clausedExpression, List<ParameterExpression> vars)
+		{
+			var block = new List<Expression>();
 
 			// Create a variable for each let and initialize
 			foreach (var let in clausedExpression.LetClauses)
@@ -103,11 +159,11 @@ namespace Ancestry.QueryProcessor.Compile
 
 			// Add the expression to the body
 			block.Add(CompileExpression(plan, clausedExpression.Expression));
-			
+
 			return Expression.Block(vars, block);
 		}
 
-		private Expression CompileExpression(ScriptPlan plan, Parse.Expression expression)
+		private Expression CompileExpression(ScriptPlan plan, Parse.Expression expression, System.Type typeHint = null)
 		{
 			switch (expression.GetType().Name)
 			{
@@ -116,37 +172,142 @@ namespace Ancestry.QueryProcessor.Compile
 				case "ClausedExpression": return CompileClausedExpression(plan, (Parse.ClausedExpression)expression);
 				case "IdentifierExpression": return CompileIdentifierExpression(plan, (Parse.IdentifierExpression)expression);
 				case "TupleSelector": return CompileTupleSelector(plan, (Parse.TupleSelector)expression);
+				case "ListSelector": return CompileListSelector(plan, (Parse.ListSelector)expression);
+				case "SetSelector": return CompileSetSelector(plan, (Parse.SetSelector)expression);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
 		}
 
+		private Expression CompileSetSelector(ScriptPlan plan, Parse.SetSelector setSelector)
+		{
+			// Compile each item's expression
+			var initializers = new ElementInit[setSelector.Items.Count];
+			System.Type type = null;
+			System.Type setType = null;
+			MethodInfo addMethod = null;
+			for (var i = 0; i < setSelector.Items.Count; i++)
+			{
+				var expression = CompileExpression(plan, setSelector.Items[i], type);
+				if (type == null)
+				{
+					type = expression.Type;
+					GetSetTypeAndAddMethod(type, ref setType, ref addMethod);
+				}
+				else if (type != expression.Type)
+					expression = Convert(expression, type);
+				initializers[i] = Expression.ElementInit(addMethod, expression);
+			}
+			if (type == null)
+			{
+				type = typeof(void);
+				GetSetTypeAndAddMethod(type, ref setType, ref addMethod);
+			}
+
+			return Expression.ListInit(Expression.New(setType), initializers);
+		}
+
+		private static void GetSetTypeAndAddMethod(System.Type type, ref System.Type setType, ref MethodInfo addMethod)
+		{
+			setType = typeof(HashSet<>).MakeGenericType(type);
+			addMethod = setType.GetMethod("Add");
+		}
+
+		private Expression CompileListSelector(ScriptPlan plan, Parse.ListSelector listSelector)
+		{
+			// Compile each item's expression
+			var initializers = new Expression[listSelector.Items.Count];
+			System.Type type = null;
+			for (var i = 0; i < listSelector.Items.Count; i++)
+			{
+				var expression = CompileExpression(plan, listSelector.Items[i], type);
+				if (type == null)
+					type = expression.Type;
+				else if (type != expression.Type)
+					expression = Convert(expression, type);
+				initializers[i] = expression;
+			}
+			if (type == null)
+				type = typeof(void);
+
+			return Expression.NewArrayInit(type, initializers);
+		}
+
+		private Expression Convert(Expression expression, System.Type type)
+		{
+			throw new NotImplementedException();
+		}
+
 		private Expression CompileTupleSelector(ScriptPlan plan, Parse.TupleSelector tupleSelector)
 		{
-			var typeBuilder = _module.DefineType("Tuple" + tupleSelector.GetHashCode(), TypeAttributes.Public);
 			var bindings = new List<MemberBinding>();
 			var expressions = new Dictionary<Parse.AttributeSelector, Expression>();
 			
-			// Add attributes
+			// Compile attributes
 			foreach (var attribute in tupleSelector.Attributes)
+				expressions.Add(attribute, CompileExpression(plan, attribute.Value));
+
+			var tupleType = TupeTypeFromTupleSelector(tupleSelector, expressions);
+			var type = FindOrCreateNativeFromTupleType(tupleType);
+			
+			// Create initialization bindings for each field
+			foreach (var attr in tupleSelector.Attributes)
 			{
-				var value = CompileExpression(plan, attribute.Value);
-				var field = typeBuilder.DefineField(QualifiedIdentifierToName(attribute.Name), value.Type, FieldAttributes.Public);
-				expressions.Add(attribute, value);
+				var binding = Expression.Bind(type.GetField(QualifiedID.FromQualifiedIdentifier(attr.Name).ToString()), expressions[attr]);
+				bindings.Add(binding);
+			}
+
+			return Expression.MemberInit(Expression.New(type), bindings);
+		}
+
+		private System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
+		{
+			System.Type nativeType;
+			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
+			{
+				nativeType = TypeTypeToNative(tupleType);
+				_tupleToNative.Add(tupleType, nativeType);
+			}
+			return nativeType;
+		}
+
+		private static Type.TupleType TupeTypeFromTupleSelector(Parse.TupleSelector tupleSelector, Dictionary<Parse.AttributeSelector, Expression> expressions)
+		{
+			// Create a tuple type for the given selector
+			var tupleType = new Type.TupleType();
+			foreach (var attribute in tupleSelector.Attributes)
+				tupleType.Attributes.Add(QualifiedID.FromQualifiedIdentifier(attribute.Name), expressions[attribute].Type);
+			foreach (var reference in tupleSelector.References)
+				tupleType.References.Add(QualifiedID.FromQualifiedIdentifier(reference.Name), Type.TupleReference.FromParseReference(reference));
+			foreach (var key in tupleSelector.Keys)
+				tupleType.Keys.Add(Type.TupleKey.FromParseKey(key));
+			return tupleType;
+		}
+
+		private System.Type TypeTypeToNative(Type.TupleType tupleType)
+		{
+			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
+			var fieldsByID = new Dictionary<QualifiedID, FieldInfo>();
+
+			// Add attributes
+			foreach (var attribute in tupleType.Attributes)
+			{
+				var field = typeBuilder.DefineField(attribute.Key.ToString(), attribute.Value, FieldAttributes.Public);
+				fieldsByID.Add(attribute.Key, field);
 			}
 
 			// Add references
-			foreach (var reference in tupleSelector.References)
+			foreach (var reference in tupleType.References)
 			{
-				var cab = 
+				var cab =
 					new CustomAttributeBuilder
 					(
-						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string[]), typeof(string), typeof(string[]) }), 
+						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string[]), typeof(string), typeof(string[]) }),
 						new object[] 
-						{ 
-							(from san in reference.SourceAttributeNames select QualifiedIdentifierToName(san)).ToArray(),
-							QualifiedIdentifierToName(reference.Target),
-							(from tan in reference.TargetAttributeNames select QualifiedIdentifierToName(tan)).ToArray(),
-						}
+							{ 
+								(from san in reference.Value.SourceAttributeNames select san.ToString()).ToArray(),
+								reference.Value.Target.ToString(),
+								(from tan in reference.Value.TargetAttributeNames select tan.ToString()).ToArray(),
+							}
 					);
 				typeBuilder.SetCustomAttribute(cab);
 			}
@@ -160,18 +321,94 @@ namespace Ancestry.QueryProcessor.Compile
 				);
 			typeBuilder.SetCustomAttribute(attributeBuilder);
 
+			// Add comparison and hash methods based on key(s)
+			EmitTupleGetHashCode(tupleType, typeBuilder, fieldsByID);
+			var equalityMethod = EmitTupleEquality(tupleType, typeBuilder, fieldsByID);
+			EmitTupleInequality(typeBuilder, equalityMethod);
+			EmitTupleEquals(typeBuilder, equalityMethod);
 
 			// Create the type
-			var type = typeBuilder.CreateType();
-			
-			// Create initialization bindings for each field
-			foreach (var attr in tupleSelector.Attributes)
-			{
-				var binding = Expression.Bind(type.GetField(QualifiedIdentifierToName(attr.Name)), expressions[attr]);
-				bindings.Add(binding);
-			}
+			return typeBuilder.CreateType();
+		}
 
-			return Expression.MemberInit(Expression.New(type), bindings);
+		private static MethodBuilder EmitTupleInequality(TypeBuilder typeBuilder, MethodBuilder equalityMethod)
+		{
+			var inequalityMethod = typeBuilder.DefineMethod("op_Inequality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
+			var il = inequalityMethod.GetILGenerator();
+			il.Emit(OpCodes.Ldarg_0);
+			il.Emit(OpCodes.Ldarg_1);
+			il.EmitCall(OpCodes.Call, equalityMethod, null);
+			il.Emit(OpCodes.Not);
+			il.Emit(OpCodes.Ret);
+			return inequalityMethod;
+		}
+
+		private static MethodBuilder EmitTupleEquality(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
+		{
+			var equalityMethod = typeBuilder.DefineMethod("op_Equality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
+			var il = equalityMethod.GetILGenerator();
+			bool first = true;
+			foreach (var keyItem in tupleType.GetKeyAttributes())
+			{
+				il.Emit(OpCodes.Ldarg_0);
+				il.Emit(OpCodes.Ldfld, fieldsByID[keyItem]);
+				il.Emit(OpCodes.Ldarg_1);
+				il.Emit(OpCodes.Ldfld, fieldsByID[keyItem]);
+				il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectEquals, null);
+				if (first)
+					first = false;
+				else
+					il.Emit(OpCodes.And);
+			}
+			il.Emit(OpCodes.Ret);
+			return equalityMethod;
+		}
+
+		private static MethodBuilder EmitTupleGetHashCode(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
+		{
+			var getHashCodeMethod = typeBuilder.DefineMethod("GetHashCode", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(Int32), new System.Type[] { });
+			var il = getHashCodeMethod.GetILGenerator();
+			// result = 83
+			il.Emit(OpCodes.Ldc_I4, 83);
+			foreach (var keyItem in tupleType.GetKeyAttributes())
+			{
+				var field = fieldsByID[keyItem];
+				var hashMethod = field.FieldType.GetMethod("GetHashCode");
+
+				// result ^= this.<field>.GetHashCode();
+				il.Emit(OpCodes.Ldarg_0);
+				il.Emit(OpCodes.Ldflda, field);
+				if (hashMethod != null)
+					il.EmitCall(OpCodes.Call, hashMethod, null);
+				else
+					il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectGetHashCode, null);
+ 				il.Emit(OpCodes.Xor);
+			}
+			il.Emit(OpCodes.Ret);
+			typeBuilder.DefineMethodOverride(getHashCodeMethod, ReflectionUtility.ObjectGetHashCode);
+			return getHashCodeMethod;
+		}
+
+		private static MethodBuilder EmitTupleEquals(TypeBuilder typeBuilder, MethodBuilder equalityMethod)
+		{
+			var equalsMethod = typeBuilder.DefineMethod("Equals", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(bool), new System.Type[] { typeof(object) });
+			var il = equalsMethod.GetILGenerator();
+			var baseLabel = il.DefineLabel();
+			il.Emit(OpCodes.Ldarg_1);
+			il.Emit(OpCodes.Isinst, typeof(Type.TupleType));
+			il.Emit(OpCodes.Brfalse, baseLabel);
+			il.Emit(OpCodes.Ldarg_1);
+			il.Emit(OpCodes.Castclass, typeof(Type.TupleType));
+			il.Emit(OpCodes.Ldarg_0);
+			il.EmitCall(OpCodes.Call, equalityMethod, null);
+			il.Emit(OpCodes.Ret);
+			il.MarkLabel(baseLabel);
+			il.Emit(OpCodes.Ldarg_0);
+			il.Emit(OpCodes.Ldarg_1);
+			il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectEquals, null);
+			il.Emit(OpCodes.Ret);
+			typeBuilder.DefineMethodOverride(equalsMethod, ReflectionUtility.ObjectEquals);
+			return equalsMethod;
 		}
 
 		private string QualifiedIdentifierToName(Parse.QualifiedIdentifier qualifiedIdentifier)

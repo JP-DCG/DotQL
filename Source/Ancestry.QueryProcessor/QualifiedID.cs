@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Ancestry.QueryProcessor.Plan
+namespace Ancestry.QueryProcessor
 {
 	public struct QualifiedID
 	{

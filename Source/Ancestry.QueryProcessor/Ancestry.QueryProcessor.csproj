@@ -47,6 +47,7 @@
     <Compile Include="BaseException.cs" />
     <Compile Include="AncestryException.cs" />
     <Compile Include="Compile\Compiler.cs" />
+    <Compile Include="Compile\ReflectionUtility.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
     <Compile Include="Plan\Characteristics.cs" />
@@ -55,7 +56,7 @@
     <Compile Include="JsonInterop.cs" />
     <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Planner.cs" />
-    <Compile Include="Plan\QualifiedID.cs" />
+    <Compile Include="QualifiedID.cs" />
     <Compile Include="Plan\PlannerContext.cs" />
     <Compile Include="Plan\PlanningException.cs" />
     <Compile Include="QueryOptions.cs" />
@@ -81,7 +82,10 @@
     <Compile Include="Plan\PlanTable.cs" />
     <Compile Include="Type\Scalar.cs" />
     <Compile Include="Type\TupleAttribute.cs" />
+    <Compile Include="Type\TupleKey.cs" />
+    <Compile Include="Type\TupleReference.cs" />
     <Compile Include="Type\TupleReferenceAttribute.cs" />
+    <Compile Include="Type\TupleType.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />
