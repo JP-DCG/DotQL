@@ -70,7 +70,7 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 						if (info.Key == ConsoleKey.Backspace)
 						{
 							sb.Remove(sb.Length - 1, 1);
-							Console.Write("\b \b");
+							Console.Write(" \b");
 						}
 						else
 						{

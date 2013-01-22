@@ -107,16 +107,23 @@ namespace Ancestry.QueryProcessor
 			// Convert arguments
 			var convertedArgs = JsonInterop.JsonArgsToNative(args);
 
+			var name = "DotQL" + DateTime.Now.ToString("YYYYMMDDhhmmssss");
+			var sourceFileName = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.ChangeExtension(name, "dql"));
+
+			// Save the file if we're debugging
+			if (actualOptions.DebugOn)
+				System.IO.File.WriteAllText(sourceFileName, text);
+
 			// Parse
 			var parser = new Parser();
 			var script = Parser.ParseFrom(parser.Script, text);
 
 			// Plan
-			var planner = new Planner();
-			var plan = planner.PlanScript(script, actualOptions);
+			var planner = new Planner(actualOptions);
+			var plan = planner.PlanScript(script);
 
 			// Compile
-			var compiler = new Compiler();
+			var compiler = new Compiler(actualOptions, name, sourceFileName);
 			var executable = compiler.CreateExecutable(plan);
 
 			// Run

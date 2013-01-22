@@ -3,6 +3,8 @@ using Ancestry.QueryProcessor.Plan;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.SymbolStore;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -20,11 +22,38 @@ namespace Ancestry.QueryProcessor.Compile
 		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
 		private Dictionary<Parse.ISymbol, ParameterExpression> _paramsBySymbol = new Dictionary<Parse.ISymbol, ParameterExpression>();
 
-		public Compiler()
+		private ParameterExpression _cancelToken;
+		private QueryOptions _options;
+		private SymbolDocumentInfo _symbolDocument;
+		private ISymbolDocumentWriter _symbolWriter;
+
+		public Compiler(QueryOptions actualOptions, string assemblyName, string sourceFileName)
 		{
-			_assemblyName = new AssemblyName("Dynamic");
+			_options = actualOptions;
+			_assemblyName = new AssemblyName(assemblyName);
+			_symbolDocument = Expression.SymbolDocument(sourceFileName);
+
 			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
-			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll");
+			if (_options.DebugOn)
+				_assembly.SetCustomAttribute
+				(
+					new CustomAttributeBuilder
+					(
+						typeof(DebuggableAttribute).GetConstructor
+						(
+							new System.Type[] { typeof(DebuggableAttribute.DebuggingModes) }
+						),
+						new object[] 
+						{ 
+							DebuggableAttribute.DebuggingModes.DisableOptimizations | 
+							DebuggableAttribute.DebuggingModes.Default 
+						}
+					)
+				);
+			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _options.DebugOn);
+			if (_options.DebugOn)
+				_symbolWriter = _module.DefineDocument(sourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
+
 			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
 		}
 
@@ -45,43 +74,67 @@ namespace Ancestry.QueryProcessor.Compile
 			//var method = type.DefineMethod("Execute", MethodAttributes.Static | MethodAttributes.Public);
 
 			var args = Expression.Parameter(typeof(Dictionary<string, object>), "args");
-			var cancelToken = Expression.Parameter(typeof(CancellationToken), "cancelToken");
+			_cancelToken = Expression.Parameter(typeof(CancellationToken), "cancelToken");
 
 			var execute = 
 				Expression.Lambda<ExecuteHandler>
 				(
-					CompileScript(plan, args, cancelToken),
+					CompileScript(plan, args),
 					args,
-					cancelToken
+					_cancelToken
 				);
 
 			_module.CreateGlobalFunctions();
 			_assembly.Save("qpdebug.dll");
 
-			return execute.Compile();
+			//var pdbGenerator = _options.DebugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
+			return execute.Compile();//pdbGenerator);
 
 			//// TODO: Pass debug info
 			//execute.CompileToMethod(method);
 		}
 
-		private Expression CompileScript(ScriptPlan plan, Expression args, Expression cancelToken)
+		private Expression CompileScript(ScriptPlan plan, Expression args)
 		{
-			// Compute result and convert to object (box if needed)
-			if (plan.Script.Expression != null)
+			var script = plan.Script;
+			var vars = new List<ParameterExpression>();
+
+			foreach (var u in script.Usings)
 			{
-				var result = CompileClausedExpression(plan, plan.Script.Expression);
+				// TODO: add variables for each symbol in each module
+				//_paramsBySymbol.Add(
+				//vars.Add(
+			}
+
+			// Compute result and convert to object (box if needed)
+			if (script.Expression != null)
+			{
+				var result = CompileClausedExpression(plan, script.Expression);
 				if (result.Type.IsValueType)
 					result = Expression.Convert(result, typeof(object));
 
 				return 
 					Expression.Block
 					(
+						GetDebugInfo(script),
 						// TODO: usings, modules, vars (with arg overrides), assignments
-						plan.Script.Expression != null ? result : null
+						script.Expression != null ? result : null
 					);
 			}
 			else
 				return Expression.Constant(null, typeof(object));
+		}
+
+		private DebugInfoExpression GetDebugInfo(Parse.Statement statement)
+		{
+			return Expression.DebugInfo
+			(
+				_symbolDocument, 
+				statement.Line + 1, 
+				statement.LinePos + 1, 
+				(statement.EndLine < 0 ? statement.Line : statement.EndLine) + 1, 
+				(statement.EndLinePos < 0 ? statement.LinePos : statement.EndLinePos) + 1
+			);
 		}
 
 		private Expression CompileClausedExpression(ScriptPlan plan, Parse.ClausedExpression clausedExpression)
@@ -105,23 +158,25 @@ namespace Ancestry.QueryProcessor.Compile
 				_paramsBySymbol.Add(forClause, forVariable);
 				vars.Add(forVariable);
 
+				var returnBlock = CompileClausedReturn(plan, clausedExpression, vars);
 				var resultIsSet = clausedExpression.OrderDimensions.Count == 0
 					&& forExpression.Type.IsConstructedGenericType
 					&& (forExpression.Type.GetGenericTypeDefinition() == typeof(HashSet<>));
 				var resultType = resultIsSet 
-					? typeof(HashSet<>).MakeGenericType(elementType) 
-					: typeof(List<>).MakeGenericType(elementType);
+					? typeof(HashSet<>).MakeGenericType(returnBlock.Type)
+					: typeof(List<>).MakeGenericType(returnBlock.Type);
 				var resultVariable = Expression.Variable(resultType, "result");
 				vars.Add(resultVariable);
 				var resultAddMethod = resultType.GetMethod("Add");
 				var breakLabel = Expression.Label("break");
 
-				var returnBlock = CompileClausedReturn(plan, clausedExpression, vars);
 
 				return Expression.Block
 				(
 					vars,
+					GetDebugInfo(clausedExpression),
 					Expression.Assign(enumerator, Expression.Call(forExpression, enumerableType.GetMethod("GetEnumerator"))),
+					Expression.Assign(resultVariable, Expression.New(resultType)),
 					Expression.Loop
 					(
 						Expression.IfThenElse
@@ -130,7 +185,14 @@ namespace Ancestry.QueryProcessor.Compile
 							Expression.Block
 							(
 								Expression.Assign(forVariable, Expression.Property(enumerator, enumeratorType.GetProperty("Current"))),
-								Expression.Call(resultVariable, resultAddMethod, returnBlock)
+								
+								clausedExpression.WhereClause == null
+									? (Expression)Expression.Call(resultVariable, resultAddMethod, returnBlock)
+									: Expression.IfThen
+									(
+										CompileExpression(plan, clausedExpression.WhereClause, typeof(bool)), 
+										Expression.Call(resultVariable, resultAddMethod, returnBlock)
+									)
 							),
 							Expression.Break(breakLabel)
 						),
@@ -140,27 +202,27 @@ namespace Ancestry.QueryProcessor.Compile
 				);
 			}
 
-			return CompileClausedReturn(plan, clausedExpression, vars);
+			return Expression.Block(vars, CompileClausedReturn(plan, clausedExpression, vars));
 		}
 
 		private Expression CompileClausedReturn(ScriptPlan plan, Parse.ClausedExpression clausedExpression, List<ParameterExpression> vars)
 		{
-			var block = new List<Expression>();
+			var blocks = new List<Expression> { GetDebugInfo(clausedExpression) };
 
 			// Create a variable for each let and initialize
 			foreach (var let in clausedExpression.LetClauses)
 			{
 				var compiledExpression = CompileExpression(plan, let.Expression);
 				var variable = Expression.Variable(compiledExpression.Type, let.Name.ToString());
-				block.Add(Expression.Assign(variable, compiledExpression));
+				blocks.Add(Expression.Assign(variable, compiledExpression));
 				_paramsBySymbol.Add(let, variable);
 				vars.Add(variable);
 			}
 
 			// Add the expression to the body
-			block.Add(CompileExpression(plan, clausedExpression.Expression));
+			blocks.Add(CompileExpression(plan, clausedExpression.Expression));
 
-			return Expression.Block(vars, block);
+			return Expression.Block(blocks);
 		}
 
 		private Expression CompileExpression(ScriptPlan plan, Parse.Expression expression, System.Type typeHint = null)
@@ -174,8 +236,18 @@ namespace Ancestry.QueryProcessor.Compile
 				case "TupleSelector": return CompileTupleSelector(plan, (Parse.TupleSelector)expression);
 				case "ListSelector": return CompileListSelector(plan, (Parse.ListSelector)expression);
 				case "SetSelector": return CompileSetSelector(plan, (Parse.SetSelector)expression);
+				case "CallExpression": return CompileCallExpression(plan, (Parse.CallExpression)expression);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
+		}
+
+		private Expression CompileCallExpression(ScriptPlan plan, Parse.CallExpression callExpression)
+		{
+			var expression = CompileExpression(plan, callExpression.Expression);
+			var args = new Expression[callExpression.Arguments.Count];
+			for (var i = 0; i < callExpression.Arguments.Count; i++)
+				args[i] = CompileExpression(plan, callExpression.Arguments[i]);
+			return Expression.Invoke(expression, args);
 		}
 
 		private Expression CompileSetSelector(ScriptPlan plan, Parse.SetSelector setSelector)
@@ -350,11 +422,16 @@ namespace Ancestry.QueryProcessor.Compile
 			bool first = true;
 			foreach (var keyItem in tupleType.GetKeyAttributes())
 			{
+				var field = fieldsByID[keyItem];
 				il.Emit(OpCodes.Ldarg_0);
-				il.Emit(OpCodes.Ldfld, fieldsByID[keyItem]);
+				il.Emit(OpCodes.Ldfld, field);
 				il.Emit(OpCodes.Ldarg_1);
-				il.Emit(OpCodes.Ldfld, fieldsByID[keyItem]);
-				il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectEquals, null);
+				il.Emit(OpCodes.Ldfld, field);
+				var fieldEqualityMethod = field.FieldType.GetMethod("op_Equality", new System.Type[] { field.FieldType, field.FieldType });
+				if (fieldEqualityMethod != null)
+					il.EmitCall(OpCodes.Call, fieldEqualityMethod, null);
+				else
+					il.Emit(OpCodes.Ceq);
 				if (first)
 					first = false;
 				else
@@ -395,17 +472,17 @@ namespace Ancestry.QueryProcessor.Compile
 			var il = equalsMethod.GetILGenerator();
 			var baseLabel = il.DefineLabel();
 			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Isinst, typeof(Type.TupleType));
+			il.Emit(OpCodes.Isinst, typeBuilder);
 			il.Emit(OpCodes.Brfalse, baseLabel);
 			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Castclass, typeof(Type.TupleType));
+			il.Emit(OpCodes.Castclass, typeBuilder);
 			il.Emit(OpCodes.Ldarg_0);
 			il.EmitCall(OpCodes.Call, equalityMethod, null);
 			il.Emit(OpCodes.Ret);
 			il.MarkLabel(baseLabel);
 			il.Emit(OpCodes.Ldarg_0);
 			il.Emit(OpCodes.Ldarg_1);
-			il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectEquals, null);
+			il.EmitCall(OpCodes.Call, ReflectionUtility.ObjectEquals, null);
 			il.Emit(OpCodes.Ret);
 			typeBuilder.DefineMethodOverride(equalsMethod, ReflectionUtility.ObjectEquals);
 			return equalsMethod;

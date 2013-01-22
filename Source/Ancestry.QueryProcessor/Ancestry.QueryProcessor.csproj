@@ -62,6 +62,8 @@
     <Compile Include="QueryOptions.cs" />
     <Compile Include="QueryLimits.cs" />
     <Compile Include="RequestedSla.cs" />
+    <Compile Include="Runtime\SystemModule.cs" />
+    <Compile Include="Storage\InMemory.cs" />
     <Compile Include="Storage\Interfaces.cs" />
     <Compile Include="Parse\Keywords.cs" />
     <Compile Include="Parse\Parser.cs" />
@@ -80,6 +82,7 @@
     <Compile Include="Parse\TextEmitter.cs" />
     <Compile Include="Plan\ScriptPlan.cs" />
     <Compile Include="Plan\PlanTable.cs" />
+    <Compile Include="Type\ModuleAttribute.cs" />
     <Compile Include="Type\Scalar.cs" />
     <Compile Include="Type\TupleAttribute.cs" />
     <Compile Include="Type\TupleKey.cs" />

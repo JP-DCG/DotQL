@@ -8,10 +8,10 @@ namespace Ancestry.QueryProcessor.Plan
 {
 	public class Frame
 	{
-		private Dictionary<QualifiedID, ISymbol> _items = new Dictionary<QualifiedID, ISymbol>();
+		private Dictionary<QualifiedID, object> _items = new Dictionary<QualifiedID, object>();
 
-		private Dictionary<ISymbol, List<Parse.Statement>> _references = new Dictionary<ISymbol,List<Statement>>();
-		private Dictionary<ISymbol, List<Parse.Statement>> References { get { return _references; } }
+		private Dictionary<object, List<Parse.Statement>> _references = new Dictionary<object,List<Statement>>();
+		private Dictionary<object, List<Parse.Statement>> References { get { return _references; } }
 
 		private Frame _baseFrame;
 		public Frame BaseFrame { get { return _baseFrame; } }
@@ -21,21 +21,21 @@ namespace Ancestry.QueryProcessor.Plan
 			_baseFrame = baseFrame;
 		}
 
-		public void Add(QualifiedID name, ISymbol symbol)
+		public void Add(QualifiedID name, object symbol)
 		{
 			var existing = this[name];
 			if (existing != null)
-				throw new PlanningException(PlanningException.Codes.IdentifierConflict, existing.Name);
+				throw new PlanningException(PlanningException.Codes.IdentifierConflict, name);
 			_items.Add(name, symbol);
 		}
 
 		/// <summary> Attempts to resolve the given symbol; return null if unable. </summary>
-		public ISymbol this[QualifiedID id]
+		public object this[QualifiedID id]
 		{
 			get
 			{
 				// TODO: attempt with dequalified names
-				ISymbol result = null;
+				object result = null;
 				var current = this;
 				while (result == null && current != null)
 				{
@@ -46,26 +46,28 @@ namespace Ancestry.QueryProcessor.Plan
 			}
 		}
 
-		public ISymbol Resolve(QualifiedIdentifier id)
+		public T Resolve<T>(QualifiedIdentifier id)
 		{
-			return Resolve(QualifiedID.FromQualifiedIdentifier(id));
+			return Resolve<T>(QualifiedID.FromQualifiedIdentifier(id));
 		}
 
 		/// <summary> Attempts to resolve the given symbol; throws if unable. </summary>
-		public ISymbol Resolve(QualifiedID id)
+		public T Resolve<T>(QualifiedID id)
 		{
 			var result = this[id];
 			if (result == null)
 				throw new PlanningException(PlanningException.Codes.UnknownIdentifier, id.ToString());
-			return result;
+			if (!(result is T))
+				throw new PlanningException(PlanningException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
+			return (T)result;
 		}
 
-		public void AddNonRooted(QualifiedIdentifier id, ISymbol symbol)
+		public void AddNonRooted(QualifiedIdentifier id, object symbol)
 		{
 			AddNonRooted(QualifiedID.FromQualifiedIdentifier(id), symbol);
 		}
 
-		public void AddNonRooted(QualifiedID id, ISymbol symbol)
+		public void AddNonRooted(QualifiedID id, object symbol)
 		{
 			if (id.IsRooted)
 				throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);

@@ -8,20 +8,22 @@ using Ancestry.QueryProcessor.Plan;
 
 namespace Ancestry.QueryProcessor.Storage
 {
-	public interface IStorageModule
+	public interface IRepository
 	{
+		object GetInstance(System.Type module);
+
 		int GetCost(PlanTable table, ScriptPlan plan);
 		
-		ICursor Open(PlanTable table);
+		IRepositoryCursor Open(PlanTable table);
 
-		IStorageTransaction Begin();
+		IRepositoryTransaction Begin();
 	}
 
-	public interface ICursor
+	public interface IRepositoryCursor
 	{
 	}
 
-	public interface IStorageTransaction
+	public interface IRepositoryTransaction
 	{
 	}
 }

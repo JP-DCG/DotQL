@@ -19,6 +19,9 @@ namespace Ancestry.QueryProcessor.Plan
 
 			/// <summary>Error code 103103: "Expecting a reference of type '{0}'; actual: '{1}'."</summary>
 			IncorrectTypeReferenced = 103103,
+
+			/// <summary>Error code 103104: "No repository found with an instance of module '{0}'."</summary>
+			NoInstanceForModule = 103104,
 		}
 
 		// Resource manager for this exception class

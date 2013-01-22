@@ -1407,6 +1407,7 @@ namespace Ancestry.QueryProcessor.Parse
 			}
 			if (lexer[1, false].IsSymbol(Keywords.Where))
 			{
+				lexer.NextToken().CheckSymbol(Keywords.Where);
 				var where = Expression(lexer);
 				expression.WhereClause = where;
 				assignment.WhereClause = where;

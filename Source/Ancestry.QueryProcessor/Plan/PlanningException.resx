@@ -129,4 +129,7 @@
   <data name="103103" xml:space="preserve">
     <value>Expecting a reference of type '{0}'; actual: '{1}'.</value>
   </data>
+  <data name="103104" xml:space="preserve">
+    <value>No repository found with an instance of module '{0}'.</value>
+  </data>
 </root>
