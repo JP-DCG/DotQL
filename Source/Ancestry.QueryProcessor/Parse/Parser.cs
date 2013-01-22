@@ -1176,8 +1176,8 @@ namespace Ancestry.QueryProcessor.Parse
 			var result = new TupleKey();
 			result.SetPosition(lexer);
 
-			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-			while (!lexer[1].IsSymbol(Keywords.EndGroup))
+			lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
+			while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 			{
 				result.AttributeNames.Add(QualifiedIdentifier(lexer));
 			}

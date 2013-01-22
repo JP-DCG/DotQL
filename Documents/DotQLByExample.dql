@@ -58,7 +58,7 @@ Declaration
 			ID : Integer 
 			City : String 
 			ref Orders(ID) Orders(CustomerID) 
-			key (ID) 
+			key { ID } 
 		}
 	}
 
@@ -73,7 +73,7 @@ Tables really are just sets of tuples:
 		On: DateTime  
 		ref Customer(CustomerID) Customers(ID)  
 		ref Items(ID) OrderItems(OrderID) 
-		key(ID)
+		key { ID }
 	}
 	Orders: { Order }
 
@@ -89,7 +89,7 @@ References are not bidirectional; they must be designated from each direction:
 			Quantity: Integer
 			ref Order(OrderID) Orders(ID)  
 			ref Part(PartID) Parts(ID)
-			key(OrderID PartID)
+			key { OrderID PartID }
 		}
 	}
 
@@ -104,7 +104,7 @@ The last of the structures to be used in examples:
 			Name: Quantity
 			IsDiscontinued: Boolean
 			ref OrderItems(ID) OrderItems(PartID)
-			key(ID)
+			key { ID }
 		}
 	}
 
@@ -471,7 +471,7 @@ A function selector may specify a function type name rather than repeat the sign
 
 	InventoryFunctions: const 
 	{ 
-		{ IDs: 1..100  DetermineInventory: (PartID : Long) => return 50  key(IDs) }
+		{ IDs: 1..100  DetermineInventory: (PartID : Long) => return 50  key { IDs } }
 		{ IDs: 101..99999  DetermineInventory: (PartID : Long) => return 30 }
 	}
 
@@ -776,7 +776,7 @@ Empty lists of normal tuples:
 
 Empty tuple of attribute carrying tuple:
 
-	return { : } of { ID: Integer key (ID) }
+	return { : } of { ID: Integer key { ID } }
 
 Result: `{ ID: 0 }`
 

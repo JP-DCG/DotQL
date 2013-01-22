@@ -68,7 +68,7 @@ TupleReference :=
 		Target : QualifiedIdentifier "(" TargetAttributeNames : QualifiedIdentifier* ")"	
 
 TupleKey :=
-	"key" "(" AttributeNames : [ QualifiedIdentifier ]* ")"
+	"key" "{" AttributeNames : [ QualifiedIdentifier ]* "}"
 
 FunctionType :=
 	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration
