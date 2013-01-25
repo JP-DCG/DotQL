@@ -1,0 +1,77 @@
+﻿@{ViewBag.Title = "DotQL Query Page";}
+<style type="text/css" media="screen">
+	.editor { 
+        position: relative;
+        top: 0;
+        right: 0;
+		height: 400px;
+        width: 100%;
+		border: 1px solid black;
+		font-size: 14px;
+    }
+</style>
+<div id="body">
+
+    <aside>
+		<h3>Keys</h3>
+		<code><pre>Ctrl-E to execute</pre></code>
+		<h3><a href="https://github.com/Ancestry/DotQL/blob/master/Source/Ancestry.QueryProcessor/Parse/DotQL.g4">Syntax</a></h3>
+		<a href="https://github.com/Ancestry/DotQL/wiki/DotQL%20By%20Example">examples</a>
+		<code><pre>FLWOR = for, let, where, order, return
+. = dereference
+, = embed
+?() = restriction</pre></code>
+		<h3>Schema</h3>
+		<code><pre><!-- TODO: Load schema --></pre></code>
+	</aside>	
+	
+	<article>
+        <h3>Request</h3>
+
+        <div id="requestEditor" class="editor">return </div>
+
+        <h3>Result</h3>
+
+        <div id="resultEditor" class="editor"></div>
+
+		<script src="http://d1n0x3qji82z53.cloudfront.net/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script>
+			var resultEditor = ace.edit("resultEditor");
+			resultEditor.setTheme("ace/theme/xcode");
+			resultEditor.getSession().setMode("ace/mode/javascript");
+			resultEditor.setShowPrintMargin(false);
+			resultEditor.setReadOnly(true);
+
+			var editor = ace.edit("requestEditor");
+			editor.setTheme("ace/theme/textmate");
+			editor.getSession().setMode("ace/mode/xquery");
+			editor.setShowPrintMargin(false);
+			editor.commands.addCommand({
+				name: 'executeScript',
+				bindKey: { win: 'Ctrl-E', mac: 'Command-E' },
+				exec: function (editor) {
+					var query = editor.getValue();
+					$.ajax('/api/Eval', {
+						accepts: 'application/json',
+						data: { e: query },
+						success: function (result, s, h) {
+							resultEditor.setValue(h.responseText);
+						},
+						error: function (h, s, message) {
+							try	{
+								resultEditor.setValue(JSON.parse(h.responseText).ExceptionMessage);
+							}
+							catch(e) {
+								resultEditor.setValue(message + "\r\n" + h.responseText);
+							}
+						}
+					});
+				},
+				readOnly: false
+			});
+			editor.selection.moveCursorLineEnd();
+			editor.focus();
+		</script>
+    </article>
+
+</div>

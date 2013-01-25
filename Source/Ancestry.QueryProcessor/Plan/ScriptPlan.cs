@@ -22,10 +22,10 @@ namespace Ancestry.QueryProcessor.Plan
 
 		public Frame Global { get; set; }
 
-		private Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol> _references = new Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol>();
-		public Dictionary<Parse.QualifiedIdentifier, Parse.ISymbol> References { get { return _references; } }
+		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
+		public Dictionary<Parse.QualifiedIdentifier, object> References { get { return _references; } }
 
-		public void AddReference(Parse.ISymbol symbol, Parse.QualifiedIdentifier id)
+		public void AddReference(object symbol, Parse.QualifiedIdentifier id)
 		{
 			References.Add(id, symbol);
 		}

@@ -20,21 +20,26 @@ namespace Ancestry.QueryProcessor.Compile
 		private ModuleBuilder _module;
 
 		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
-		private Dictionary<Parse.ISymbol, ParameterExpression> _paramsBySymbol = new Dictionary<Parse.ISymbol, ParameterExpression>();
+		private Dictionary<object, Expression> _paramsBySymbol = new Dictionary<object, Expression>();
 
+		private ParameterExpression _args;
+		private ParameterExpression _factory;
 		private ParameterExpression _cancelToken;
+
 		private QueryOptions _options;
+		private bool _debugOn;
 		private SymbolDocumentInfo _symbolDocument;
 		private ISymbolDocumentWriter _symbolWriter;
 
-		public Compiler(QueryOptions actualOptions, string assemblyName, string sourceFileName)
+		public Compiler(QueryOptions actualOptions, bool debugOn, string assemblyName, string sourceFileName)
 		{
 			_options = actualOptions;
+			_debugOn = debugOn;
 			_assemblyName = new AssemblyName(assemblyName);
 			_symbolDocument = Expression.SymbolDocument(sourceFileName);
 
 			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
-			if (_options.DebugOn)
+			if (_debugOn)
 				_assembly.SetCustomAttribute
 				(
 					new CustomAttributeBuilder
@@ -50,8 +55,8 @@ namespace Ancestry.QueryProcessor.Compile
 						}
 					)
 				);
-			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _options.DebugOn);
-			if (_options.DebugOn)
+			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _debugOn);
+			if (_debugOn)
 				_symbolWriter = _module.DefineDocument(sourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
 
 			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
@@ -73,37 +78,38 @@ namespace Ancestry.QueryProcessor.Compile
 
 			//var method = type.DefineMethod("Execute", MethodAttributes.Static | MethodAttributes.Public);
 
-			var args = Expression.Parameter(typeof(Dictionary<string, object>), "args");
+			_args = Expression.Parameter(typeof(Dictionary<string, object>), "args");
+			_factory = Expression.Parameter(typeof(Storage.IRepositoryFactory), "factory");
 			_cancelToken = Expression.Parameter(typeof(CancellationToken), "cancelToken");
 
 			var execute = 
 				Expression.Lambda<ExecuteHandler>
 				(
-					CompileScript(plan, args),
-					args,
+					CompileScript(plan),
+					_args,
+					_factory,
 					_cancelToken
 				);
 
 			_module.CreateGlobalFunctions();
-			_assembly.Save("qpdebug.dll");
+			//_assembly.Save("qpdebug.dll");
 
-			//var pdbGenerator = _options.DebugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
+			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
 			return execute.Compile();//pdbGenerator);
 
 			//// TODO: Pass debug info
 			//execute.CompileToMethod(method);
 		}
 
-		private Expression CompileScript(ScriptPlan plan, Expression args)
+		private Expression CompileScript(ScriptPlan plan)
 		{
 			var script = plan.Script;
 			var vars = new List<ParameterExpression>();
+			var block = new List<Expression>();
 
 			foreach (var u in script.Usings)
 			{
-				// TODO: add variables for each symbol in each module
-				//_paramsBySymbol.Add(
-				//vars.Add(
+				var module = FindReference<System.Type>(plan, u.Target);
 			}
 
 			// Compute result and convert to object (box if needed)
@@ -113,16 +119,24 @@ namespace Ancestry.QueryProcessor.Compile
 				if (result.Type.IsValueType)
 					result = Expression.Convert(result, typeof(object));
 
-				return 
-					Expression.Block
-					(
-						GetDebugInfo(script),
-						// TODO: usings, modules, vars (with arg overrides), assignments
-						script.Expression != null ? result : null
-					);
+				if (_debugOn)
+					block.Add(GetDebugInfo(script));
+				block.Add(result);
+
+				return Expression.Block(vars, result);
 			}
 			else
 				return Expression.Constant(null, typeof(object));
+		}
+
+		private static T FindReference<T>(ScriptPlan plan, Parse.QualifiedIdentifier id)
+		{
+			object module;
+			if (!plan.References.TryGetValue(id, out module))
+				throw new CompilerException(CompilerException.Codes.IdentifierNotFound, id.ToString());
+			if (!(module is T))
+				throw new CompilerException(CompilerException.Codes.IncorrectType, module.GetType(), typeof(T));
+			return (T)module;
 		}
 
 		private DebugInfoExpression GetDebugInfo(Parse.Statement statement)
@@ -336,7 +350,7 @@ namespace Ancestry.QueryProcessor.Compile
 			System.Type nativeType;
 			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
 			{
-				nativeType = TypeTypeToNative(tupleType);
+				nativeType = TupleMaker.TypeTypeToNative(_module, tupleType);
 				_tupleToNative.Add(tupleType, nativeType);
 			}
 			return nativeType;
@@ -355,139 +369,6 @@ namespace Ancestry.QueryProcessor.Compile
 			return tupleType;
 		}
 
-		private System.Type TypeTypeToNative(Type.TupleType tupleType)
-		{
-			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
-			var fieldsByID = new Dictionary<QualifiedID, FieldInfo>();
-
-			// Add attributes
-			foreach (var attribute in tupleType.Attributes)
-			{
-				var field = typeBuilder.DefineField(attribute.Key.ToString(), attribute.Value, FieldAttributes.Public);
-				fieldsByID.Add(attribute.Key, field);
-			}
-
-			// Add references
-			foreach (var reference in tupleType.References)
-			{
-				var cab =
-					new CustomAttributeBuilder
-					(
-						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string[]), typeof(string), typeof(string[]) }),
-						new object[] 
-							{ 
-								(from san in reference.Value.SourceAttributeNames select san.ToString()).ToArray(),
-								reference.Value.Target.ToString(),
-								(from tan in reference.Value.TargetAttributeNames select tan.ToString()).ToArray(),
-							}
-					);
-				typeBuilder.SetCustomAttribute(cab);
-			}
-
-			// Add tuple attribute
-			var attributeBuilder =
-				new CustomAttributeBuilder
-				(
-					typeof(Type.TupleAttribute).GetConstructor(new System.Type[] { }),
-					new object[] { }
-				);
-			typeBuilder.SetCustomAttribute(attributeBuilder);
-
-			// Add comparison and hash methods based on key(s)
-			EmitTupleGetHashCode(tupleType, typeBuilder, fieldsByID);
-			var equalityMethod = EmitTupleEquality(tupleType, typeBuilder, fieldsByID);
-			EmitTupleInequality(typeBuilder, equalityMethod);
-			EmitTupleEquals(typeBuilder, equalityMethod);
-
-			// Create the type
-			return typeBuilder.CreateType();
-		}
-
-		private static MethodBuilder EmitTupleInequality(TypeBuilder typeBuilder, MethodBuilder equalityMethod)
-		{
-			var inequalityMethod = typeBuilder.DefineMethod("op_Inequality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
-			var il = inequalityMethod.GetILGenerator();
-			il.Emit(OpCodes.Ldarg_0);
-			il.Emit(OpCodes.Ldarg_1);
-			il.EmitCall(OpCodes.Call, equalityMethod, null);
-			il.Emit(OpCodes.Not);
-			il.Emit(OpCodes.Ret);
-			return inequalityMethod;
-		}
-
-		private static MethodBuilder EmitTupleEquality(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
-		{
-			var equalityMethod = typeBuilder.DefineMethod("op_Equality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
-			var il = equalityMethod.GetILGenerator();
-			bool first = true;
-			foreach (var keyItem in tupleType.GetKeyAttributes())
-			{
-				var field = fieldsByID[keyItem];
-				il.Emit(OpCodes.Ldarg_0);
-				il.Emit(OpCodes.Ldfld, field);
-				il.Emit(OpCodes.Ldarg_1);
-				il.Emit(OpCodes.Ldfld, field);
-				var fieldEqualityMethod = field.FieldType.GetMethod("op_Equality", new System.Type[] { field.FieldType, field.FieldType });
-				if (fieldEqualityMethod != null)
-					il.EmitCall(OpCodes.Call, fieldEqualityMethod, null);
-				else
-					il.Emit(OpCodes.Ceq);
-				if (first)
-					first = false;
-				else
-					il.Emit(OpCodes.And);
-			}
-			il.Emit(OpCodes.Ret);
-			return equalityMethod;
-		}
-
-		private static MethodBuilder EmitTupleGetHashCode(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
-		{
-			var getHashCodeMethod = typeBuilder.DefineMethod("GetHashCode", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(Int32), new System.Type[] { });
-			var il = getHashCodeMethod.GetILGenerator();
-			// result = 83
-			il.Emit(OpCodes.Ldc_I4, 83);
-			foreach (var keyItem in tupleType.GetKeyAttributes())
-			{
-				var field = fieldsByID[keyItem];
-				var hashMethod = field.FieldType.GetMethod("GetHashCode");
-
-				// result ^= this.<field>.GetHashCode();
-				il.Emit(OpCodes.Ldarg_0);
-				il.Emit(OpCodes.Ldflda, field);
-				if (hashMethod != null)
-					il.EmitCall(OpCodes.Call, hashMethod, null);
-				else
-					il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectGetHashCode, null);
- 				il.Emit(OpCodes.Xor);
-			}
-			il.Emit(OpCodes.Ret);
-			typeBuilder.DefineMethodOverride(getHashCodeMethod, ReflectionUtility.ObjectGetHashCode);
-			return getHashCodeMethod;
-		}
-
-		private static MethodBuilder EmitTupleEquals(TypeBuilder typeBuilder, MethodBuilder equalityMethod)
-		{
-			var equalsMethod = typeBuilder.DefineMethod("Equals", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(bool), new System.Type[] { typeof(object) });
-			var il = equalsMethod.GetILGenerator();
-			var baseLabel = il.DefineLabel();
-			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Isinst, typeBuilder);
-			il.Emit(OpCodes.Brfalse, baseLabel);
-			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Castclass, typeBuilder);
-			il.Emit(OpCodes.Ldarg_0);
-			il.EmitCall(OpCodes.Call, equalityMethod, null);
-			il.Emit(OpCodes.Ret);
-			il.MarkLabel(baseLabel);
-			il.Emit(OpCodes.Ldarg_0);
-			il.Emit(OpCodes.Ldarg_1);
-			il.EmitCall(OpCodes.Call, ReflectionUtility.ObjectEquals, null);
-			il.Emit(OpCodes.Ret);
-			typeBuilder.DefineMethodOverride(equalsMethod, ReflectionUtility.ObjectEquals);
-			return equalsMethod;
-		}
-
 		private string QualifiedIdentifierToName(Parse.QualifiedIdentifier qualifiedIdentifier)
 		{
 			return String.Join("_", qualifiedIdentifier.Components);
@@ -495,10 +376,47 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileIdentifierExpression(ScriptPlan plan, Parse.IdentifierExpression identifierExpression)
 		{
-			Parse.ISymbol symbol;
-			if (!plan.References.TryGetValue(identifierExpression.Target, out symbol))
-				throw new Exception("Identifier Not found."); // TODO: CompilerException(CompilerException.Codes.IdentifierNotFound, identifierExpression.Target.ToString());
-			return _paramsBySymbol[symbol];
+			var symbol = FindReference<object>(plan, identifierExpression.Target);
+			Expression result;
+			if (_paramsBySymbol.TryGetValue(symbol, out result))
+				return result;
+
+			switch (symbol.GetType().Name)
+			{
+				case "RuntimeMethodInfo": 
+					var method = (MethodInfo)symbol;
+					// TODO: type parameter determination!!
+					method = method.MakeGenericMethod(typeof(int));
+					var paramTypes = new List<System.Type>(from p in method.GetParameters() select p.ParameterType);
+					paramTypes.Add(method.ReturnType);
+					var delegateType = Expression.GetFuncType(paramTypes.ToArray());
+					return Expression.Constant(Delegate.CreateDelegate(delegateType, method));
+				case "RuntimeFieldInfo":
+					var field = (FieldInfo)symbol;
+					return Expression.Call
+					(
+						_factory, 
+						ReflectionUtility.IRepositoryFactoryGetRepository.MakeGenericMethod(new System.Type[] { field.FieldType }),
+						Expression.Constant(field.DeclaringType),
+						QualifiedIdentifierToQualifiedIDExpression(identifierExpression.Target)
+					);
+				// TODO: enums and typedefs
+				default:
+					throw new CompilerException(CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
+			}
+		}
+
+		private static Expression QualifiedIdentifierToQualifiedIDExpression(Parse.QualifiedIdentifier id)
+		{
+			return Expression.MemberInit
+			(
+				Expression.New(typeof(QualifiedID)),
+				Expression.Bind
+				(
+					typeof(QualifiedID).GetField("Components"),
+					Expression.NewArrayInit(typeof(string), from t in id.Components select Expression.Constant(t))
+				)
+			);
 		}
 
 		private Expression CompileBinaryExpression(ScriptPlan plan, Parse.BinaryExpression expression)

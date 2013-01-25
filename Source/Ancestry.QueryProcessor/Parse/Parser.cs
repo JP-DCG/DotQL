@@ -798,34 +798,34 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var expression = UnaryExpression(lexer);
 
-			if (lexer[1, false].IsSymbol(Keywords.Invoke))
+			while (lexer[1, false].IsSymbol(Keywords.Invoke) || lexer[1, false].IsSymbol(Keywords.Function))
 			{
-				lexer.NextToken();
-
-				var result = new CallExpression();
-				result.SetPosition(lexer);
-				result.Arguments.Add(expression);
-				result.Expression = Expression(lexer);
-
-				if (lexer[1].IsSymbol(Keywords.Less))
+				if (lexer[1, false].IsSymbol(Keywords.Invoke))
 				{
 					lexer.NextToken();
-					while (!lexer[1].IsSymbol(Keywords.Greater))
-						result.TypeArguments.Add(TypeDeclaration(lexer));
-					lexer.NextToken();
+
+					var result = new CallExpression();
+					result.SetPosition(lexer);
+					result.Arguments.Add(expression);
+					result.Expression = Expression(lexer);
+
+					if (lexer[1].IsSymbol(Keywords.Less))
+					{
+						lexer.NextToken();
+						while (!lexer[1].IsSymbol(Keywords.Greater))
+							result.TypeArguments.Add(TypeDeclaration(lexer));
+						lexer.NextToken();
+					}
+
+					lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+
+					while (!lexer[1].IsSymbol(Keywords.EndGroup))
+						result.Arguments.Add(Expression(lexer));
+
+					lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+					expression = result;
 				}
-
-				lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-
-				while (!lexer[1].IsSymbol(Keywords.EndGroup))
-					result.Arguments.Add(Expression(lexer));
-
-				lexer.NextToken().CheckSymbol(Keywords.EndGroup);
-				return result;
-			}
-			else
-			{
-				while (lexer[1].Token == Keywords.Function)
+				else
 				{
 					lexer.NextToken();
 				

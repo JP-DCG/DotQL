@@ -434,6 +434,7 @@ Result: `[1 0 -1]`
 The expression to the left of the `->` is passed as the first argument to the function, and additional arguments are passed in the following parenthesis.
 
 Alternate declaration of Sign function:
+
 	let Sign := (x : Integer) =>
 		return (0 < x)->ToInteger() - (x < 0)->ToInteger()
 

@@ -15,9 +15,7 @@ namespace Ancestry.QueryProcessor
 				new Using { Target = new QualifiedIdentifier { Components = new string[] { "System" } } } 
 			};
 
-		public List<IRepository> Repositories = new List<IRepository>();
 		public RequestedSla RequestedSla;
 		public QueryLimits QueryLimits;
-		public bool DebugOn = true;
 	}
 }

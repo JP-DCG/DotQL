@@ -405,6 +405,14 @@ namespace Ancestry.QueryProcessor.Parse
 								break;
 							}
 							break;
+						case '-':
+							if (!_nextEOF && _next == '>')
+							{
+								Advance();
+								_builder.Append(_current);
+								break;
+							}
+							break;
 						case '.':
 							if (!_nextEOF && _next == '.')
 							{

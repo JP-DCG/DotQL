@@ -100,7 +100,7 @@ namespace Ancestry.QueryProcessor.ConsoleApp
 			try
 			{
 
-				var connection = new Connection();
+				var connection = new Processor();
 
 				var result = connection.Evaluate(sb.ToString());
 				Console.WriteLine("Results: {0}", result.ToString());
