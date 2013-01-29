@@ -13,6 +13,9 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105101: "Reference to type '{0}', expecting '{1}'."</summary>
 			IncorrectType = 105101,
+
+			/// <summary>Error code 105102: "The generic type ({0}) passed does not match the type of the target ({1})."</summary>
+			MismatchedGeneric = 105102,
 		}
 
 		// Resource manager for this exception class

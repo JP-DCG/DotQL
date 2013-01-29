@@ -52,6 +52,9 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(((JValue)((JArray)result)[0]).Value, 2);
 			Assert.AreEqual(((JValue)((JArray)result)[1]).Value, 3);
 			Assert.AreEqual(((JValue)((JArray)result)[2]).Value, 4);
+
+			result = processor.Evaluate("return '1955/3/25'dt->System\\AddMonth(2)");
+			Assert.AreEqual(DateTime.Parse("1955/5/25"), ((JValue)result).Value);
 		}
 	}
 }

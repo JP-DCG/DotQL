@@ -8,11 +8,11 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class TupleType
 	{
-		private Dictionary<QualifiedID, System.Type> _attributes = new Dictionary<QualifiedID, System.Type>();
-		public Dictionary<QualifiedID, System.Type> Attributes { get { return _attributes; } }
+		private Dictionary<Name, System.Type> _attributes = new Dictionary<Name, System.Type>();
+		public Dictionary<Name, System.Type> Attributes { get { return _attributes; } }
 
-		private Dictionary<QualifiedID, TupleReference> _references = new Dictionary<QualifiedID,TupleReference>();
-		public Dictionary<QualifiedID, TupleReference> References { get { return _references; } }
+		private Dictionary<Name, TupleReference> _references = new Dictionary<Name,TupleReference>();
+		public Dictionary<Name, TupleReference> References { get { return _references; } }
 
 		private HashSet<TupleKey> _keys = new HashSet<TupleKey>();
 		public HashSet<TupleKey> Keys { get { return _keys; } }
@@ -53,7 +53,7 @@ namespace Ancestry.QueryProcessor.Type
 			return !(left == right);
 		}
 
-		public IEnumerable<QualifiedID> GetKeyAttributes()
+		public IEnumerable<Name> GetKeyAttributes()
 		{
 			if (Keys.Count == 0)
 			{
@@ -63,7 +63,7 @@ namespace Ancestry.QueryProcessor.Type
 			else
 			{
 				// Return distinct set of all attributes from all keys
-				var attributes = new HashSet<QualifiedID>();
+				var attributes = new HashSet<Name>();
 				foreach (var k in Keys)
 					foreach (var an in k.AttributeNames)
 					{

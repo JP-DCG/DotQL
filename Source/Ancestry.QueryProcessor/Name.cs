@@ -6,22 +6,27 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor
 {
-	public struct QualifiedID
+	public struct Name
 	{
 		public bool IsRooted;
 		public string[] Components;
 
-		public static QualifiedID FromQualifiedIdentifier(Parse.QualifiedIdentifier id)
+		public static Name FromQualifiedIdentifier(Parse.QualifiedIdentifier id)
 		{
-			return new QualifiedID { IsRooted = id.IsRooted, Components = id.Components };
+			return new Name { IsRooted = id.IsRooted, Components = id.Components };
+		}
+
+		public static Name FromComponents(params string[] components)
+		{
+			return new Name { Components = components };
 		}
 
 		public override bool Equals(object obj)
 		{
-			if (!(obj is QualifiedID))
+			if (!(obj is Name))
 				return base.Equals(obj);
 
-			return (QualifiedID)obj == this;
+			return (Name)obj == this;
 		}
 
 		public override int GetHashCode()
@@ -37,14 +42,14 @@ namespace Ancestry.QueryProcessor
 			return (IsRooted ? "\\" : "") + String.Join("\\", Components);
 		}
 
-		public static bool operator ==(QualifiedID left, QualifiedID right)
+		public static bool operator ==(Name left, Name right)
 		{
 			return left.IsRooted == right.IsRooted
 				&& left.Components.Length == right.Components.Length
 				&& left.Components.SequenceEqual(right.Components);
 		}
 
-		public static bool operator !=(QualifiedID left, QualifiedID right)
+		public static bool operator !=(Name left, Name right)
 		{
 			return !(left == right);
 		}

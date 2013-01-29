@@ -12,6 +12,7 @@ namespace Ancestry.QueryProcessor.Storage
 	{
 		int GetCost(ScriptPlan plan);
 		
-		T Value { get; set; }
+		T Get(Parse.Expression condition);
+		void Set(Parse.Expression condition, T newValue);
 	}
 }

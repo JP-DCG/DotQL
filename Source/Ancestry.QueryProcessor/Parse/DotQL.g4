@@ -145,6 +145,7 @@ expression =
 		| IntegerLiteral
 		| DoubleLiteral
 		| CharacterLiteral
+		| NameLiteral
 		| StringLiteral
 		| BooleanLiteral : ( "true" | "false" )
 		| NullLiteral : "null"
@@ -180,6 +181,9 @@ DoubleLiteral :=
 
 CharacterLiteral :=
 	_ pascalString+ 'c' _
+
+NameLiteral :=
+	_ pascalString+ 'n' _
 
 StringLiteral :=
 	_ ( PascalSegments : ( Leadings : [ '#' Digits : digit* ]* [ Strings : pascalString ]^( BetweenChars: ( '#' Digits : digit* )* ) EndingChars : [ '#' Digits : digit* ]* ) 

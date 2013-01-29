@@ -116,7 +116,7 @@ namespace Ancestry.QueryProcessor
 			var script = Parser.ParseFrom(parser.Script, text);
 
 			// Plan
-			var planner = new Planner(actualOptions, Settings.AdditionalAssemblies);
+			var planner = new Planner(actualOptions, Settings.RepositoryFactory);
 			var plan = planner.PlanScript(script);
 
 			// Compile

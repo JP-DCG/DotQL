@@ -15,16 +15,14 @@ namespace Ancestry.QueryProcessor.Storage
 
 		private T _value;
 
-		public T Value
+		public T Get(Parse.Expression condition)
 		{
-			get
-			{
-				return _value;
-			}
-			set
-			{
-				_value = value;
-			}
+			return _value;
+		}
+
+		public void Set(Parse.Expression condition, T newValue)
+		{
+			_value = newValue;
 		}
 	}
 }

@@ -9,11 +9,11 @@ namespace Ancestry.QueryProcessor.Type
 	[AttributeUsage(AttributeTargets.Class)]
 	public class ModuleAttribute : Attribute
 	{
-		public QualifiedID Name { get; set; }
+		public Name Name { get; set; }
 
 		public ModuleAttribute(string[] nameComponents)
 		{
-			Name = new QualifiedID { Components = nameComponents };
+			Name = new Name { Components = nameComponents };
 		}
 	}
 }

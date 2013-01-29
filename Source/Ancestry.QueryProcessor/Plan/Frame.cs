@@ -8,7 +8,7 @@ namespace Ancestry.QueryProcessor.Plan
 {
 	public class Frame
 	{
-		private Dictionary<QualifiedID, object> _items = new Dictionary<QualifiedID, object>();
+		private Dictionary<Name, object> _items = new Dictionary<Name, object>();
 
 		private Dictionary<object, List<Parse.Statement>> _references = new Dictionary<object,List<Statement>>();
 		private Dictionary<object, List<Parse.Statement>> References { get { return _references; } }
@@ -21,7 +21,7 @@ namespace Ancestry.QueryProcessor.Plan
 			_baseFrame = baseFrame;
 		}
 
-		public void Add(QualifiedID name, object symbol)
+		public void Add(Name name, object symbol)
 		{
 			var existing = this[name];
 			if (existing != null)
@@ -30,7 +30,7 @@ namespace Ancestry.QueryProcessor.Plan
 		}
 
 		/// <summary> Attempts to resolve the given symbol; return null if unable. </summary>
-		public object this[QualifiedID id]
+		public object this[Name id]
 		{
 			get
 			{
@@ -48,11 +48,11 @@ namespace Ancestry.QueryProcessor.Plan
 
 		public T Resolve<T>(QualifiedIdentifier id)
 		{
-			return Resolve<T>(QualifiedID.FromQualifiedIdentifier(id));
+			return Resolve<T>(Name.FromQualifiedIdentifier(id));
 		}
 
 		/// <summary> Attempts to resolve the given symbol; throws if unable. </summary>
-		public T Resolve<T>(QualifiedID id)
+		public T Resolve<T>(Name id)
 		{
 			var result = this[id];
 			if (result == null)
@@ -64,10 +64,10 @@ namespace Ancestry.QueryProcessor.Plan
 
 		public void AddNonRooted(QualifiedIdentifier id, object symbol)
 		{
-			AddNonRooted(QualifiedID.FromQualifiedIdentifier(id), symbol);
+			AddNonRooted(Name.FromQualifiedIdentifier(id), symbol);
 		}
 
-		public void AddNonRooted(QualifiedID id, object symbol)
+		public void AddNonRooted(Name id, object symbol)
 		{
 			if (id.IsRooted)
 				throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);

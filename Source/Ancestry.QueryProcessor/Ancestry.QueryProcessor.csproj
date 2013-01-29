@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="BaseException.cs" />
     <Compile Include="AncestryException.cs" />
+    <Compile Include="Compile\Builder.cs" />
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Compile\CompilerException.cs" />
     <Compile Include="Compile\ReflectionUtility.cs" />
@@ -59,14 +60,17 @@
     <Compile Include="Parse\LexerToken.cs" />
     <Compile Include="Plan\Planner.cs" />
     <Compile Include="ProcessorSettings.cs" />
-    <Compile Include="QualifiedID.cs" />
+    <Compile Include="Name.cs" />
     <Compile Include="Plan\PlannerContext.cs" />
     <Compile Include="Plan\PlanningException.cs" />
     <Compile Include="QueryOptions.cs" />
     <Compile Include="QueryLimits.cs" />
     <Compile Include="RequestedSla.cs" />
     <Compile Include="Runtime\IUpdateable.cs" />
-    <Compile Include="Runtime\System.cs" />
+    <Compile Include="Runtime\ModuleTuple.cs" />
+    <Compile Include="Runtime\Runtime.cs" />
+    <Compile Include="Runtime\SystemModule.cs" />
+    <Compile Include="Storage\InMemoryModuleRepository.cs" />
     <Compile Include="Storage\InMemoryRepository.cs" />
     <Compile Include="Storage\InMemoryFactory.cs" />
     <Compile Include="Storage\IRepository.cs" />

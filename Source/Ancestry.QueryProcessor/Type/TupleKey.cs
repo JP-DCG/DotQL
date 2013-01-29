@@ -8,7 +8,7 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class TupleKey
 	{
-		public QualifiedID[] AttributeNames { get; set; }
+		public Name[] AttributeNames { get; set; }
 
 		public override string ToString()
 		{
@@ -44,7 +44,7 @@ namespace Ancestry.QueryProcessor.Type
 
 		public static TupleKey FromParseKey(Parse.TupleKey key)
 		{
-			return new TupleKey { AttributeNames = (from an in key.AttributeNames select QualifiedID.FromQualifiedIdentifier(an)).ToArray() };
+			return new TupleKey { AttributeNames = (from an in key.AttributeNames select Name.FromQualifiedIdentifier(an)).ToArray() };
 		}
 	}
 }

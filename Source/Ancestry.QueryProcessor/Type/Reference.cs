@@ -8,8 +8,8 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class Reference<T>
 	{
-		public QualifiedID ModuleName { get; set; }
-		public QualifiedID VarName { get; set; }
+		public Name ModuleName { get; set; }
+		public Name VarName { get; set; }
 		public Parse.Expression Condition { get; set; }
 	}
 }

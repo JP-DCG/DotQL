@@ -7,16 +7,23 @@ using System.Threading.Tasks;
 namespace Ancestry.QueryProcessor.Runtime
 {
 	[Type.Module(new[] { "System" })]
-	public class System
+	public class SystemModule
 	{
-		public static List<T> ToList<T>(IEnumerable<T> setValue)
+		public ISet<ModuleTuple> Modules;
+
+		public static IList<T> ToList<T>(ISet<T> setValue)
 		{
 			return new List<T>(setValue);
 		}
 
-		public static HashSet<T> ToSet<T>(IEnumerable<T> listValue)
+		public static ISet<T> ToSet<T>(IList<T> listValue)
 		{
 			return new HashSet<T>(listValue);
+		}
+
+		public static DateTime AddMonth(DateTime start, int months)
+		{
+			return start.AddMonths(months);
 		}
 	}
 }

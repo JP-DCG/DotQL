@@ -109,10 +109,27 @@ namespace Ancestry.QueryProcessor.Compile
 
 			foreach (var u in script.Usings)
 			{
-				var module = FindReference<System.Type>(plan, u.Target);
+				var usedModule = FindReference<System.Type>(plan, u.Target);
 			}
 
-			// Compute result and convert to object (box if needed)
+			// Declare each module
+			foreach (var m in script.Modules)
+			{
+				var module = CompileModuleDeclaration(plan, m);
+				block.Add
+				(
+					Expression.Call
+					(
+						typeof(Runtime.Runtime).GetMethod("DeclareModule"), 
+						Expression.Call(typeof(Name).GetMethod("FromQualifiedIdentifier"), Expression.Constant(m.Name)), 
+						Expression.Constant(m.Version),
+						Expression.Constant(module), 
+						_factory
+					)
+				);
+			}
+
+			// Compute result and convert result to object
 			if (script.Expression != null)
 			{
 				var result = CompileClausedExpression(plan, script.Expression);
@@ -122,11 +139,11 @@ namespace Ancestry.QueryProcessor.Compile
 				if (_debugOn)
 					block.Add(GetDebugInfo(script));
 				block.Add(result);
-
-				return Expression.Block(vars, result);
 			}
 			else
-				return Expression.Constant(null, typeof(object));
+				block.Add(Expression.Constant(null, typeof(object)));
+
+			return Expression.Block(vars, block);
 		}
 
 		private static T FindReference<T>(ScriptPlan plan, Parse.QualifiedIdentifier id)
@@ -255,13 +272,154 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
+		private System.Type CompileModuleDeclaration(ScriptPlan plan, Parse.ModuleDeclaration moduleDeclaration)
+		{
+			var type = _module.DefineType(moduleDeclaration.Name.ToString(), TypeAttributes.Class | TypeAttributes.Public);
+			
+			foreach (var member in moduleDeclaration.Members)
+			{
+				switch (member.GetType().Name)
+				{
+					case "VarMember": 
+						var varMember = (Parse.VarMember)member;
+						type.DefineField(member.Name.ToString(), CompileTypeDeclaration(plan, varMember.Type), FieldAttributes.Public);
+						break;
+
+					case "TypeMember":
+						var typeMember = (Parse.TypeMember)member;
+						type.DefineField(member.Name.ToString(), CompileTypeDeclaration(plan, typeMember.Type), FieldAttributes.Public | FieldAttributes.Static);
+						break;
+
+					case "EnumMember":
+						var enumMember = (Parse.EnumMember)member;
+						var enumType = type.DefineNestedType(enumMember.Name.ToString(), TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
+						enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
+						var i = 0;
+						foreach (var value in enumMember.Values)
+						{
+							FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
+							field.SetConstant(i++);
+						}
+						break;
+
+					case "ConstMember":
+						//var constMember = (Parse.ConstMember)member;
+						//var expression = CompileExpression(plan, constMember.Expression);
+						//var constField = type.DefineField(member.Name.ToString(), expression.Type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
+						// TODO: evaluate expression and store as constant (limit to no references to variables)
+						// expression.Lambda...
+						// expression.Compile
+						// constField.SetConstant(
+						break;
+						
+					default: throw new Exception("Unknown member type " + member.GetType().Name);
+				}
+			}
+
+			return type.CreateType();
+		}
+
 		private Expression CompileCallExpression(ScriptPlan plan, Parse.CallExpression callExpression)
 		{
-			var expression = CompileExpression(plan, callExpression.Expression);
+			// Compile arguments
 			var args = new Expression[callExpression.Arguments.Count];
 			for (var i = 0; i < callExpression.Arguments.Count; i++)
 				args[i] = CompileExpression(plan, callExpression.Arguments[i]);
-			return Expression.Invoke(expression, args);
+
+			var expression = CompileExpression(plan, callExpression.Expression);
+			if (typeof(MethodInfo).IsAssignableFrom(expression.Type) && expression is ConstantExpression)
+			{
+				var method = (MethodInfo)((ConstantExpression)expression).Value;
+				if (method.ContainsGenericParameters)
+				{
+					var genericArgs = method.GetGenericArguments();
+					var resolved = new System.Type[genericArgs.Length];
+					if (callExpression.TypeArguments.Count > 0)
+					{
+						for (var i = 0; i < resolved.Length; i++)
+							resolved[i] = CompileTypeDeclaration(plan, callExpression.TypeArguments[i]);
+					}
+					else
+					{
+						var parameters = method.GetParameters();
+						for (var i = 0; i < parameters.Length; i++)
+							ResolveTypeParameters(resolved, parameters[i].ParameterType, args[i].Type);
+						// TODO: Assert that all type parameters are resolved
+					}
+					method = method.MakeGenericMethod(resolved);
+					// http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
+				}	
+				return Expression.Call(method, args);
+			}
+			else if (typeof(Delegate).IsAssignableFrom(expression.Type))
+				return Expression.Invoke(expression, args);
+			else
+				throw new CompilerException(CompilerException.Codes.IncorrectType, expression.Type, "function");
+		}
+
+		private System.Type CompileTypeDeclaration(ScriptPlan plan, Parse.TypeDeclaration typeDeclaration)
+		{
+			switch (typeDeclaration.GetType().Name)
+			{
+				case "OptionalType": return typeof(Nullable<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.OptionalType)typeDeclaration).Type));
+				case "ListType": return typeof(IList<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.ListType)typeDeclaration).Type));
+				case "SetType": return typeof(ISet<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.SetType)typeDeclaration).Type)); 
+				case "TupleType": return FindOrCreateNativeFromTupleType(TupleTypeFromDomTupleType(plan, (Parse.TupleType)typeDeclaration));
+				case "FunctionType": return CompileFunctionType(plan, (Parse.FunctionType)typeDeclaration);
+				default: throw new Exception("Unknown type declaration " + typeDeclaration.GetType().Name); 
+			}
+		}
+
+		private System.Type CompileFunctionType(ScriptPlan plan, Parse.FunctionType functionType)
+		{
+			throw new NotImplementedException();
+		}
+
+		private Type.TupleType TupleTypeFromDomTupleType(ScriptPlan plan, Parse.TupleType tupleType)
+		{
+			var result = new Type.TupleType();
+
+			foreach (var a in tupleType.Attributes)
+				result.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(plan, a.Type));
+
+			foreach (var r in tupleType.References)
+				result.References.Add
+				(
+					Name.FromQualifiedIdentifier(r.Name), 
+					new Type.TupleReference 
+					{ 
+						SourceAttributeNames = IdentifiersToNames(r.SourceAttributeNames),  
+						Target = Name.FromQualifiedIdentifier(r.Target),
+						TargetAttributeNames = IdentifiersToNames(r.TargetAttributeNames)
+					}
+				);
+
+			foreach (var k in tupleType.Keys)
+				result.Keys.Add(new Type.TupleKey { AttributeNames = IdentifiersToNames(k.AttributeNames) });
+
+			return result;
+		}
+
+		private static Name[] IdentifiersToNames(IEnumerable<Parse.QualifiedIdentifier> ids)
+		{
+			return (from n in ids select Name.FromQualifiedIdentifier(n)).ToArray();
+		}
+
+		private void ResolveTypeParameters(System.Type[] resolved, System.Type parameterType, System.Type argumentType)
+		{
+			// If the given parameter contains an unresolved generic type parameter, attempt to resolve using actual arguments
+			if (parameterType.ContainsGenericParameters)
+			{
+				var paramArgs = parameterType.GetGenericArguments();
+				var argArgs = argumentType.GetGenericArguments();
+				if (paramArgs.Length != argArgs.Length)
+					throw new CompilerException(CompilerException.Codes.MismatchedGeneric, parameterType, argumentType);
+				for (var i = 0; i < paramArgs.Length; i++)
+					if (paramArgs[i].IsGenericParameter && resolved[paramArgs[i].GenericParameterPosition] == null)
+						resolved[paramArgs[i].GenericParameterPosition] = argArgs[i];
+					else 
+						ResolveTypeParameters(resolved, paramArgs[i], argArgs[i]);
+			}
 		}
 
 		private Expression CompileSetSelector(ScriptPlan plan, Parse.SetSelector setSelector)
@@ -338,7 +496,7 @@ namespace Ancestry.QueryProcessor.Compile
 			// Create initialization bindings for each field
 			foreach (var attr in tupleSelector.Attributes)
 			{
-				var binding = Expression.Bind(type.GetField(QualifiedID.FromQualifiedIdentifier(attr.Name).ToString()), expressions[attr]);
+				var binding = Expression.Bind(type.GetField(Name.FromQualifiedIdentifier(attr.Name).ToString()), expressions[attr]);
 				bindings.Add(binding);
 			}
 
@@ -361,9 +519,9 @@ namespace Ancestry.QueryProcessor.Compile
 			// Create a tuple type for the given selector
 			var tupleType = new Type.TupleType();
 			foreach (var attribute in tupleSelector.Attributes)
-				tupleType.Attributes.Add(QualifiedID.FromQualifiedIdentifier(attribute.Name), expressions[attribute].Type);
+				tupleType.Attributes.Add(Name.FromQualifiedIdentifier(attribute.Name), expressions[attribute].Type);
 			foreach (var reference in tupleSelector.References)
-				tupleType.References.Add(QualifiedID.FromQualifiedIdentifier(reference.Name), Type.TupleReference.FromParseReference(reference));
+				tupleType.References.Add(Name.FromQualifiedIdentifier(reference.Name), Type.TupleReference.FromParseReference(reference));
 			foreach (var key in tupleSelector.Keys)
 				tupleType.Keys.Add(Type.TupleKey.FromParseKey(key));
 			return tupleType;
@@ -385,12 +543,7 @@ namespace Ancestry.QueryProcessor.Compile
 			{
 				case "RuntimeMethodInfo": 
 					var method = (MethodInfo)symbol;
-					// TODO: type parameter determination!!
-					method = method.MakeGenericMethod(typeof(int));
-					var paramTypes = new List<System.Type>(from p in method.GetParameters() select p.ParameterType);
-					paramTypes.Add(method.ReturnType);
-					var delegateType = Expression.GetFuncType(paramTypes.ToArray());
-					return Expression.Constant(Delegate.CreateDelegate(delegateType, method));
+					return Expression.Constant(method, typeof(MethodInfo)); 
 				case "RuntimeFieldInfo":
 					var field = (FieldInfo)symbol;
 					return Expression.Call
@@ -398,25 +551,12 @@ namespace Ancestry.QueryProcessor.Compile
 						_factory, 
 						ReflectionUtility.IRepositoryFactoryGetRepository.MakeGenericMethod(new System.Type[] { field.FieldType }),
 						Expression.Constant(field.DeclaringType),
-						QualifiedIdentifierToQualifiedIDExpression(identifierExpression.Target)
+						Builder.Name(identifierExpression.Target.Components)
 					);
 				// TODO: enums and typedefs
 				default:
 					throw new CompilerException(CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
 			}
-		}
-
-		private static Expression QualifiedIdentifierToQualifiedIDExpression(Parse.QualifiedIdentifier id)
-		{
-			return Expression.MemberInit
-			(
-				Expression.New(typeof(QualifiedID)),
-				Expression.Bind
-				(
-					typeof(QualifiedID).GetField("Components"),
-					Expression.NewArrayInit(typeof(string), from t in id.Components select Expression.Constant(t))
-				)
-			);
 		}
 
 		private Expression CompileBinaryExpression(ScriptPlan plan, Parse.BinaryExpression expression)

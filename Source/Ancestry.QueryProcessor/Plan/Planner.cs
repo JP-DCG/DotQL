@@ -12,12 +12,12 @@ namespace Ancestry.QueryProcessor.Plan
 	public class Planner
 	{
 		private QueryOptions _options;
-		private IEnumerable<AssemblyName> _additionalAssemblies;
+		private Storage.IRepositoryFactory _factory;
 
-		public Planner(QueryOptions options, IEnumerable<AssemblyName> additionalAssemblies)
+		public Planner(QueryOptions options, Storage.IRepositoryFactory factory)
 		{
 			_options = options;
-			_additionalAssemblies = additionalAssemblies;
+			_factory = factory;
 		}
 
 		public ScriptPlan PlanScript(Parse.Script script)
@@ -36,41 +36,34 @@ namespace Ancestry.QueryProcessor.Plan
 			return plan;
 		}
 
-		private IEnumerable<System.Type> FindModules()
+		private IEnumerable<Runtime.ModuleTuple> GetModules()
 		{
-			foreach 
-			(
-				var assembly in 
-					AppDomain.CurrentDomain.GetAssemblies()
-						.Union(from an in _additionalAssemblies select Assembly.Load(an))
-			)
-				foreach (var type in assembly.GetTypes().Where(t => t.GetCustomAttributes(typeof(Type.ModuleAttribute), true).Length > 0))
-					yield return type;
+			return Runtime.Runtime.GetModulesRepository(_factory).Get(null);
 		}
 
 		private void DiscoverScript(ScriptPlan plan)
 		{
 			// Find modules
-			var modules = FindModules();
+			var modules = GetModules();
 
 			// Add root frame
 			var local = plan.Global;
 
 			var modulesByName = new Frame();
 			foreach (var module in modules)
-				modulesByName.AddNonRooted(GetModuleName(module), module);
+				modulesByName.AddNonRooted(module.Name, module);
 
 			// Import symbols for usings
 			foreach (var u in plan.Script.Usings.Union(_options.DefaultUsings))
 			{
-				var module = modulesByName.Resolve<System.Type>(u.Target);
+				var module = modulesByName.Resolve<Runtime.ModuleTuple>(u.Target);
 				local.AddNonRooted(u.Target, module);
-				foreach (var method in module.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-					local.AddNonRooted(new QualifiedID { Components = u.Target.Components.Union(new string[] { method.Name }).ToArray() }, method);
-				foreach (var type in module.GetNestedTypes(BindingFlags.Public))
-					local.AddNonRooted(new QualifiedID { Components = u.Target.Components.Union(new string[] { type.Name }).ToArray() }, type);
-				foreach (var field in module.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-					local.AddNonRooted(new QualifiedID { Components = u.Target.Components.Union(new string[] { field.Name }).ToArray() }, field);
+				foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { method.Name }).ToArray() }, method);
+				foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public))
+					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { type.Name }).ToArray() }, type);
+				foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { field.Name }).ToArray() }, field);
 			}
 
 			// TODO: manage symbols for modules
@@ -89,15 +82,6 @@ namespace Ancestry.QueryProcessor.Plan
 
 			if (plan.Script.Expression != null)
 				DiscoverStatement(plan, local, plan.Script.Expression);
-		}
-
-		private QualifiedID GetModuleName(System.Type module)
-		{
-			var attribute = (Type.ModuleAttribute)module.GetCustomAttribute(typeof(Type.ModuleAttribute));
-			if (attribute != null)
-				return attribute.Name;
-			else
-				return new QualifiedID { Components = module.FullName.Split('.') };
 		}
 
 		private void DiscoverStatement(ScriptPlan plan, Frame frame, Parse.Statement statement)
@@ -141,7 +125,7 @@ namespace Ancestry.QueryProcessor.Plan
 				// Populate qualified enumeration members
 				if (member is Parse.EnumMember)
 					foreach (var e in ((Parse.EnumMember)member).Values)
-						local.AddNonRooted(new QualifiedID() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
+						local.AddNonRooted(new Name() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
 			}
 
 			foreach (var member in moduleDeclaration.Members)

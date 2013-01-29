@@ -607,7 +607,7 @@ Modules
 
 Declaring a module:
 
-	Ancestry\FamilyPaths: module 1.0.0
+	module Ancestry\FamilyPaths 1.0.0 
 	{
 		Code: enum { Parent Sibling Child Spouse }
 		Modifier: enum { Male Female Elder Younger Legal God Former Practical }
@@ -618,10 +618,22 @@ Declaring a module:
 		...
 	}
 
+...which is short-hand for this:
+
+	set Modules?(Name = 'Ancestry\FamilyPaths'n) :=
+		{
+			Version: 1.0.0 
+			Class: class
+			{
+				Code: enum { Parent Sibling Child Spouse }
+				...
+			}
+		}
+
 Using a module:
 
 	using Ancestry\FamilyPaths 1.0.0
-	return Normalize([{ Code: Parent } { Code: Parent }])
+	return [{ Code: Parent } { Code: Parent }]->Normalize()
 
 Result: `[{ Code: Parent  Multiplier: 2  Modifiers: { } }]`
 
@@ -646,7 +658,7 @@ Module aliases:
 
 Modules may contain the following members:
 
-	module ...
+	module MyModule 2.1.0
 	{
 		Current: Integer									// Variables
 		Code: typedef Integer								// Type Definitions

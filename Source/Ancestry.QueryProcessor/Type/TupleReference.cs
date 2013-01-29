@@ -8,9 +8,9 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class TupleReference
 	{
-		public QualifiedID[] SourceAttributeNames { get; set; }
-		public QualifiedID Target { get; set; }
-		public QualifiedID[] TargetAttributeNames { get; set; }
+		public Name[] SourceAttributeNames { get; set; }
+		public Name Target { get; set; }
+		public Name[] TargetAttributeNames { get; set; }
 
 		public override int GetHashCode()
 		{
@@ -52,9 +52,9 @@ namespace Ancestry.QueryProcessor.Type
 			return 
 				new TupleReference 
 				{ 
-					SourceAttributeNames = (from san in reference.SourceAttributeNames select QualifiedID.FromQualifiedIdentifier(san)).ToArray(),
-					Target = QualifiedID.FromQualifiedIdentifier(reference.Target),
-					TargetAttributeNames = (from tan in reference.TargetAttributeNames select QualifiedID.FromQualifiedIdentifier(tan)).ToArray()
+					SourceAttributeNames = (from san in reference.SourceAttributeNames select Name.FromQualifiedIdentifier(san)).ToArray(),
+					Target = Name.FromQualifiedIdentifier(reference.Target),
+					TargetAttributeNames = (from tan in reference.TargetAttributeNames select Name.FromQualifiedIdentifier(tan)).ToArray()
 				};
 		}
 	}

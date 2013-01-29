@@ -13,7 +13,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public static System.Type TypeTypeToNative(ModuleBuilder module, Type.TupleType tupleType)
 		{
 			var typeBuilder = module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
-			var fieldsByID = new Dictionary<QualifiedID, FieldInfo>();
+			var fieldsByID = new Dictionary<Name, FieldInfo>();
 
 			// Add attributes
 			foreach (var attribute in tupleType.Attributes)
@@ -70,7 +70,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return inequalityMethod;
 		}
 
-		private static MethodBuilder EmitTupleEquality(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
+		private static MethodBuilder EmitTupleEquality(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
 		{
 			var equalityMethod = typeBuilder.DefineMethod("op_Equality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
 			var il = equalityMethod.GetILGenerator();
@@ -96,7 +96,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return equalityMethod;
 		}
 
-		private static MethodBuilder EmitTupleGetHashCode(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<QualifiedID, FieldInfo> fieldsByID)
+		private static MethodBuilder EmitTupleGetHashCode(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
 		{
 			var getHashCodeMethod = typeBuilder.DefineMethod("GetHashCode", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(Int32), new System.Type[] { });
 			var il = getHashCodeMethod.GetILGenerator();
