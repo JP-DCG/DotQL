@@ -199,6 +199,8 @@ namespace Ancestry.QueryProcessor.Parse
 				lexer.NextToken();
 				result.Initializer = Expression(lexer);
 			}
+			if (result.Type == null && result.Initializer == null)
+				throw new ParserException(ParserException.Codes.TypeOrInitializerExpected);
 			return result;
 		}
 
@@ -586,6 +588,7 @@ namespace Ancestry.QueryProcessor.Parse
 				case TokenType.Integer: value = token.AsInteger; break;
 				case TokenType.Double: value = token.AsDouble; break;
 				case TokenType.String: value = token.AsString; break;
+				case TokenType.Name: var name = token.AsName; CheckValidIdentifier(name); value = name; break;
 				case TokenType.Char: value = token.AsChar; break;
 				//case TokenType.Date: value = token.AsDateTime;	// TODO: Create 1st class Date and Time types
 				case TokenType.DateTime: value = token.AsDateTime; break;
@@ -1225,11 +1228,22 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			lexer.NextToken().CheckType(TokenType.Symbol);
 			var result = lexer[0].Token;
-			if (!IsValidIdentifier(result))
-				throw new ParserException(ParserException.Codes.InvalidIdentifier, result);
-			if (IsReservedWord(result))
+			CheckValidIdentifier(result);
+			if (Tokenizer.IsReservedWord(result))
 				throw new ParserException(ParserException.Codes.ReservedWordIdentifier, result);
 			return result;
+		}
+
+		public static void CheckValidIdentifier(string id)
+		{
+			if (!Tokenizer.IsValidIdentifier(id))
+				throw new ParserException(ParserException.Codes.InvalidIdentifier, id);
+		}
+
+		private static void CheckValidIdentifier(Name name)
+		{
+			foreach (var c in name.Components)
+				CheckValidIdentifier(c);
 		}
 
 		/*
@@ -1528,24 +1542,6 @@ namespace Ancestry.QueryProcessor.Parse
 
 				results.Add(result);
 			}
-		}
-
-		public bool IsValidIdentifier(string subject)
-		{
-			if (subject.Length < 1)
-				return false;
-			if (!(Char.IsLetter(subject[0]) || (subject[0] == '_')))
-				return false;
-			for (int i = 1; i < subject.Length; i++)
-				if (!(Char.IsLetterOrDigit(subject[i]) || (subject[i] == '_')))
-					return false;
-			return true;
-		}
-
-		protected bool IsReservedWord(string identifier)
-		{
-			// TODO: limit to just reserved words
-			return Keywords.Contains(identifier);
 		}
 	}
 }

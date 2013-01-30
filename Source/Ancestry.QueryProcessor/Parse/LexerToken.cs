@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-	public enum TokenType { Unknown, Symbol, Long, Integer, Hex, LongHex, Double, Version, String, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
+	public enum TokenType { Unknown, Symbol, Long, Integer, Hex, LongHex, Double, Version, String, Name, Char, Date, Time, DateTime, Guid, TimeSpan, EOF, Error }
 
 	public class LexerToken
 	{
@@ -33,6 +33,16 @@ namespace Ancestry.QueryProcessor.Parse
 			{
 				DebugCheckType(TokenType.String);
 				return Token;
+			}
+		}
+
+		/// <summary> Returns the currently active TokenType as a Name. </summary>
+		public Name AsName
+		{
+			get
+			{
+				DebugCheckType(TokenType.Name);
+				return Name.FromNative(Token);
 			}
 		}
 

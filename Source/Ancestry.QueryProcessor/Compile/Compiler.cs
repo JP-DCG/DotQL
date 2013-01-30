@@ -107,43 +107,120 @@ namespace Ancestry.QueryProcessor.Compile
 			var vars = new List<ParameterExpression>();
 			var block = new List<Expression>();
 
-			foreach (var u in script.Usings)
-			{
-				var usedModule = FindReference<System.Type>(plan, u.Target);
-			}
+			if (_debugOn)
+				block.Add(GetDebugInfo(script));
 
-			// Declare each module
+			foreach (var u in script.Usings.Union(_options.DefaultUsings).Distinct(new UsingComparer()))
+				CompileUsing(plan, u, vars, block);
+
 			foreach (var m in script.Modules)
-			{
-				var module = CompileModuleDeclaration(plan, m);
-				block.Add
-				(
-					Expression.Call
-					(
-						typeof(Runtime.Runtime).GetMethod("DeclareModule"), 
-						Expression.Call(typeof(Name).GetMethod("FromQualifiedIdentifier"), Expression.Constant(m.Name)), 
-						Expression.Constant(m.Version),
-						Expression.Constant(module), 
-						_factory
-					)
-				);
-			}
+				CompileModule(plan, block, m);
 
-			// Compute result and convert result to object
+			foreach (var v in script.Vars)
+				CompileVar(plan, v, vars, block);
+
 			if (script.Expression != null)
-			{
-				var result = CompileClausedExpression(plan, script.Expression);
-				if (result.Type.IsValueType)
-					result = Expression.Convert(result, typeof(object));
-
-				if (_debugOn)
-					block.Add(GetDebugInfo(script));
-				block.Add(result);
-			}
+				CompileResult(plan, script.Expression, block);
 			else
 				block.Add(Expression.Constant(null, typeof(object)));
 
 			return Expression.Block(vars, block);
+		}
+
+		private void CompileResult(ScriptPlan plan, Parse.ClausedExpression expression, List<Expression> block)
+		{
+			var result = CompileClausedExpression(plan, expression);
+
+			// Box the result if needed
+			if (result.Type.IsValueType)
+				result = Expression.Convert(result, typeof(object));
+
+			block.Add(result);
+		}
+
+		private void CompileVar(ScriptPlan plan, Parse.VarDeclaration v, List<ParameterExpression> vars, List<Expression> block)
+		{
+			// Compile the (optional) type
+			var type = v.Type != null ? CompileTypeDeclaration(plan, v.Type) : null;
+
+			// Compile the (optional) initializer
+			var initializer = v.Initializer != null ? CompileExpression(plan, v.Initializer, type) : null;
+
+			// Default the type to the initializer's type
+			type = type ?? initializer.Type;
+
+			// Create the variable
+			var variable = Expression.Parameter(type, v.Name.ToString());
+			vars.Add(variable);
+			_paramsBySymbol.Add(v, variable);
+			
+			// Build the variable initialization logic
+			block.Add
+			(
+				Expression.Assign
+				(
+					variable,
+					Expression.Call(typeof(Runtime.Runtime).GetMethod("GetInitializer").MakeGenericMethod(type), initializer, _args, Expression.Constant(v.Name))
+				)
+			);
+		}
+
+		private void CompileModule(ScriptPlan plan, List<Expression> block, Parse.ModuleDeclaration module)
+		{
+			// Create the class for the module
+			var moduleType = CompileModuleDeclaration(plan, module);
+
+			// Build the code to declare the module
+			block.Add
+			(
+				Expression.Call
+				(
+					typeof(Runtime.Runtime).GetMethod("DeclareModule"),
+					Expression.Constant(Name.FromQualifiedIdentifier(module.Name)),
+					Expression.Constant(module.Version),
+					Expression.Constant(moduleType),
+					_factory
+				)
+			);
+		}
+
+		private void CompileUsing(ScriptPlan plan, Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
+		{
+			// Determine the class of the module
+			var moduleType = FindReference<Runtime.ModuleTuple>(plan, use.Target).Class;
+
+			// Create a variable to hold the module instance
+			var moduleVar = Expression.Parameter(moduleType, (use.Alias ?? use.Target).ToString());
+			vars.Add(moduleVar);
+			_paramsBySymbol.Add(moduleType, moduleVar);
+
+			// Create initializers for each variable bound to a repository
+			var moduleInitializers = new List<MemberBinding>();
+			foreach
+			(
+				var field in
+					moduleType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+						.Where(f => f.FieldType.GetGenericTypeDefinition() == typeof(Storage.IRepository<>))
+			)
+				moduleInitializers.Add
+				(
+					Expression.Bind
+					(
+						field,
+						Expression.Call
+						(
+							_factory,
+							typeof(Storage.IRepositoryFactory).GetMethod("GetRepository").MakeGenericMethod(field.FieldType.GenericTypeArguments),
+							Expression.Constant(moduleType),
+							Expression.Constant(Name.FromNative(field.Name))
+						)
+					)
+				);
+
+			// Build code to construct instance and assign to variable
+			block.Add(Expression.Assign(moduleVar, Expression.MemberInit(Expression.New(moduleType), moduleInitializers)));
+
+			var moduleName = Name.FromQualifiedIdentifier(use.Target);
 		}
 
 		private static T FindReference<T>(ScriptPlan plan, Parse.QualifiedIdentifier id)
@@ -282,7 +359,7 @@ namespace Ancestry.QueryProcessor.Compile
 				{
 					case "VarMember": 
 						var varMember = (Parse.VarMember)member;
-						type.DefineField(member.Name.ToString(), CompileTypeDeclaration(plan, varMember.Type), FieldAttributes.Public);
+						type.DefineField(member.Name.ToString(), typeof(Storage.IRepository<>).MakeGenericType(CompileTypeDeclaration(plan, varMember.Type)), FieldAttributes.Public);
 						break;
 
 					case "TypeMember":
@@ -535,24 +612,34 @@ namespace Ancestry.QueryProcessor.Compile
 		private Expression CompileIdentifierExpression(ScriptPlan plan, Parse.IdentifierExpression identifierExpression)
 		{
 			var symbol = FindReference<object>(plan, identifierExpression.Target);
-			Expression result;
-			if (_paramsBySymbol.TryGetValue(symbol, out result))
-				return result;
+			Expression param;
+			if (_paramsBySymbol.TryGetValue(symbol, out param))
+				return param;
 
 			switch (symbol.GetType().Name)
 			{
 				case "RuntimeMethodInfo": 
 					var method = (MethodInfo)symbol;
 					return Expression.Constant(method, typeof(MethodInfo)); 
-				case "RuntimeFieldInfo":
+				case "RtFieldInfo":
 					var field = (FieldInfo)symbol;
-					return Expression.Call
-					(
-						_factory, 
-						ReflectionUtility.IRepositoryFactoryGetRepository.MakeGenericMethod(new System.Type[] { field.FieldType }),
-						Expression.Constant(field.DeclaringType),
-						Builder.Name(identifierExpression.Target.Components)
-					);
+					
+					// Find the module instance
+					if (!_paramsBySymbol.TryGetValue(field.DeclaringType, out param))
+						throw new Exception("Internal error: unable to find module for field.");
+
+					return 
+						Expression.Call
+						(
+							Expression.Field
+							(
+								param,
+								field
+							),
+							field.FieldType.GetMethod("Get"),
+							Expression.Constant(null, typeof(Parse.Expression))	// Condition
+						);
+
 				// TODO: enums and typedefs
 				default:
 					throw new CompilerException(CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);

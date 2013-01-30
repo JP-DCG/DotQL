@@ -25,7 +25,7 @@ namespace Ancestry.QueryProcessor.Plan
 		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
 		public Dictionary<Parse.QualifiedIdentifier, object> References { get { return _references; } }
 
-		public void AddReference(object symbol, Parse.QualifiedIdentifier id)
+		public void AddReference(Parse.QualifiedIdentifier id, object symbol)
 		{
 			References.Add(id, symbol);
 		}

@@ -15,11 +15,6 @@ namespace Ancestry.QueryProcessor.Storage
 
 		private InMemoryFactory _repository;
 
-		public int GetCost(Plan.ScriptPlan plan)
-		{
-			throw new NotImplementedException();
-		}
-
 		public ISet<Runtime.ModuleTuple> Get(Parse.Expression condition)
 		{
 			if (condition == null)

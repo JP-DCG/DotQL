@@ -617,6 +617,10 @@ namespace Ancestry.QueryProcessor.Parse
 								if (_builder.Length != 1)
 									throw new LexerException(LexerException.Codes.InvalidCharacter);
 								break;
+							case 'n' :
+								Advance();
+								_tokenType = TokenType.Name;
+								break;
 							case 'd' :
 								Advance(); 
 								if (!_nextEOF && _next == 't')
@@ -678,6 +682,24 @@ namespace Ancestry.QueryProcessor.Parse
 		private static bool ExceedsInt32Hex(StringBuilder builder)
 		{
 			return builder.Length >= 8;
+		}
+
+		public static bool IsValidIdentifier(string subject)
+		{
+			if (subject.Length < 1)
+				return false;
+			if (!(Char.IsLetter(subject[0]) || (subject[0] == '_')))
+				return false;
+			for (int i = 1; i < subject.Length; i++)
+				if (!(Char.IsLetterOrDigit(subject[i]) || (subject[i] == '_')))
+					return false;
+			return true;
+		}
+
+		public static bool IsReservedWord(string identifier)
+		{
+			// TODO: limit to just reserved words
+			return Keywords.Contains(identifier);
 		}
 	}
 }

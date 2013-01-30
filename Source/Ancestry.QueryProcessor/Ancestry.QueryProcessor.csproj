@@ -51,6 +51,7 @@
     <Compile Include="Compile\CompilerException.cs" />
     <Compile Include="Compile\ReflectionUtility.cs" />
     <Compile Include="Compile\TupleMaker.cs" />
+    <Compile Include="Plan\UsingComparer.cs" />
     <Compile Include="Processor.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
     <Compile Include="Plan\Characteristics.cs" />
@@ -83,7 +84,7 @@
     <Compile Include="Parse\BasicTextEmitter.cs" />
     <Compile Include="Parse\BaseLanguage.cs" />
     <Compile Include="Parse\LanguageException.cs" />
-    <Compile Include="Parse\Lexer.cs" />
+    <Compile Include="Parse\Tokenizer.cs" />
     <Compile Include="Parse\LexerException.cs" />
     <Compile Include="Parse\ParserException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

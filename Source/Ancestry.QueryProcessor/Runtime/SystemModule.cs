@@ -9,7 +9,7 @@ namespace Ancestry.QueryProcessor.Runtime
 	[Type.Module(new[] { "System" })]
 	public class SystemModule
 	{
-		public ISet<ModuleTuple> Modules;
+		public Storage.IRepository<ISet<ModuleTuple>> Modules;
 
 		public static IList<T> ToList<T>(ISet<T> setValue)
 		{

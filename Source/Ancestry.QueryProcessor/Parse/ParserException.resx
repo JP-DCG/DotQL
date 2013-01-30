@@ -216,4 +216,7 @@
   <data name="109132" xml:space="preserve">
     <value>Tuple member expected.</value>
   </data>
+  <data name="109133" xml:space="preserve">
+    <value>Type or initializer expression expected in variable declaration.</value>
+  </data>
 </root>

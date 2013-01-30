@@ -77,25 +77,25 @@ namespace Ancestry.QueryProcessor.Parse
 
 			/// <summary>Error code 109120: "Schema definition directive expected."</summary>
 			DDLDirectiveExpected = 109120,
-			
+
 			/// <summary>Error code 109121: "Type specifier already set for selector expression."</summary>
 			TypeSpecifierSet = 109121,
-			
+
 			/// <summary>Error code 109122: "Unknown event specifier "{0}"."</summary>
 			UnknownEventSpecifier = 109122,
-			
+
 			/// <summary>Error code 109123: "Event specifier list contains incompatible event specifiers."</summary>
 			InvalidEventSpecifierList = 109123,
-			
+
 			/// <summary>Error code 109124: "Sort definition already specified."</summary>
 			SortDefinitionExists = 109124,
-			
+
 			/// <summary>Error code 109125: "Invalid right specifier ('all', 'usage', or '{&lt;list of rights&gt;}' expected)."</summary>
 			InvalidRightSpecifier = 109125,
 
 			/// <summary>Error code 109126: "Invalid security specifier."</summary>
 			InvalidSecuritySpecifier = 109126,
-			
+
 			/// <summary>Error code 109127: "Unknown constraint target."</summary>
 			UnknownConstraintTarget = 109127,
 
@@ -113,6 +113,9 @@ namespace Ancestry.QueryProcessor.Parse
 
 			/// <summary>Error code 102132: "Tuple member expected."</summary>
 			TupleMemberExpected = 109132,
+
+			/// <summary>Error code 109133: "Type or initializer expression expected in variable declaration."</summary>
+			TypeOrInitializerExpected = 109133,
 		}
 
 		// Resource manager for this exception class

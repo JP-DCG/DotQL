@@ -43,27 +43,27 @@ namespace Ancestry.QueryProcessor.Plan
 
 		private void DiscoverScript(ScriptPlan plan)
 		{
-			// Find modules
-			var modules = GetModules();
-
 			// Add root frame
 			var local = plan.Global;
 
+			// Create temporary frame for resolution of used modules from all modules
 			var modulesByName = new Frame();
-			foreach (var module in modules)
-				modulesByName.AddNonRooted(module.Name, module);
+			foreach (var module in GetModules())
+				modulesByName.Add(module.Name, module);
 
 			// Import symbols for usings
-			foreach (var u in plan.Script.Usings.Union(_options.DefaultUsings))
+			foreach (var u in plan.Script.Usings.Union(_options.DefaultUsings).Distinct(new UsingComparer()))
 			{
-				var module = modulesByName.Resolve<Runtime.ModuleTuple>(u.Target);
-				local.AddNonRooted(u.Target, module);
+				var moduleName = Name.FromQualifiedIdentifier(u.Target);
+				var module = modulesByName.Resolve<Runtime.ModuleTuple>(moduleName);
+				plan.AddReference(u.Target, module);
+				local.Add(moduleName, module);
 				foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { method.Name }).ToArray() }, method);
+					local.Add(moduleName + Name.FromNative(method.Name), method);
 				foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public))
-					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { type.Name }).ToArray() }, type);
+					local.Add(moduleName + Name.FromNative(type.Name), type);
 				foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-					local.AddNonRooted(new Name { Components = u.Target.Components.Union(new string[] { field.Name }).ToArray() }, field);
+					local.Add(moduleName + Name.FromNative(field.Name), field);
 			}
 
 			// TODO: manage symbols for modules
@@ -74,7 +74,7 @@ namespace Ancestry.QueryProcessor.Plan
 			{
 				DiscoverStatement(plan, local, v.Type);
 				DiscoverStatement(plan, local, v.Initializer);
-				local.AddNonRooted(v.Name, v);
+				local.Add(v.Name, v);
 			}
 
 			foreach (var a in plan.Script.Assignments)
@@ -107,7 +107,7 @@ namespace Ancestry.QueryProcessor.Plan
 			plan.Frames.Add(functionSelector, local);
 			
 			foreach (var p in functionSelector.Parameters)
-				local.AddNonRooted(p.Name, p);
+				local.Add(p.Name, p);
 			
 			DiscoverStatement(plan, local, functionSelector.Expression);
 		}
@@ -120,12 +120,12 @@ namespace Ancestry.QueryProcessor.Plan
 			// Gather the module's symbols
 			foreach (var member in moduleDeclaration.Members)
 			{
-				local.AddNonRooted(member.Name, member);
+				local.Add(member.Name, member);
 
 				// Populate qualified enumeration members
 				if (member is Parse.EnumMember)
 					foreach (var e in ((Parse.EnumMember)member).Values)
-						local.AddNonRooted(new Name() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
+						local.Add(new Name() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
 			}
 
 			foreach (var member in moduleDeclaration.Members)
@@ -134,12 +134,12 @@ namespace Ancestry.QueryProcessor.Plan
 
 		private void DiscoverNamedType(ScriptPlan plan, Frame frame, Parse.NamedType namedType)
 		{
-			plan.AddReference(frame.Resolve<Parse.ISymbol>(namedType.Target), namedType.Target);
+			plan.AddReference(namedType.Target, frame.Resolve<Parse.ISymbol>(namedType.Target));
 		}
 
 		private void DiscoverIdentifierExpression(ScriptPlan plan, Frame frame, Parse.IdentifierExpression identifier)
 		{
-			plan.AddReference(frame.Resolve<object>(identifier.Target), identifier.Target);
+			plan.AddReference(identifier.Target, frame.Resolve<object>(identifier.Target));
 		}
 
 		private void DiscoverTupleType(ScriptPlan plan, Frame frame, Parse.TupleType tupleType)
@@ -150,7 +150,7 @@ namespace Ancestry.QueryProcessor.Plan
 			// Discover all attributes as symbols
 			foreach (var a in tupleType.Attributes)
 			{
-				local.AddNonRooted(a.Name, a);
+				local.Add(a.Name, a);
 			}
 
 			// Resolve source reference columns
@@ -164,7 +164,7 @@ namespace Ancestry.QueryProcessor.Plan
 			{
 				Resolve(plan, r.SourceAttributeNames, local);
 				var target = plan.Global.Resolve<Parse.Statement>(r.Target);
-				plan.AddReference(target, r.Target);
+				plan.AddReference(r.Target, target);
 				Resolve(plan, r.TargetAttributeNames, plan.Frames[target]);
 			}
 		}
@@ -177,12 +177,12 @@ namespace Ancestry.QueryProcessor.Plan
 			foreach (var fc in expression.ForClauses)
 			{
 				DiscoverStatement(plan, local, fc.Expression);
-				local.AddNonRooted(fc.Name, fc);
+				local.Add(fc.Name, fc);
 			}
 			foreach (var lc in expression.LetClauses)
 			{
 				DiscoverStatement(plan, local, lc.Expression);
-				local.AddNonRooted(lc.Name, lc);
+				local.Add(lc.Name, lc);
 			}
 			if (expression.WhereClause != null)
 				DiscoverStatement(plan, local, expression.WhereClause);
@@ -194,7 +194,7 @@ namespace Ancestry.QueryProcessor.Plan
 		private void Resolve(ScriptPlan plan, IEnumerable<Parse.QualifiedIdentifier> list, Frame frame)
 		{
 			foreach (var item in list)
-				plan.AddReference(frame.Resolve<object>(item), item);
+				plan.AddReference(item, frame.Resolve<object>(item));
 		}
 	}
 }

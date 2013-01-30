@@ -21,8 +21,15 @@ namespace Ancestry.QueryProcessor.Plan
 			_baseFrame = baseFrame;
 		}
 
+		public void Add(QualifiedIdentifier id, object symbol)
+		{
+			Add(Name.FromQualifiedIdentifier(id), symbol);
+		}
+
 		public void Add(Name name, object symbol)
 		{
+			if (name.IsRooted)
+				throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
 			var existing = this[name];
 			if (existing != null)
 				throw new PlanningException(PlanningException.Codes.IdentifierConflict, name);
@@ -60,18 +67,6 @@ namespace Ancestry.QueryProcessor.Plan
 			if (!(result is T))
 				throw new PlanningException(PlanningException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
 			return (T)result;
-		}
-
-		public void AddNonRooted(QualifiedIdentifier id, object symbol)
-		{
-			AddNonRooted(Name.FromQualifiedIdentifier(id), symbol);
-		}
-
-		public void AddNonRooted(Name id, object symbol)
-		{
-			if (id.IsRooted)
-				throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
-			Add(id, symbol); 
 		}
 	}
 }

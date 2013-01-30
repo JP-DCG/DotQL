@@ -53,5 +53,18 @@ namespace Ancestry.QueryProcessor
 		{
 			return !(left == right);
 		}
+
+		public static Name operator+(Name left, Name right)
+		{
+			return new Name { Components = left.Components.Union(right.Components).ToArray() };
+		}
+
+		public static Name FromNative(string native)
+		{
+			var components = native.Split(new [] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
+			var name = Name.FromComponents(components);
+			name.IsRooted = native.StartsWith("\\");
+			return name;
+		}
 	}
 }
