@@ -39,7 +39,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public static LineInfo StartingLine = new LineInfo(1, 1, 1, 1);
     }
     
-	public abstract class Statement : Object 
+	public class Statement : Object 
 	{
 		public Statement() : base() {}
 		public Statement(Lexer lexer) : base()

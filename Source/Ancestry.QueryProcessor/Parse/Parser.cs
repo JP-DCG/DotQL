@@ -72,13 +72,13 @@ namespace Ancestry.QueryProcessor.Parse
 			var @using = new Using();
 			@using.SetPosition(lexer);
 
-			var qualifiedIdentifier = QualifiedIdentifier(lexer);
+			var qualifiedIdentifier = QualifiedIdentifier(lexer, true);
 
 			if (lexer[1].IsSymbol(Keywords.Equal))
 			{
 				@using.Alias = qualifiedIdentifier;
 				lexer.NextToken();
-				qualifiedIdentifier = QualifiedIdentifier(lexer);
+				qualifiedIdentifier = QualifiedIdentifier(lexer, false);
 			}
 
 			@using.Target = qualifiedIdentifier;
@@ -96,7 +96,7 @@ namespace Ancestry.QueryProcessor.Parse
             var moduleDeclaration = new ModuleDeclaration();
             moduleDeclaration.SetPosition(lexer);
 
-            moduleDeclaration.Name = QualifiedIdentifier(lexer);
+            moduleDeclaration.Name = QualifiedIdentifier(lexer, true);
 
             lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 
@@ -130,7 +130,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			LexerToken lexerToken = lexer[1];
 
-			var moduleMemberName = QualifiedIdentifier(lexer);
+			var moduleMemberName = QualifiedIdentifier(lexer, true);
 
 			lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
 
@@ -152,7 +152,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 					while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 					{
-						enumMember.Values.Add(QualifiedIdentifier(lexer));
+						enumMember.Values.Add(QualifiedIdentifier(lexer, true));
 					}
 
 					moduleMember = enumMember;
@@ -188,7 +188,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 			var result = new VarDeclaration();
 			result.SetPosition(lexer);
-			result.Name = QualifiedIdentifier(lexer);
+			result.Name = QualifiedIdentifier(lexer, true);
 			if (lexer[1, false].IsSymbol(Keywords.AttributeSeparator))
 			{
 				lexer.NextToken();
@@ -390,10 +390,10 @@ namespace Ancestry.QueryProcessor.Parse
 				case Keywords.Key: return TupleKey(lexer);
 				default: 
 					{
-						// Inferred-named attribute
+						// Named attribute
 						var attribute = new TupleAttribute();
 						attribute.SetPosition(lexer);
-						attribute.Name = QualifiedIdentifier(lexer);
+						attribute.Name = QualifiedIdentifier(lexer, true);
 						lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
 						attribute.Type = TypeDeclaration(lexer);
 						return attribute;
@@ -442,7 +442,7 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var param = new FunctionParameter();
 			param.SetPosition(lexer[1]);
-			param.Name = QualifiedIdentifier(lexer);
+			param.Name = QualifiedIdentifier(lexer, true);
 			lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
 			param.Type = TypeDeclaration(lexer);
 			return param;
@@ -479,7 +479,7 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var result = new NamedType();
 			result.SetPosition(lexer[1]);
-			result.Target = QualifiedIdentifier(lexer);
+			result.Target = QualifiedIdentifier(lexer, false);
 			return result;
 		}
 
@@ -896,11 +896,11 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-			Left : expression Operator : ( "." | "@" | "," ) Right : expression
+				Left : expression Operator : ( "." | "@" | "," ) Right : expression
 		*/
 		public Expression DereferenceExpression(Lexer lexer)
 		{
-			var expression = TermExpression(lexer);
+			var expression = RestrictExpression(lexer);
 
 			while (lexer[1].Type == TokenType.Symbol)
 			{
@@ -909,11 +909,36 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Dereference:
 					case Keywords.Extract:
 					case Keywords.Embed:
-						expression = AppendToBinaryExpression(lexer, expression, TermExpression);
+						expression = AppendToBinaryExpression(lexer, expression, RestrictExpression);
 						break;
 					default:
 						return expression;
 				}
+			}
+			return expression;
+		}
+
+		/*
+				Expression : expression "?" "(" Condition : expression ")"
+		*/
+		public Expression RestrictExpression(Lexer lexer)
+		{
+			var expression = TermExpression(lexer);
+
+			while (lexer[1].IsSymbol(Keywords.Restrict))
+			{
+				lexer.NextToken();
+				var restrict = new RestrictExpression();
+				restrict.SetPosition(lexer);
+				restrict.Expression = expression;
+
+				lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+
+				restrict.Condition = Expression(lexer);
+
+				lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+
+				expression = restrict;
 			}
 			return expression;
 		}
@@ -1128,9 +1153,10 @@ namespace Ancestry.QueryProcessor.Parse
 				case Keywords.Key: return TupleKey(lexer);
 				default:
 				{
+					// Named attribute
 					var attribute = new AttributeSelector();
 					attribute.SetPosition(lexer[1]);
-					attribute.Name = QualifiedIdentifier(lexer);
+					attribute.Name = QualifiedIdentifier(lexer, true);
 					lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
 					attribute.Value = Expression(lexer);
 					return attribute;
@@ -1148,21 +1174,21 @@ namespace Ancestry.QueryProcessor.Parse
 
 			var result = new TupleReference();
 			result.SetPosition(lexer);
-			result.Name = QualifiedIdentifier(lexer);
+			result.Name = QualifiedIdentifier(lexer, true);
 
 			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
 			do
 			{
-				result.SourceAttributeNames.Add(QualifiedIdentifier(lexer));
+				result.SourceAttributeNames.Add(QualifiedIdentifier(lexer, false));
 			} while (!lexer[1].IsSymbol(Keywords.EndGroup));
 			lexer.NextToken();
 
-			result.Target = QualifiedIdentifier(lexer);
+			result.Target = QualifiedIdentifier(lexer, true);
 
 			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
 			do
 			{
-				result.TargetAttributeNames.Add(QualifiedIdentifier(lexer));
+				result.TargetAttributeNames.Add(QualifiedIdentifier(lexer, false));
 			} while (!lexer[1].IsSymbol(Keywords.EndGroup));
 			lexer.NextToken();
 
@@ -1182,7 +1208,7 @@ namespace Ancestry.QueryProcessor.Parse
 			lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 			while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 			{
-				result.AttributeNames.Add(QualifiedIdentifier(lexer));
+				result.AttributeNames.Add(QualifiedIdentifier(lexer, false));
 			}
 			lexer.NextToken();
 
@@ -1192,7 +1218,7 @@ namespace Ancestry.QueryProcessor.Parse
 		/*
 			IsRooted : [ '\' ] Items : Identifier^'\'
 		*/
-		public QualifiedIdentifier QualifiedIdentifier(Lexer lexer)
+		public QualifiedIdentifier QualifiedIdentifier(Lexer lexer, bool checkReserved)
 		{
 			var result = new QualifiedIdentifier();
 			result.SetPosition(lexer[1]);
@@ -1210,7 +1236,7 @@ namespace Ancestry.QueryProcessor.Parse
 			var items = new List<string>();
 			while (true)
 			{
-				var identifier = Identifier(lexer);
+				var identifier = Identifier(lexer, checkReserved);
 				items.Add(identifier);
 
 				// Continue if another qualifier is found
@@ -1224,12 +1250,12 @@ namespace Ancestry.QueryProcessor.Parse
 			return result;
 		}
 
-		public string Identifier(Lexer lexer)
+		public string Identifier(Lexer lexer, bool checkReserved)
 		{
 			lexer.NextToken().CheckType(TokenType.Symbol);
 			var result = lexer[0].Token;
 			CheckValidIdentifier(result);
-			if (Tokenizer.IsReservedWord(result))
+			if (checkReserved && Tokenizer.IsReservedWord(result))
 				throw new ParserException(ParserException.Codes.ReservedWordIdentifier, result);
 			return result;
 		}
@@ -1379,7 +1405,7 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			var result = new IdentifierExpression();
 			result.SetPosition(lexer[1]);
-			result.Target = QualifiedIdentifier(lexer);
+			result.Target = QualifiedIdentifier(lexer, false);
 			return result;
 		}
 
@@ -1490,7 +1516,7 @@ namespace Ancestry.QueryProcessor.Parse
 			var result = new LetClause();
 			result.SetPosition(lexer);
 
-			result.Name = QualifiedIdentifier(lexer);
+			result.Name = QualifiedIdentifier(lexer, true);
 			
 			lexer.NextToken().CheckSymbol(Keywords.Assignment);
 
@@ -1509,7 +1535,7 @@ namespace Ancestry.QueryProcessor.Parse
 			var result = new ForClause();
 			result.SetPosition(lexer);
 
-			result.Name = QualifiedIdentifier(lexer);
+			result.Name = QualifiedIdentifier(lexer, true);
 
 			lexer.NextToken().CheckSymbol(Keywords.In);
 

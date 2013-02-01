@@ -356,13 +356,15 @@ namespace Ancestry.QueryProcessor.Parse
 							break;
 
 						case '?':
-							if (Next == '=')
-							{
-								Advance();
-								_builder.Append(_current);
-							}
-							else
-								throw new LexerException(LexerException.Codes.IllegalInputCharacter, _next);
+							if (!_nextEOF)
+								switch (_next)
+								{
+									case '=':
+									case '?':
+										Advance();
+										_builder.Append(_current);
+									break;
+								}
 							break;
 
 						case '*':
@@ -698,8 +700,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public static bool IsReservedWord(string identifier)
 		{
-			// TODO: limit to just reserved words
-			return Keywords.Contains(identifier);
+			return ReservedWords.Contains(identifier);
 		}
 	}
 }

@@ -86,14 +86,10 @@ namespace Ancestry.QueryProcessor.Parse
 		public const string Function = "=>";
 		public const string Invoke = "->";
 		public const string AttributeSeparator = ":";
+		public const string Restrict = "?";
 		public const string Optional = "?";
 		public const string Required = "!";
 
-		// Reserved
-		public const string Args = "args";
-		public const string Value = "value";
-		public const string Index = "index";
-        
         private static string[] FKeywords;
         
         private static void PopulateKeywords()

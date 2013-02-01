@@ -16,6 +16,21 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105102: "The generic type ({0}) passed does not match the type of the target ({1})."</summary>
 			MismatchedGeneric = 105102,
+			
+			/// <summary>Error code 105103: "Recursive declaration.  A declaration must not reference itself directly or indirectly."</summary>
+			RecursiveDeclaration = 105103,
+
+			/// <summary>Error code 105104: "Invalid rooted identifier.  Rooted identifiers are only allowed in references."</summary>
+			InvalidRootedIdentifier = 105104,
+
+			/// <summary>Error code 105105: "Identifier conflict.  There is already an identifier by this name in scope."</summary>
+			IdentifierConflict = 105105,
+
+			/// <summary>Error code 105106: "Unknown identifier ({0})."</summary>
+			UnknownIdentifier = 105106,
+
+			/// <summary>Error code 105107: "Expecting a reference of type '{0}'; actual: '{1}'."</summary>
+			IncorrectTypeReferenced = 105107,
 		}
 
 		// Resource manager for this exception class

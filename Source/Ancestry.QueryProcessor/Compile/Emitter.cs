@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.SymbolStore;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
@@ -8,11 +11,99 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Compile
 {
-	public static class TupleMaker
+	public class Emitter
 	{
-		public static System.Type TypeTypeToNative(ModuleBuilder module, Type.TupleType tupleType)
+		private AssemblyName _assemblyName;
+		private AssemblyBuilder _assembly;
+		private ModuleBuilder _module;
+		private ISymbolDocumentWriter _symbolWriter;
+
+		private EmitterOptions _options;
+
+		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
+
+		public Emitter(EmitterOptions options)
 		{
-			var typeBuilder = module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
+			_options = options;
+			_assemblyName = new AssemblyName(_options.AssemblyName);
+			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
+			if (_options.DebugOn)
+				_assembly.SetCustomAttribute
+				(
+					new CustomAttributeBuilder
+					(
+						typeof(DebuggableAttribute).GetConstructor
+						(
+							new System.Type[] { typeof(DebuggableAttribute.DebuggingModes) }
+						),
+						new object[] 
+						{ 
+							DebuggableAttribute.DebuggingModes.DisableOptimizations | 
+							DebuggableAttribute.DebuggingModes.Default 
+						}
+					)
+				);
+			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _options.DebugOn);
+			if (_options.DebugOn)
+				_symbolWriter = _module.DefineDocument(_options.SourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
+			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
+		}
+
+		public void SaveAssembly()
+		{
+			_module.CreateGlobalFunctions();
+			_assembly.Save(_assemblyName + ".dll");
+
+			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
+		}
+
+		public TypeBuilder BeginModule(string name)
+		{
+			return _module.DefineType(name, TypeAttributes.Class | TypeAttributes.Public);
+		}
+
+		public void DeclareVariable(TypeBuilder module, string name, System.Type type)
+		{
+			module.DefineField(name, typeof(Storage.IRepository<>).MakeGenericType(type), FieldAttributes.Public);
+		}
+
+		public void DeclareTypeDef(TypeBuilder module, string name, System.Type type)
+		{
+			module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);
+		}
+
+		public void DeclareEnum(TypeBuilder module, string name, IEnumerable<string> values)
+		{
+			var enumType = module.DefineNestedType(name, TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
+			enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
+			var i = 0;
+			foreach (var value in values)
+			{
+				FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
+				field.SetConstant(i++);
+			}
+		}
+
+		public void DeclareConst(TypeBuilder module, string name, object value, System.Type type)
+		{
+			var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
+			constField.SetConstant(value);
+		}
+
+		public System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
+		{
+			System.Type nativeType;
+			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
+			{
+				nativeType = TypeFromTupleType(tupleType);
+				_tupleToNative.Add(tupleType, nativeType);
+			}
+			return nativeType;
+		}
+
+		public System.Type TypeFromTupleType(Type.TupleType tupleType)
+		{
+			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
 			var fieldsByID = new Dictionary<Name, FieldInfo>();
 
 			// Add attributes

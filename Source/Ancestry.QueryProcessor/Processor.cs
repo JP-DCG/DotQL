@@ -1,6 +1,5 @@
 ﻿using Ancestry.QueryProcessor.Compile;
 using Ancestry.QueryProcessor.Parse;
-using Ancestry.QueryProcessor.Plan;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -104,8 +103,8 @@ namespace Ancestry.QueryProcessor
 			var convertedArgs = JsonInterop.JsonArgsToNative(args);
 
 			// Create assembly and source file names
-			var name = "DotQL" + DateTime.Now.ToString("yyyyMMddhhmmssss");
-			var sourceFileName = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.ChangeExtension(name, "dql"));
+			var assemblyName = "DotQL" + DateTime.Now.ToString("yyyyMMddhhmmssss");
+			var sourceFileName = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.ChangeExtension(assemblyName, "dql"));
 
 			// Save the file if we're debugging
 			if (Settings.DebugOn)
@@ -115,13 +114,20 @@ namespace Ancestry.QueryProcessor
 			var parser = new Parser();
 			var script = Parser.ParseFrom(parser.Script, text);
 
-			// Plan
-			var planner = new Planner(actualOptions, Settings.RepositoryFactory);
-			var plan = planner.PlanScript(script);
-
 			// Compile
-			var compiler = new Compiler(actualOptions, Settings.DebugOn, name, sourceFileName);
-			var executable = compiler.CreateExecutable(plan);
+			var executable = 
+				Compiler.CreateExecutable
+				(
+					new CompilerOptions
+					{
+						DefaultUsings = actualOptions.DefaultUsings, 
+						DebugOn = Settings.DebugOn, 
+						AssemblyName = assemblyName, 
+						SourceFileName = sourceFileName,
+						Factory = Settings.RepositoryFactory,
+					},
+					script
+				);
 
 			// Run
 			return executable(convertedArgs, Settings.RepositoryFactory, cancelToken);

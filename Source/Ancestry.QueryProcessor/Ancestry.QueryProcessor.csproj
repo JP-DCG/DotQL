@@ -49,26 +49,27 @@
     <Compile Include="Compile\Builder.cs" />
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Compile\CompilerException.cs" />
+    <Compile Include="Compile\CompilerOptions.cs" />
+    <Compile Include="Compile\Emitter.cs" />
+    <Compile Include="Compile\EmitterOptions.cs" />
     <Compile Include="Compile\ReflectionUtility.cs" />
-    <Compile Include="Compile\TupleMaker.cs" />
-    <Compile Include="Plan\UsingComparer.cs" />
+    <Compile Include="Compile\UsingComparer.cs" />
+    <Compile Include="Parse\ReservedWords.cs" />
     <Compile Include="Processor.cs" />
     <Compile Include="Execute\ExecuteHandler.cs" />
-    <Compile Include="Plan\Characteristics.cs" />
-    <Compile Include="Plan\Frame.cs" />
+    <Compile Include="Compile\Characteristics.cs" />
+    <Compile Include="Compile\Frame.cs" />
     <Compile Include="IProcessor.cs" />
     <Compile Include="JsonInterop.cs" />
     <Compile Include="Parse\LexerToken.cs" />
-    <Compile Include="Plan\Planner.cs" />
     <Compile Include="ProcessorSettings.cs" />
     <Compile Include="Name.cs" />
-    <Compile Include="Plan\PlannerContext.cs" />
-    <Compile Include="Plan\PlanningException.cs" />
     <Compile Include="QueryOptions.cs" />
     <Compile Include="QueryLimits.cs" />
     <Compile Include="RequestedSla.cs" />
     <Compile Include="Runtime\IUpdateable.cs" />
     <Compile Include="Runtime\ModuleTuple.cs" />
+    <Compile Include="Runtime\Optional.cs" />
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
     <Compile Include="Storage\InMemoryModuleRepository.cs" />
@@ -90,7 +91,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Parse\SyntaxException.cs" />
     <Compile Include="Parse\TextEmitter.cs" />
-    <Compile Include="Plan\ScriptPlan.cs" />
     <Compile Include="Storage\IRepositoryFactory.cs" />
     <Compile Include="Type\ModuleAttribute.cs" />
     <Compile Include="Type\Reference.cs" />
@@ -103,14 +103,15 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />
-    <EmbeddedResource Include="Compile\CompilerException.resx" />
+    <EmbeddedResource Include="Compile\CompilerException.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="Parse\LanguageException.resx">
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Parse\LexerException.resx" />
     <EmbeddedResource Include="Parse\ParserException.resx" />
     <EmbeddedResource Include="Parse\SyntaxException.resx" />
-    <EmbeddedResource Include="Plan\PlanningException.resx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Parse\DotQL.g4" />

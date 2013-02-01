@@ -30,7 +30,7 @@ namespace Ancestry.QueryProcessor.Runtime
 		public static T GetInitializer<T>(T initializer, Dictionary<string, object> args, Name name)
 		{
 			object arg;
-			if (args.TryGetValue(name.ToString(), out arg))
+			if (args != null && args.TryGetValue(name.ToString(), out arg))
 				return (T)arg;
 			return initializer;
 		}

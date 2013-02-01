@@ -56,5 +56,74 @@ namespace Ancestry.QueryProcessor.Test
 			result = processor.Evaluate("return '1955/3/25'dt->System\\AddMonth(2)");
 			Assert.AreEqual(DateTime.Parse("1955/5/25"), ((JValue)result).Value);
 		}
+
+		[TestMethod]
+		public void Let()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("let x := 5 let y := 10 return x + y");
+			Assert.IsTrue(result is JValue);
+			Assert.AreEqual(15, ((JValue)result).Value);
+		}
+
+		[TestMethod]
+		public void For()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("for i in { 2 3 4 5 6 7 } return i + 10");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(6, ((JArray)result).Count);
+			Assert.AreEqual("12", ((JArray)result)[0].ToString());
+			Assert.AreEqual("17", ((JArray)result)[5].ToString());
+		}
+
+		[TestMethod]
+		public void Where()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("for i in { 2 3 4 5 6 7 } where i % 2 = 0 return i");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(3, ((JArray)result).Count);
+			Assert.AreEqual("2", ((JArray)result)[0].ToString());
+			Assert.AreEqual("6", ((JArray)result)[2].ToString());
+		}
+
+		[TestMethod]
+		public void PassingArguments()
+		{
+			var processor = new Processor();
+
+			var result = processor.Evaluate("var x := 5 return x", new JObject(new JProperty("x", 10)));
+			Assert.IsTrue(result is JValue);
+			Assert.AreEqual(10, ((JValue)result).Value);
+		}
+
+		[TestMethod]
+		public void SelectingModules()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return System\\Modules");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(1, ((JArray)result).Count);
+		}
+
+		[TestMethod]
+		public void PathRestrictionOfSet()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { 2 3 4 5 6 }?(value >= 4)");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(3, ((JArray)result).Count);
+			Assert.AreEqual("4", ((JArray)result)[0].ToString());
+			Assert.AreEqual("6", ((JArray)result)[2].ToString());
+		}
+
+		[TestMethod]
+		public void PathRestrictionOfScalar()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return 5?(value >= 4)");
+			Assert.IsTrue(result is JValue);
+		}
 	}
 }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Ancestry.QueryProcessor.Plan
+namespace Ancestry.QueryProcessor.Compile
 {
 	public class Frame
 	{
@@ -29,10 +29,10 @@ namespace Ancestry.QueryProcessor.Plan
 		public void Add(Name name, object symbol)
 		{
 			if (name.IsRooted)
-				throw new PlanningException(PlanningException.Codes.InvalidRootedIdentifier);
+				throw new CompilerException(CompilerException.Codes.InvalidRootedIdentifier);
 			var existing = this[name];
 			if (existing != null)
-				throw new PlanningException(PlanningException.Codes.IdentifierConflict, name);
+				throw new CompilerException(CompilerException.Codes.IdentifierConflict, name);
 			_items.Add(name, symbol);
 		}
 
@@ -63,9 +63,9 @@ namespace Ancestry.QueryProcessor.Plan
 		{
 			var result = this[id];
 			if (result == null)
-				throw new PlanningException(PlanningException.Codes.UnknownIdentifier, id.ToString());
+				throw new CompilerException(CompilerException.Codes.UnknownIdentifier, id.ToString());
 			if (!(result is T))
-				throw new PlanningException(PlanningException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
+				throw new CompilerException(CompilerException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
 			return (T)result;
 		}
 	}

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Ancestry.QueryProcessor.Plan
+namespace Ancestry.QueryProcessor.Compile
 {
 	public class UsingComparer : IEqualityComparer<Parse.Using>
 	{

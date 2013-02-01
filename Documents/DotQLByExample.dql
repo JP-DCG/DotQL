@@ -517,6 +517,12 @@ Determining null:
 
 e.g. result `true` if null either because there was no such row, or there was a row but the hypothetical Delivered attribute doesn't have a value
 
+Restricting off a singleton:
+
+	return 5?(value > 10)
+
+Result: `null` (because the value doesn't pass the restriction)
+
 Tuple with optional attribute:
 
 	return { First: "Bob" } of { Prefix: String?  First: String }
@@ -619,17 +625,14 @@ Declaring a module:
 		...
 	}
 
-...which is short-hand for this:
+...which is short-hand for upserting into the System\Modules table:
 
-	set Modules?(Name = 'Ancestry\FamilyPaths'n) :=
-		{
-			Version: 1.0.0 
-			Class: class
-			{
-				Code: enum { Parent Sibling Child Spouse }
-				...
-			}
-		}
+	Modules:
+	{
+		Name: Name
+		Version: Version 
+		Class: (compiled code)
+	}
 
 Using a module:
 

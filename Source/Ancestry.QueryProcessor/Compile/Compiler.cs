@@ -1,5 +1,4 @@
 using Ancestry.QueryProcessor.Execute;
-using Ancestry.QueryProcessor.Plan;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,121 +14,150 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public class Compiler
 	{
-		private AssemblyName _assemblyName;
-		private AssemblyBuilder _assembly;
-		private ModuleBuilder _module;
-
-		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
-		private Dictionary<object, Expression> _paramsBySymbol = new Dictionary<object, Expression>();
-
-		private ParameterExpression _args;
-		private ParameterExpression _factory;
-		private ParameterExpression _cancelToken;
-
-		private QueryOptions _options;
-		private bool _debugOn;
+		private CompilerOptions _options;
+		private Emitter _emitter;
 		private SymbolDocumentInfo _symbolDocument;
-		private ISymbolDocumentWriter _symbolWriter;
 
-		public Compiler(QueryOptions actualOptions, bool debugOn, string assemblyName, string sourceFileName)
+		// Scope management
+		private Dictionary<Parse.Statement, Frame> _frames = new Dictionary<Parse.Statement, Frame>();
+		public Frame _importFrame;
+		public Frame _scriptFrame;
+		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
+		private Dictionary<object, Expression> _paramsBySymbol = new Dictionary<object, Expression>();
+		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
+
+		// Parameters
+		private ParameterExpression _argParam;
+		private ParameterExpression _factoryParam;
+		private ParameterExpression _cancelParam;
+
+		// Using private constructor pattern because state spans single static call
+		private Compiler() { }
+
+		public static ExecuteHandler CreateExecutable(CompilerOptions options, Parse.Script script)
 		{
-			_options = actualOptions;
-			_debugOn = debugOn;
-			_assemblyName = new AssemblyName(assemblyName);
-			_symbolDocument = Expression.SymbolDocument(sourceFileName);
-
-			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
-			if (_debugOn)
-				_assembly.SetCustomAttribute
-				(
-					new CustomAttributeBuilder
-					(
-						typeof(DebuggableAttribute).GetConstructor
-						(
-							new System.Type[] { typeof(DebuggableAttribute.DebuggingModes) }
-						),
-						new object[] 
-						{ 
-							DebuggableAttribute.DebuggingModes.DisableOptimizations | 
-							DebuggableAttribute.DebuggingModes.Default 
-						}
-					)
-				);
-			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _debugOn);
-			if (_debugOn)
-				_symbolWriter = _module.DefineDocument(sourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
-
-			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
+			return new Compiler().InternalCreateExecutable(options, script);
 		}
 
-		public ExecuteHandler CreateExecutable(ScriptPlan plan)
+		private ExecuteHandler InternalCreateExecutable(CompilerOptions options, Parse.Script script)
 		{
-			//// TODO: setup app domain with appropriate cache path, shadow copying etc.
+			_options = options;
+			_emitter =
+				new Emitter
+				(
+					new EmitterOptions
+					{
+						DebugOn = options.DebugOn,
+						AssemblyName = options.AssemblyName,
+						SourceFileName = options.SourceFileName
+					}
+				);
+			_symbolDocument = Expression.SymbolDocument(_options.SourceFileName);
+
+			//// TODO: setup separate app domain with appropriate cache path, shadow copying etc.
 			//var domainName = "plan" + DateTime.Now.Ticks.ToString();
 			//var domain = AppDomain.CreateDomain(domainName);
-			//var an = new AssemblyName("Dynamic." + domainName);
 
-			//// TODO: use RunAndCollect for transient execution
-			//var assembly = domain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
+			_argParam = Expression.Parameter(typeof(Dictionary<string, object>), "args");
+			_factoryParam = Expression.Parameter(typeof(Storage.IRepositoryFactory), "factory");
+			_cancelParam = Expression.Parameter(typeof(CancellationToken), "cancelToken");
 
-			//var module = assembly.DefineDynamicModule(an.Name + ".dll");
-
-			//var type = module.DefineType("Executable", TypeAttributes.Public, typeof(ExecutableBase));
-
-			//var method = type.DefineMethod("Execute", MethodAttributes.Static | MethodAttributes.Public);
-
-			_args = Expression.Parameter(typeof(Dictionary<string, object>), "args");
-			_factory = Expression.Parameter(typeof(Storage.IRepositoryFactory), "factory");
-			_cancelToken = Expression.Parameter(typeof(CancellationToken), "cancelToken");
-
-			var execute = 
+			var execute =
 				Expression.Lambda<ExecuteHandler>
 				(
-					CompileScript(plan),
-					_args,
-					_factory,
-					_cancelToken
+					CompileScript(script),
+					_argParam,
+					_factoryParam,
+					_cancelParam
 				);
 
-			_module.CreateGlobalFunctions();
-			//_assembly.Save("qpdebug.dll");
-
-			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
 			return execute.Compile();//pdbGenerator);
 
 			//// TODO: Pass debug info
 			//execute.CompileToMethod(method);
 		}
 
-		private Expression CompileScript(ScriptPlan plan)
+		private IEnumerable<Runtime.ModuleTuple> GetModules()
 		{
-			var script = plan.Script;
+			return Runtime.Runtime.GetModulesRepository(_options.Factory).Get(null);
+		}
+
+		private Expression CompileScript(Parse.Script script)
+		{
+			_importFrame = new Frame();
+			_scriptFrame = new Frame(_importFrame);
+			_frames.Add(script, _scriptFrame);
+
 			var vars = new List<ParameterExpression>();
 			var block = new List<Expression>();
 
-			if (_debugOn)
+			if (_options.DebugOn)
 				block.Add(GetDebugInfo(script));
 
+			// Create temporary frame for resolution of used modules from all modules
+			var modulesFrame = new Frame();
+			foreach (var module in GetModules())
+				modulesFrame.Add(module.Name, module);
+
+			// Usings
 			foreach (var u in script.Usings.Union(_options.DefaultUsings).Distinct(new UsingComparer()))
-				CompileUsing(plan, u, vars, block);
+			{
+				ResolveUsing(_importFrame, u, modulesFrame);
+				CompileUsing(u, vars, block);
+			}
 
+			// Module declarations
 			foreach (var m in script.Modules)
-				CompileModule(plan, block, m);
+				CompileModule(_scriptFrame, block, m);
 
+			// Vars
 			foreach (var v in script.Vars)
-				CompileVar(plan, v, vars, block);
+			{
+				CompileVar(_scriptFrame, v, vars, block);
+				_scriptFrame.Add(v.Name, v);
+			}
 
+			// Assignments
+			foreach (var a in script.Assignments)
+				CompileAssignment(_scriptFrame, a, block);
+
+			// Return expression
 			if (script.Expression != null)
-				CompileResult(plan, script.Expression, block);
+				CompileResult(_scriptFrame, script.Expression, block);
 			else
 				block.Add(Expression.Constant(null, typeof(object)));
 
 			return Expression.Block(vars, block);
 		}
 
-		private void CompileResult(ScriptPlan plan, Parse.ClausedExpression expression, List<Expression> block)
+		private void ResolveUsing(Frame frame, Parse.Using u, Frame modulesFrame)
 		{
-			var result = CompileClausedExpression(plan, expression);
+			var moduleName = Name.FromQualifiedIdentifier(u.Target);
+			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(moduleName);
+			_references.Add(u.Target, module);
+			frame.Add(moduleName, module);
+			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+				frame.Add(moduleName + Name.FromNative(method.Name), method);
+			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
+				frame.Add(moduleName + Name.FromNative(type.Name), type);
+			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+				frame.Add(moduleName + Name.FromNative(field.Name), field);
+		}
+
+		private void AddAllReferences(Frame frame, IEnumerable<Parse.QualifiedIdentifier> list)
+		{
+			foreach (var item in list)
+				_references.Add(item, frame.Resolve<object>(item));
+		}
+
+		private void CompileAssignment(Frame frame, Parse.ClausedAssignment a, List<Expression> block)
+		{
+			throw new NotImplementedException();
+		}
+
+		private void CompileResult(Frame frame, Parse.ClausedExpression expression, List<Expression> block)
+		{
+			var result = CompileClausedExpression(frame, expression);
 
 			// Box the result if needed
 			if (result.Type.IsValueType)
@@ -138,13 +166,13 @@ namespace Ancestry.QueryProcessor.Compile
 			block.Add(result);
 		}
 
-		private void CompileVar(ScriptPlan plan, Parse.VarDeclaration v, List<ParameterExpression> vars, List<Expression> block)
+		private void CompileVar(Frame frame, Parse.VarDeclaration v, List<ParameterExpression> vars, List<Expression> block)
 		{
 			// Compile the (optional) type
-			var type = v.Type != null ? CompileTypeDeclaration(plan, v.Type) : null;
+			var type = v.Type != null ? CompileTypeDeclaration(frame, v.Type) : null;
 
 			// Compile the (optional) initializer
-			var initializer = v.Initializer != null ? CompileExpression(plan, v.Initializer, type) : null;
+			var initializer = v.Initializer != null ? CompileExpression(frame, v.Initializer, type) : null;
 
 			// Default the type to the initializer's type
 			type = type ?? initializer.Type;
@@ -160,15 +188,21 @@ namespace Ancestry.QueryProcessor.Compile
 				Expression.Assign
 				(
 					variable,
-					Expression.Call(typeof(Runtime.Runtime).GetMethod("GetInitializer").MakeGenericMethod(type), initializer, _args, Expression.Constant(v.Name))
+					Expression.Call
+					(
+						typeof(Runtime.Runtime).GetMethod("GetInitializer").MakeGenericMethod(type), 
+						initializer, 
+						_argParam, 
+						Expression.Constant(Name.FromQualifiedIdentifier(v.Name))
+					)
 				)
 			);
 		}
 
-		private void CompileModule(ScriptPlan plan, List<Expression> block, Parse.ModuleDeclaration module)
+		private void CompileModule(Frame frame, List<Expression> block, Parse.ModuleDeclaration module)
 		{
 			// Create the class for the module
-			var moduleType = CompileModuleDeclaration(plan, module);
+			var moduleType = TypeFromModule(frame, module);
 
 			// Build the code to declare the module
 			block.Add
@@ -179,15 +213,15 @@ namespace Ancestry.QueryProcessor.Compile
 					Expression.Constant(Name.FromQualifiedIdentifier(module.Name)),
 					Expression.Constant(module.Version),
 					Expression.Constant(moduleType),
-					_factory
+					_factoryParam
 				)
 			);
 		}
 
-		private void CompileUsing(ScriptPlan plan, Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
+		private void CompileUsing(Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
 		{
 			// Determine the class of the module
-			var moduleType = FindReference<Runtime.ModuleTuple>(plan, use.Target).Class;
+			var moduleType = FindReference<Runtime.ModuleTuple>(use.Target).Class;
 
 			// Create a variable to hold the module instance
 			var moduleVar = Expression.Parameter(moduleType, (use.Alias ?? use.Target).ToString());
@@ -209,7 +243,7 @@ namespace Ancestry.QueryProcessor.Compile
 						field,
 						Expression.Call
 						(
-							_factory,
+							_factoryParam,
 							typeof(Storage.IRepositoryFactory).GetMethod("GetRepository").MakeGenericMethod(field.FieldType.GenericTypeArguments),
 							Expression.Constant(moduleType),
 							Expression.Constant(Name.FromNative(field.Name))
@@ -223,10 +257,10 @@ namespace Ancestry.QueryProcessor.Compile
 			var moduleName = Name.FromQualifiedIdentifier(use.Target);
 		}
 
-		private static T FindReference<T>(ScriptPlan plan, Parse.QualifiedIdentifier id)
+		private T FindReference<T>(Parse.QualifiedIdentifier id)
 		{
 			object module;
-			if (!plan.References.TryGetValue(id, out module))
+			if (!_references.TryGetValue(id, out module))
 				throw new CompilerException(CompilerException.Codes.IdentifierNotFound, id.ToString());
 			if (!(module is T))
 				throw new CompilerException(CompilerException.Codes.IncorrectType, module.GetType(), typeof(T));
@@ -245,15 +279,18 @@ namespace Ancestry.QueryProcessor.Compile
 			);
 		}
 
-		private Expression CompileClausedExpression(ScriptPlan plan, Parse.ClausedExpression clausedExpression)
+		private Expression CompileClausedExpression(Frame frame, Parse.ClausedExpression expression, System.Type typeHint = null)
 		{
+			var local = new Frame(frame);
+			_frames.Add(expression, local);
 			var vars = new List<ParameterExpression>();
 
-			if (clausedExpression.ForClauses.Count > 0)
+			if (expression.ForClauses.Count > 0)
 			//// TODO: foreach (var forClause in clausedExpression.ForClauses)
 			{
-				var forClause = clausedExpression.ForClauses[0];
-				var forExpression = CompileExpression(plan, forClause.Expression);
+				var forClause = expression.ForClauses[0];
+				var forExpression = CompileExpression(local, forClause.Expression);
+				local.Add(forClause.Name, forClause);
 				var elementType = 
 					forExpression.Type.IsConstructedGenericType
 						? forExpression.Type.GetGenericArguments()[0]
@@ -266,8 +303,8 @@ namespace Ancestry.QueryProcessor.Compile
 				_paramsBySymbol.Add(forClause, forVariable);
 				vars.Add(forVariable);
 
-				var returnBlock = CompileClausedReturn(plan, clausedExpression, vars);
-				var resultIsSet = clausedExpression.OrderDimensions.Count == 0
+				var returnBlock = CompileClausedReturn(local, expression, vars);
+				var resultIsSet = expression.OrderDimensions.Count == 0
 					&& forExpression.Type.IsConstructedGenericType
 					&& (forExpression.Type.GetGenericTypeDefinition() == typeof(HashSet<>));
 				var resultType = resultIsSet 
@@ -282,7 +319,7 @@ namespace Ancestry.QueryProcessor.Compile
 				return Expression.Block
 				(
 					vars,
-					GetDebugInfo(clausedExpression),
+					GetDebugInfo(expression),
 					Expression.Assign(enumerator, Expression.Call(forExpression, enumerableType.GetMethod("GetEnumerator"))),
 					Expression.Assign(resultVariable, Expression.New(resultType)),
 					Expression.Loop
@@ -294,11 +331,11 @@ namespace Ancestry.QueryProcessor.Compile
 							(
 								Expression.Assign(forVariable, Expression.Property(enumerator, enumeratorType.GetProperty("Current"))),
 								
-								clausedExpression.WhereClause == null
+								expression.WhereClause == null
 									? (Expression)Expression.Call(resultVariable, resultAddMethod, returnBlock)
 									: Expression.IfThen
 									(
-										CompileExpression(plan, clausedExpression.WhereClause, typeof(bool)), 
+										CompileExpression(local, expression.WhereClause, typeof(bool)), 
 										Expression.Call(resultVariable, resultAddMethod, returnBlock)
 									)
 							),
@@ -310,48 +347,153 @@ namespace Ancestry.QueryProcessor.Compile
 				);
 			}
 
-			return Expression.Block(vars, CompileClausedReturn(plan, clausedExpression, vars));
+			return Expression.Block(vars, CompileClausedReturn(local, expression, vars, typeHint));
 		}
 
-		private Expression CompileClausedReturn(ScriptPlan plan, Parse.ClausedExpression clausedExpression, List<ParameterExpression> vars)
+		private Expression CompileClausedReturn(Frame frame, Parse.ClausedExpression clausedExpression, List<ParameterExpression> vars, System.Type typeHint = null)
 		{
 			var blocks = new List<Expression> { GetDebugInfo(clausedExpression) };
 
 			// Create a variable for each let and initialize
 			foreach (var let in clausedExpression.LetClauses)
 			{
-				var compiledExpression = CompileExpression(plan, let.Expression);
+				var compiledExpression = CompileExpression(frame, let.Expression);
 				var variable = Expression.Variable(compiledExpression.Type, let.Name.ToString());
 				blocks.Add(Expression.Assign(variable, compiledExpression));
 				_paramsBySymbol.Add(let, variable);
 				vars.Add(variable);
+				frame.Add(let.Name, let);
 			}
 
 			// Add the expression to the body
-			blocks.Add(CompileExpression(plan, clausedExpression.Expression));
+			blocks.Add(CompileExpression(frame, clausedExpression.Expression, typeHint));
 
 			return Expression.Block(blocks);
 		}
 
-		private Expression CompileExpression(ScriptPlan plan, Parse.Expression expression, System.Type typeHint = null)
+		private Expression CompileExpression(Frame frame, Parse.Expression expression, System.Type typeHint = null)
 		{
 			switch (expression.GetType().Name)
 			{
-				case "LiteralExpression": return CompileLiteral(plan, (Parse.LiteralExpression)expression);
-				case "BinaryExpression": return CompileBinaryExpression(plan, (Parse.BinaryExpression)expression);
-				case "ClausedExpression": return CompileClausedExpression(plan, (Parse.ClausedExpression)expression);
-				case "IdentifierExpression": return CompileIdentifierExpression(plan, (Parse.IdentifierExpression)expression);
-				case "TupleSelector": return CompileTupleSelector(plan, (Parse.TupleSelector)expression);
-				case "ListSelector": return CompileListSelector(plan, (Parse.ListSelector)expression);
-				case "SetSelector": return CompileSetSelector(plan, (Parse.SetSelector)expression);
-				case "CallExpression": return CompileCallExpression(plan, (Parse.CallExpression)expression);
+				case "LiteralExpression": return CompileLiteral(frame, (Parse.LiteralExpression)expression, typeHint);
+				case "BinaryExpression": return CompileBinaryExpression(frame, (Parse.BinaryExpression)expression, typeHint);
+				case "ClausedExpression": return CompileClausedExpression(frame, (Parse.ClausedExpression)expression, typeHint);
+				case "IdentifierExpression": return CompileIdentifierExpression(frame, (Parse.IdentifierExpression)expression, typeHint);
+				case "TupleSelector": return CompileTupleSelector(frame, (Parse.TupleSelector)expression, typeHint);
+				case "ListSelector": return CompileListSelector(frame, (Parse.ListSelector)expression, typeHint);
+				case "SetSelector": return CompileSetSelector(frame, (Parse.SetSelector)expression, typeHint);
+				case "FunctionSelector": return CompileFunctionSelector(frame, (Parse.FunctionSelector)expression, typeHint);
+				case "CallExpression": return CompileCallExpression(frame, (Parse.CallExpression)expression, typeHint);
+				case "RestrictExpression": return CompileRestrictExpression(frame, (Parse.RestrictExpression)expression, typeHint);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
 		}
 
-		private System.Type CompileModuleDeclaration(ScriptPlan plan, Parse.ModuleDeclaration moduleDeclaration)
+		private Expression CompileRestrictExpression(Frame frame, Parse.RestrictExpression restrictExpression, System.Type typeHint)
 		{
-			var type = _module.DefineType(moduleDeclaration.Name.ToString(), TypeAttributes.Class | TypeAttributes.Public);
+			var local = new Frame(frame);
+			var expression = CompileExpression(frame, restrictExpression.Expression, typeHint);
+			if (typeof(IEnumerable).IsAssignableFrom(expression.Type) && expression.Type.IsGenericType)
+			{
+				var memberType = expression.Type.GenericTypeArguments[0];
+				var parameters = new List<ParameterExpression>();
+
+				// Add value param
+				var valueParam = Expression.Parameter(memberType, Parse.ReservedWords.Value);
+				parameters.Add(valueParam);
+				local.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
+				_paramsBySymbol.Add(expression, valueParam);
+
+				// Add index param
+				var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
+				parameters.Add(indexParam);
+				var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
+				local.Add(Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+				_paramsBySymbol.Add(indexSymbol, indexParam);
+
+				// TODO: detect tuple members and push attributes into frame
+
+				// Compile condition
+				var condition = 
+					Expression.Lambda
+					(
+						CompileExpression(local, restrictExpression.Condition, typeof(bool)), 
+						parameters
+					);
+
+				var where = typeof(System.Linq.Enumerable).GetMethodExt("Where", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, bool>) });
+				where = where.MakeGenericMethod(memberType);
+				return Expression.Call(where, expression, condition);
+			}
+			else
+			{
+				var alreadyOptional = IsOptional(expression.Type);
+				var valueParam = Expression.Parameter(expression.Type, Parse.ReservedWords.Value);
+				var parameters = new List<ParameterExpression>();
+				parameters.Add(valueParam);
+				_paramsBySymbol.Add(expression, valueParam);
+				local.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
+
+				var condition = CompileExpression(local, restrictExpression.Condition, typeof(bool));
+				return 
+					Expression.IfThenElse
+					(
+						Expression.Block(parameters, condition), 
+							alreadyOptional ? (Expression)expression : MakeOptional(expression),
+							alreadyOptional ? MakeNullOptional(expression.Type.GenericTypeArguments[0]) : MakeNullOptional(expression.Type)
+					);
+			} 
+		}
+
+		private static Expression MakeOptional(Expression expression)
+		{
+			return Expression.New(typeof(Runtime.Optional<>).MakeGenericType(expression.Type).GetConstructor(new System.Type[] { expression.Type }), expression);
+		}
+
+		private static Expression MakeNullOptional(System.Type type)
+		{
+			return Expression.New(typeof(Runtime.Optional<>).MakeGenericType(type).GetConstructor(new System.Type[] { typeof(bool) }), Expression.Constant(false));
+		}
+
+		private bool IsOptional(System.Type type)
+		{
+			return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Runtime.Optional<>);
+		}
+
+		private Expression CompileFunctionSelector(Frame frame, Parse.FunctionSelector functionSelector, System.Type typeHint)
+		{
+			var local = new Frame(frame);
+			_frames.Add(functionSelector, local);
+
+			var parameters = new ParameterExpression[functionSelector.Parameters.Count];
+			var i = 0;
+			foreach (var p in functionSelector.Parameters)
+			{
+				local.Add(p.Name, p);
+				parameters[i++] = Expression.Parameter(CompileTypeDeclaration(frame, p.Type), p.Name.ToString());
+			}
+
+			var expression = CompileExpression(local, functionSelector.Expression, typeHint);
+			return Expression.Lambda(expression, parameters);
+		}
+
+		private System.Type TypeFromModule(Frame frame, Parse.ModuleDeclaration moduleDeclaration)
+		{
+			var local = new Frame(frame);
+			_frames.Add(moduleDeclaration, local);
+
+			// Gather the module's symbols
+			foreach (var member in moduleDeclaration.Members)
+			{
+				local.Add(member.Name, member);
+
+				// Populate qualified enumeration members
+				if (member is Parse.EnumMember)
+					foreach (var e in ((Parse.EnumMember)member).Values)
+						local.Add(new Name() { Components = member.Name.Components.Union(e.Components).ToArray() }, member);
+			}
+
+			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
 			
 			foreach (var member in moduleDeclaration.Members)
 			{
@@ -359,51 +501,50 @@ namespace Ancestry.QueryProcessor.Compile
 				{
 					case "VarMember": 
 						var varMember = (Parse.VarMember)member;
-						type.DefineField(member.Name.ToString(), typeof(Storage.IRepository<>).MakeGenericType(CompileTypeDeclaration(plan, varMember.Type)), FieldAttributes.Public);
+						_emitter.DeclareVariable(module, member.Name.ToString(), CompileTypeDeclaration(local, varMember.Type));
 						break;
 
 					case "TypeMember":
 						var typeMember = (Parse.TypeMember)member;
-						type.DefineField(member.Name.ToString(), CompileTypeDeclaration(plan, typeMember.Type), FieldAttributes.Public | FieldAttributes.Static);
+						_emitter.DeclareTypeDef(module, member.Name.ToString(), CompileTypeDeclaration(local, typeMember.Type));
 						break;
 
 					case "EnumMember":
 						var enumMember = (Parse.EnumMember)member;
-						var enumType = type.DefineNestedType(enumMember.Name.ToString(), TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
-						enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
-						var i = 0;
-						foreach (var value in enumMember.Values)
-						{
-							FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
-							field.SetConstant(i++);
-						}
+						_emitter.DeclareEnum(module, member.Name.ToString(), from v in enumMember.Values select v.ToString());
+
 						break;
 
 					case "ConstMember":
-						//var constMember = (Parse.ConstMember)member;
-						//var expression = CompileExpression(plan, constMember.Expression);
-						//var constField = type.DefineField(member.Name.ToString(), expression.Type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
-						// TODO: evaluate expression and store as constant (limit to no references to variables)
-						// expression.Lambda...
-						// expression.Compile
-						// constField.SetConstant(
+						var constMember = (Parse.ConstMember)member;
+						var expression = CompileExpression(local, constMember.Expression);
+						var result = CompileTimeEvaluate(expression);
+						_emitter.DeclareConst(module, member.Name.ToString(), result, expression.Type);
 						break;
 						
 					default: throw new Exception("Unknown member type " + member.GetType().Name);
 				}
 			}
 
-			return type.CreateType();
+			return module.CreateType();
 		}
 
-		private Expression CompileCallExpression(ScriptPlan plan, Parse.CallExpression callExpression)
+		private static object CompileTimeEvaluate(Expression expression)
+		{
+			var lambda = Expression.Lambda(expression);
+			var compiled = lambda.Compile();
+			var result = compiled.DynamicInvoke();
+			return result;
+		}
+
+		private Expression CompileCallExpression(Frame frame, Parse.CallExpression callExpression, System.Type typeHint)
 		{
 			// Compile arguments
 			var args = new Expression[callExpression.Arguments.Count];
 			for (var i = 0; i < callExpression.Arguments.Count; i++)
-				args[i] = CompileExpression(plan, callExpression.Arguments[i]);
+				args[i] = CompileExpression(frame, callExpression.Arguments[i]);
 
-			var expression = CompileExpression(plan, callExpression.Expression);
+			var expression = CompileExpression(frame, callExpression.Expression);
 			if (typeof(MethodInfo).IsAssignableFrom(expression.Type) && expression is ConstantExpression)
 			{
 				var method = (MethodInfo)((ConstantExpression)expression).Value;
@@ -414,13 +555,13 @@ namespace Ancestry.QueryProcessor.Compile
 					if (callExpression.TypeArguments.Count > 0)
 					{
 						for (var i = 0; i < resolved.Length; i++)
-							resolved[i] = CompileTypeDeclaration(plan, callExpression.TypeArguments[i]);
+							resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]);
 					}
 					else
 					{
 						var parameters = method.GetParameters();
 						for (var i = 0; i < parameters.Length; i++)
-							ResolveTypeParameters(resolved, parameters[i].ParameterType, args[i].Type);
+							DetermineTypeParameters(resolved, parameters[i].ParameterType, args[i].Type);
 						// TODO: Assert that all type parameters are resolved
 					}
 					method = method.MakeGenericMethod(resolved);
@@ -434,30 +575,90 @@ namespace Ancestry.QueryProcessor.Compile
 				throw new CompilerException(CompilerException.Codes.IncorrectType, expression.Type, "function");
 		}
 
-		private System.Type CompileTypeDeclaration(ScriptPlan plan, Parse.TypeDeclaration typeDeclaration)
+		private System.Type CompileTypeDeclaration(Frame frame, Parse.TypeDeclaration typeDeclaration)
 		{
 			switch (typeDeclaration.GetType().Name)
 			{
-				case "OptionalType": return typeof(Nullable<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.OptionalType)typeDeclaration).Type));
-				case "ListType": return typeof(IList<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.ListType)typeDeclaration).Type));
-				case "SetType": return typeof(ISet<>).MakeGenericType(CompileTypeDeclaration(plan, ((Parse.SetType)typeDeclaration).Type)); 
-				case "TupleType": return FindOrCreateNativeFromTupleType(TupleTypeFromDomTupleType(plan, (Parse.TupleType)typeDeclaration));
-				case "FunctionType": return CompileFunctionType(plan, (Parse.FunctionType)typeDeclaration);
+				case "OptionalType": return typeof(Nullable<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.OptionalType)typeDeclaration).Type));
+				case "ListType": return typeof(IList<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.ListType)typeDeclaration).Type));
+				case "SetType": return typeof(ISet<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.SetType)typeDeclaration).Type));
+				case "TupleType": return CompileTupleType(frame, (Parse.TupleType)typeDeclaration);
+				case "FunctionType": return CompileFunctionType(frame, (Parse.FunctionType)typeDeclaration);
+				case "NamedType": return CompileNamedType(frame, (Parse.NamedType)typeDeclaration);
 				default: throw new Exception("Unknown type declaration " + typeDeclaration.GetType().Name); 
 			}
 		}
 
-		private System.Type CompileFunctionType(ScriptPlan plan, Parse.FunctionType functionType)
+		private System.Type CompileNamedType(Frame frame, Parse.NamedType namedType)
+		{
+			var target = frame.Resolve<object>(namedType.Target);
+			_references.Add(namedType.Target, target);
+			if (target is System.Type)
+				return (System.Type)target;
+			else if (target is FieldInfo)
+				return ((FieldInfo)target).FieldType;
+			else if (target is Parse.Statement)
+			{
+				if (!_recursions.Add(namedType))
+					throw new CompilerException(CompilerException.Codes.RecursiveDeclaration);
+				try
+				{
+					return CompileTypeDeclaration(frame, (Parse.TypeDeclaration)target);	
+				}
+				finally
+				{
+					_recursions.Remove(namedType);
+				}
+			}
+			else
+				throw new Exception("Internal Error: Named type is not the correct type");
+				
+		}
+
+		private void ResolveTupleType(Frame frame, Parse.TupleType tupleType)
+		{
+			var local = new Frame(null);
+			_frames.Add(tupleType, local);
+
+			// Resolve all attributes as symbols
+			foreach (var a in tupleType.Attributes)
+			{
+				local.Add(a.Name, a);
+			}
+
+			// Resolve source reference columns
+			foreach (var k in tupleType.Keys)
+			{
+				AddAllReferences(local, k.AttributeNames);
+			}
+
+			// Resolve key reference columns
+			foreach (var r in tupleType.References)
+			{
+				AddAllReferences(local, r.SourceAttributeNames);
+				var target = _scriptFrame.Resolve<Parse.Statement>(r.Target);
+				_references.Add(r.Target, target);
+				AddAllReferences(_frames[target], r.TargetAttributeNames);
+			}
+		}
+
+		private System.Type CompileTupleType(Frame frame, Parse.TupleType tupleType)
+		{
+			ResolveTupleType(frame, tupleType);
+			return _emitter.FindOrCreateNativeFromTupleType(TupleTypeFromDomTupleType(frame, tupleType));
+		}
+
+		private System.Type CompileFunctionType(Frame frame, Parse.FunctionType functionType)
 		{
 			throw new NotImplementedException();
 		}
 
-		private Type.TupleType TupleTypeFromDomTupleType(ScriptPlan plan, Parse.TupleType tupleType)
+		private Type.TupleType TupleTypeFromDomTupleType(Frame frame, Parse.TupleType tupleType)
 		{
 			var result = new Type.TupleType();
 
 			foreach (var a in tupleType.Attributes)
-				result.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(plan, a.Type));
+				result.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(frame, a.Type));
 
 			foreach (var r in tupleType.References)
 				result.References.Add
@@ -482,7 +683,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return (from n in ids select Name.FromQualifiedIdentifier(n)).ToArray();
 		}
 
-		private void ResolveTypeParameters(System.Type[] resolved, System.Type parameterType, System.Type argumentType)
+		private void DetermineTypeParameters(System.Type[] resolved, System.Type parameterType, System.Type argumentType)
 		{
 			// If the given parameter contains an unresolved generic type parameter, attempt to resolve using actual arguments
 			if (parameterType.ContainsGenericParameters)
@@ -495,11 +696,11 @@ namespace Ancestry.QueryProcessor.Compile
 					if (paramArgs[i].IsGenericParameter && resolved[paramArgs[i].GenericParameterPosition] == null)
 						resolved[paramArgs[i].GenericParameterPosition] = argArgs[i];
 					else 
-						ResolveTypeParameters(resolved, paramArgs[i], argArgs[i]);
+						DetermineTypeParameters(resolved, paramArgs[i], argArgs[i]);
 			}
 		}
 
-		private Expression CompileSetSelector(ScriptPlan plan, Parse.SetSelector setSelector)
+		private Expression CompileSetSelector(Frame frame, Parse.SetSelector setSelector, System.Type typeHint)
 		{
 			// Compile each item's expression
 			var initializers = new ElementInit[setSelector.Items.Count];
@@ -508,7 +709,7 @@ namespace Ancestry.QueryProcessor.Compile
 			MethodInfo addMethod = null;
 			for (var i = 0; i < setSelector.Items.Count; i++)
 			{
-				var expression = CompileExpression(plan, setSelector.Items[i], type);
+				var expression = CompileExpression(frame, setSelector.Items[i], type);
 				if (type == null)
 				{
 					type = expression.Type;
@@ -533,14 +734,14 @@ namespace Ancestry.QueryProcessor.Compile
 			addMethod = setType.GetMethod("Add");
 		}
 
-		private Expression CompileListSelector(ScriptPlan plan, Parse.ListSelector listSelector)
+		private Expression CompileListSelector(Frame frame, Parse.ListSelector listSelector, System.Type typeHint)
 		{
 			// Compile each item's expression
 			var initializers = new Expression[listSelector.Items.Count];
 			System.Type type = null;
 			for (var i = 0; i < listSelector.Items.Count; i++)
 			{
-				var expression = CompileExpression(plan, listSelector.Items[i], type);
+				var expression = CompileExpression(frame, listSelector.Items[i], type);
 				if (type == null)
 					type = expression.Type;
 				else if (type != expression.Type)
@@ -558,17 +759,47 @@ namespace Ancestry.QueryProcessor.Compile
 			throw new NotImplementedException();
 		}
 
-		private Expression CompileTupleSelector(ScriptPlan plan, Parse.TupleSelector tupleSelector)
+		private void ResolveTupleSelector(Frame frame, Parse.TupleSelector tupleSelector)
 		{
+			var local = new Frame(null);
+			_frames.Add(tupleSelector, local);
+
+			// Resolve all attributes as symbols
+			foreach (var a in tupleSelector.Attributes)
+			{
+				local.Add(a.Name, a);
+			}
+
+			// Resolve source reference columns
+			foreach (var k in tupleSelector.Keys)
+			{
+				AddAllReferences(local, k.AttributeNames);
+			}
+
+			// Resolve key reference columns
+			foreach (var r in tupleSelector.References)
+			{
+				AddAllReferences(local, r.SourceAttributeNames);
+				var target = _scriptFrame.Resolve<Parse.Statement>(r.Target);
+				_references.Add(r.Target, target);
+				AddAllReferences(_frames[target], r.TargetAttributeNames);
+			}
+		}
+		private Expression CompileTupleSelector(Frame frame, Parse.TupleSelector tupleSelector, System.Type typeHint)
+		{
+			// Resolve internal references for checking purposes
+			ResolveTupleSelector(frame, tupleSelector);
+
 			var bindings = new List<MemberBinding>();
 			var expressions = new Dictionary<Parse.AttributeSelector, Expression>();
 			
 			// Compile attributes
 			foreach (var attribute in tupleSelector.Attributes)
-				expressions.Add(attribute, CompileExpression(plan, attribute.Value));
+				expressions.Add(attribute, CompileExpression(frame, attribute.Value));
 
 			var tupleType = TupeTypeFromTupleSelector(tupleSelector, expressions);
-			var type = FindOrCreateNativeFromTupleType(tupleType);
+
+			var type = _emitter.FindOrCreateNativeFromTupleType(tupleType);
 			
 			// Create initialization bindings for each field
 			foreach (var attr in tupleSelector.Attributes)
@@ -578,17 +809,6 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 
 			return Expression.MemberInit(Expression.New(type), bindings);
-		}
-
-		private System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
-		{
-			System.Type nativeType;
-			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
-			{
-				nativeType = TupleMaker.TypeTypeToNative(_module, tupleType);
-				_tupleToNative.Add(tupleType, nativeType);
-			}
-			return nativeType;
 		}
 
 		private static Type.TupleType TupeTypeFromTupleSelector(Parse.TupleSelector tupleSelector, Dictionary<Parse.AttributeSelector, Expression> expressions)
@@ -609,9 +829,10 @@ namespace Ancestry.QueryProcessor.Compile
 			return String.Join("_", qualifiedIdentifier.Components);
 		}
 
-		private Expression CompileIdentifierExpression(ScriptPlan plan, Parse.IdentifierExpression identifierExpression)
+		private Expression CompileIdentifierExpression(Frame frame, Parse.IdentifierExpression identifierExpression, System.Type typeHint)
 		{
-			var symbol = FindReference<object>(plan, identifierExpression.Target);
+			var symbol = frame.Resolve<object>(identifierExpression.Target);
+			_references.Add(identifierExpression.Target, symbol); 
 			Expression param;
 			if (_paramsBySymbol.TryGetValue(symbol, out param))
 				return param;
@@ -646,37 +867,39 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
-		private Expression CompileBinaryExpression(ScriptPlan plan, Parse.BinaryExpression expression)
+		private Expression CompileBinaryExpression(Frame frame, Parse.BinaryExpression expression, System.Type typeHint)
 		{
 			// TODO: if intrinsic type...
-			var result = CompileExpression(plan, expression.Left);
+			var result = CompileExpression(frame, expression.Left);
 			switch (expression.Operator)
 			{
-				case Parse.Operator.Addition : return Expression.Add(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Subtract : return Expression.Subtract(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Multiply : return Expression.Multiply(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Modulo: return Expression.Modulo(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Divide: return Expression.Divide(result, CompileExpression(plan, expression.Right));
+				case Parse.Operator.Addition: return Expression.Add(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.Subtract: return Expression.Subtract(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.Multiply: return Expression.Multiply(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.Modulo: return Expression.Modulo(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.Divide: return Expression.Divide(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.Power: return Expression.Power(result, CompileExpression(frame, expression.Right, typeHint));
+
 				case Parse.Operator.BitwiseAnd:
-				case Parse.Operator.And : return Expression.And(result, CompileExpression(plan, expression.Right));
+				case Parse.Operator.And: return Expression.And(result, CompileExpression(frame, expression.Right, typeHint));
 				case Parse.Operator.BitwiseOr:
-				case Parse.Operator.Or: return Expression.Or(result, CompileExpression(plan, expression.Right));
+				case Parse.Operator.Or: return Expression.Or(result, CompileExpression(frame, expression.Right, typeHint));
 				case Parse.Operator.BitwiseXor:
-				case Parse.Operator.Xor: return Expression.ExclusiveOr(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Equal: return Expression.Equal(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.NotEqual : return Expression.NotEqual(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.ShiftLeft: return Expression.LeftShift(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.ShiftRight: return Expression.RightShift(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Power: return Expression.Power(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.InclusiveGreater: return Expression.GreaterThanOrEqual(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.InclusiveLess: return Expression.LessThanOrEqual(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(plan, expression.Right));
-				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(plan, expression.Right));
+				case Parse.Operator.Xor: return Expression.ExclusiveOr(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.ShiftLeft: return Expression.LeftShift(result, CompileExpression(frame, expression.Right, typeHint));
+				case Parse.Operator.ShiftRight: return Expression.RightShift(result, CompileExpression(frame, expression.Right, typeHint));
+
+				case Parse.Operator.Equal: return Expression.Equal(result, CompileExpression(frame, expression.Right));
+				case Parse.Operator.NotEqual: return Expression.NotEqual(result, CompileExpression(frame, expression.Right));
+				case Parse.Operator.InclusiveGreater: return Expression.GreaterThanOrEqual(result, CompileExpression(frame, expression.Right));
+				case Parse.Operator.InclusiveLess: return Expression.LessThanOrEqual(result, CompileExpression(frame, expression.Right));
+				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(frame, expression.Right));
+				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(frame, expression.Right));
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
 		}
 
-		private Expression CompileLiteral(ScriptPlan plan, Parse.LiteralExpression expression)
+		private Expression CompileLiteral(Frame frame, Parse.LiteralExpression expression, System.Type typeHint)
 		{
 			return Expression.Constant(expression.Value);
 		}

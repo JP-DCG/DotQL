@@ -703,6 +703,24 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
+	public class RestrictExpression : Expression
+	{
+		public Expression Expression { get; set; }
+
+		public Expression Condition { get; set; }
+
+		public override string ToString()
+		{
+			return Expression.ToString() + "?(" + Condition + ")";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			yield return Condition;
+		}
+	}
+
 	public class ListSelector : Expression
 	{
 		private List<Expression> _items = new List<Expression>();
@@ -710,7 +728,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "{ " + String.Join(" ", from i in Items select i.ToString()) + " }";
+			return "[" + String.Join(" ", from i in Items select i.ToString()) + "]";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -959,6 +977,11 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return (IsRooted ? "\\" : "") + String.Join("\\", Components);
+		}
+
+		public static QualifiedIdentifier FromComponents(params string[] components)
+		{
+			return new QualifiedIdentifier { Components = components };
 		}
 	}
 }

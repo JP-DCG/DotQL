@@ -126,4 +126,19 @@
   <data name="105102" xml:space="preserve">
     <value>The generic type ({0}) passed does not match the type of the target ({1}).</value>
   </data>
+  <data name="105103" xml:space="preserve">
+    <value>Recursive declaration.  A declaration must not reference itself directly or indirectly.</value>
+  </data>
+  <data name="105104" xml:space="preserve">
+    <value>Invalid rooted identifier.  Rooted identifiers are only allowed in references.</value>
+  </data>
+	<data name="105105" xml:space="preserve">
+    <value>Identifier conflict.  There is already an identifier by this name in scope.</value>
+  </data>
+	<data name="105106" xml:space="preserve">
+    <value>Unknown identifier ({0}).</value>
+  </data>
+	<data name="105107" xml:space="preserve">
+    <value>Expecting a reference of type '{0}'; actual: '{1}'.</value>
+  </data>
 </root>

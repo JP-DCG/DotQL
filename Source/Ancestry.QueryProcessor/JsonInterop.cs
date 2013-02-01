@@ -65,8 +65,17 @@ namespace Ancestry.QueryProcessor
 
 		public static Dictionary<string, object> JsonArgsToNative(JObject args)
 		{
-			return null;
-			// TODO: dynamically construct class
+			// TODO: allow complex object to be passed
+
+			if (args != null && args.Count > 0)
+			{
+				var result = new Dictionary<string, object>(args.Count);
+				foreach (var p in args.Properties())
+					result.Add(p.Name, ((JValue)p.Value).Value);
+				return result;
+			}
+			else
+				return null;
 		}
 
 		public static JToken NativeToJson(object result)

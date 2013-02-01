@@ -135,6 +135,9 @@ expression 11 =
 expression 12 =
 	DereferenceExpression : ( Left : expression Operator : ( "." | "@" | "," ) Right : expression )
 
+expression 13 =
+	RestrictExpression : ( Expression : expression "?" "(" Condition : expression ")" )
+
 expression =
 	"(" expression ")"
 		| ListSelector
