@@ -886,36 +886,36 @@ namespace Ancestry.QueryProcessor.Compile
 				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(frame, expression.Right));
 				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(frame, expression.Right));
 
-				case Parse.Operator.Dereference: return CompileDereference(frame, result, expression.Right, typeHint);
+				case Parse.Operator.Dereference: return CompileDereference(frame, result, expression, typeHint);
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
 		}
 
-		private Expression CompileDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		private Expression CompileDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
 		{
 			if (typeof(IEnumerable).IsAssignableFrom(left.Type) && left.Type.IsGenericType)
-				return CompileNaryDereference(frame, left, uncompiledRight, typeHint);
+				return CompileNaryDereference(frame, left, expression, typeHint);
 			else if (left.Type.GetCustomAttribute(typeof(Type.TupleAttribute)) != null)
-				return CompileTupleDereference(frame, left, uncompiledRight, typeHint);
+				return CompileTupleDereference(frame, left, expression, typeHint);
 			else
 				throw new CompilerException(CompilerException.Codes.CannotDereferenceOnType, left.Type);
 		}
 
-		private Expression CompileTupleDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		private Expression CompileTupleDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
 		{
-			var local = AddFrame(frame, uncompiledRight);
+			var local = AddFrame(frame, expression);
 			foreach (var field in left.Type.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
 				local.Add(Name.FromNative(field.Name), field);
 				var fieldExpression = Expression.Field(left, field);
 				_paramsBySymbol.Add(field, fieldExpression);
 			}
-			return CompileExpression(local, uncompiledRight, typeHint);
+			return CompileExpression(local, expression.Right, typeHint);
 		}
 
-		private Expression CompileNaryDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		private Expression CompileNaryDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
 		{
-			var local = AddFrame(frame, uncompiledRight);
+			var local = AddFrame(frame, expression);
 			var memberType = left.Type.GenericTypeArguments[0];
 			var parameters = new List<ParameterExpression>();
 
@@ -925,7 +925,7 @@ namespace Ancestry.QueryProcessor.Compile
 			var indexParam = CreateIndexParam(local);
 			parameters.Add(indexParam);
 
-			var selection = Expression.Lambda(CompileExpression(local, uncompiledRight, typeHint), parameters);
+			var selection = Expression.Lambda(CompileExpression(local, expression.Right, typeHint), parameters);
 			var select = typeof(Enumerable).GetMethodExt("Select", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) });
 			select = select.MakeGenericMethod(memberType, selection.ReturnType);
 			return Expression.Call(select, left, selection);

@@ -138,6 +138,17 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void RestrictOnIndex()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { 10 20 30 40 }?(index >= 2)");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(2, ((JArray)result).Count);
+			Assert.AreEqual("30", ((JArray)result)[0].ToString());
+			Assert.AreEqual("40", ((JArray)result)[1].ToString());
+		}
+
+		[TestMethod]
 		public void TupleDereference()
 		{
 			var processor = new Processor();
@@ -166,6 +177,30 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(3, ((JArray)result).Count);
 			Assert.AreEqual("10", ((JArray)result)[0].ToString());
 			Assert.AreEqual("20", ((JArray)result)[2].ToString());
+		}
+
+		[TestMethod]
+		public void DereferenceOnIndex()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { 10 20 30 40 }.(value + index)");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(4, ((JArray)result).Count);
+			Assert.AreEqual("10", ((JArray)result)[0].ToString());
+			Assert.AreEqual("43", ((JArray)result)[3].ToString());
+		}
+
+		[TestMethod]
+		public void DereferenceProducingTuple()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { 10 20 30 40 }.{ v:value i:index }");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(4, ((JArray)result).Count);
+			Assert.AreEqual("10", ((JObject)((JArray)result)[0])["v"].ToString());
+			Assert.AreEqual("0", ((JObject)((JArray)result)[0])["i"].ToString());
+			Assert.AreEqual("40", ((JObject)((JArray)result)[3])["v"].ToString());
+			Assert.AreEqual("3", ((JObject)((JArray)result)[3])["i"].ToString());
 		}
 	}
 }
