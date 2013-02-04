@@ -33,12 +33,23 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
-		public void LocalSymbolEvaluate()
+		public void TupleSelection()
 		{
 			var processor = new Processor();
-			
-			var result = processor.Evaluate("let x := 'Hello world.' return x");
-			Assert.AreEqual("Hello world.", result);
+			var result = processor.Evaluate("return { x:2 y:'hello' z:2.0 }");
+			Assert.IsTrue(result is JObject);
+			Assert.AreEqual("2", ((JObject)result)["x"].ToString());
+			Assert.AreEqual("hello", ((JObject)result)["y"].ToString());
+			Assert.AreEqual(2.0, ((JValue)((JObject)result)["z"]).Value);
+		}
+
+		[TestMethod]
+		public void TupleAutoNameSelection()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("let i := 5 return { :i }");
+			Assert.IsTrue(result is JObject);
+			Assert.AreEqual("5", ((JObject)result)["i"].ToString());
 		}
 
 		[TestMethod]
@@ -124,6 +135,37 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 			var result = processor.Evaluate("return 5?(value >= 4)");
 			Assert.IsTrue(result is JValue);
+		}
+
+		[TestMethod]
+		public void TupleDereference()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { x: 2 }.(x * 2)");
+			Assert.IsTrue(result is JValue);
+			Assert.AreEqual("4", ((JValue)result).ToString());
+		}
+
+		[TestMethod]
+		public void SetDereference()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { 2 3 4 }.(value * 5)");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(3, ((JArray)result).Count);
+			Assert.AreEqual("10", ((JArray)result)[0].ToString());
+			Assert.AreEqual("20", ((JArray)result)[2].ToString());
+		}
+
+		[TestMethod]
+		public void SetAndTupleDereference()
+		{
+			var processor = new Processor();
+			var result = processor.Evaluate("return { { x:2 y:'blah' } { x:3 y:'blah2' } { x:4 y:'blah3' } }.(value.x * 5)");
+			Assert.IsTrue(result is JArray);
+			Assert.AreEqual(3, ((JArray)result).Count);
+			Assert.AreEqual("10", ((JArray)result)[0].ToString());
+			Assert.AreEqual("20", ((JArray)result)[2].ToString());
 		}
 	}
 }

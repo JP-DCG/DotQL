@@ -85,8 +85,7 @@ namespace Ancestry.QueryProcessor.Compile
 		private Expression CompileScript(Parse.Script script)
 		{
 			_importFrame = new Frame();
-			_scriptFrame = new Frame(_importFrame);
-			_frames.Add(script, _scriptFrame);
+			_scriptFrame = AddFrame(_importFrame, script);
 
 			var vars = new List<ParameterExpression>();
 			var block = new List<Expression>();
@@ -281,8 +280,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileClausedExpression(Frame frame, Parse.ClausedExpression expression, System.Type typeHint = null)
 		{
-			var local = new Frame(frame);
-			_frames.Add(expression, local);
+			var local = AddFrame(frame, expression);
 			var vars = new List<ParameterExpression>();
 
 			if (expression.ForClauses.Count > 0)
@@ -391,7 +389,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileRestrictExpression(Frame frame, Parse.RestrictExpression restrictExpression, System.Type typeHint)
 		{
-			var local = new Frame(frame);
+			var local = AddFrame(frame, restrictExpression);
 			var expression = CompileExpression(frame, restrictExpression.Expression, typeHint);
 			if (typeof(IEnumerable).IsAssignableFrom(expression.Type) && expression.Type.IsGenericType)
 			{
@@ -399,17 +397,12 @@ namespace Ancestry.QueryProcessor.Compile
 				var parameters = new List<ParameterExpression>();
 
 				// Add value param
-				var valueParam = Expression.Parameter(memberType, Parse.ReservedWords.Value);
+				var valueParam = CreateValueParam(local, expression, memberType);
 				parameters.Add(valueParam);
-				local.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
-				_paramsBySymbol.Add(expression, valueParam);
 
 				// Add index param
-				var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
+				var indexParam = CreateIndexParam(local);
 				parameters.Add(indexParam);
-				var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
-				local.Add(Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
-				_paramsBySymbol.Add(indexSymbol, indexParam);
 
 				// TODO: detect tuple members and push attributes into frame
 
@@ -428,11 +421,11 @@ namespace Ancestry.QueryProcessor.Compile
 			else
 			{
 				var alreadyOptional = IsOptional(expression.Type);
-				var valueParam = Expression.Parameter(expression.Type, Parse.ReservedWords.Value);
 				var parameters = new List<ParameterExpression>();
+
+				// Add value param
+				var valueParam = CreateValueParam(local, expression, expression.Type);
 				parameters.Add(valueParam);
-				_paramsBySymbol.Add(expression, valueParam);
-				local.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
 
 				var condition = CompileExpression(local, restrictExpression.Condition, typeof(bool));
 				return 
@@ -443,6 +436,23 @@ namespace Ancestry.QueryProcessor.Compile
 							alreadyOptional ? MakeNullOptional(expression.Type.GenericTypeArguments[0]) : MakeNullOptional(expression.Type)
 					);
 			} 
+		}
+
+		private ParameterExpression CreateIndexParam(Frame local)
+		{
+			var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
+			var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
+			local.Add(Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+			_paramsBySymbol.Add(indexSymbol, indexParam);
+			return indexParam;
+		}
+
+		private ParameterExpression CreateValueParam(Frame frame, Expression expression, System.Type type)
+		{
+			var valueParam = Expression.Parameter(type, Parse.ReservedWords.Value);
+			_paramsBySymbol.Add(expression, valueParam);
+			frame.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
+			return valueParam;
 		}
 
 		private static Expression MakeOptional(Expression expression)
@@ -462,8 +472,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileFunctionSelector(Frame frame, Parse.FunctionSelector functionSelector, System.Type typeHint)
 		{
-			var local = new Frame(frame);
-			_frames.Add(functionSelector, local);
+			var local = AddFrame(frame, functionSelector);
 
 			var parameters = new ParameterExpression[functionSelector.Parameters.Count];
 			var i = 0;
@@ -479,8 +488,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private System.Type TypeFromModule(Frame frame, Parse.ModuleDeclaration moduleDeclaration)
 		{
-			var local = new Frame(frame);
-			_frames.Add(moduleDeclaration, local);
+			var local = AddFrame(frame, moduleDeclaration);
 
 			// Gather the module's symbols
 			foreach (var member in moduleDeclaration.Members)
@@ -615,21 +623,25 @@ namespace Ancestry.QueryProcessor.Compile
 				
 		}
 
-		private void ResolveTupleType(Frame frame, Parse.TupleType tupleType)
+		private System.Type CompileTupleType(Frame frame, Parse.TupleType tupleType)
 		{
-			var local = new Frame(null);
-			_frames.Add(tupleType, local);
+			var local = AddFrame(frame, tupleType);
+			var normalized = new Type.TupleType();
 
 			// Resolve all attributes as symbols
 			foreach (var a in tupleType.Attributes)
 			{
 				local.Add(a.Name, a);
+
+				normalized.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(frame, a.Type));		// uses frame, not local
 			}
 
 			// Resolve source reference columns
 			foreach (var k in tupleType.Keys)
 			{
 				AddAllReferences(local, k.AttributeNames);
+
+				normalized.Keys.Add(new Type.TupleKey { AttributeNames = IdentifiersToNames(k.AttributeNames) });
 			}
 
 			// Resolve key reference columns
@@ -639,43 +651,25 @@ namespace Ancestry.QueryProcessor.Compile
 				var target = _scriptFrame.Resolve<Parse.Statement>(r.Target);
 				_references.Add(r.Target, target);
 				AddAllReferences(_frames[target], r.TargetAttributeNames);
-			}
-		}
 
-		private System.Type CompileTupleType(Frame frame, Parse.TupleType tupleType)
-		{
-			ResolveTupleType(frame, tupleType);
-			return _emitter.FindOrCreateNativeFromTupleType(TupleTypeFromDomTupleType(frame, tupleType));
+				normalized.References.Add
+				(
+					Name.FromQualifiedIdentifier(r.Name),
+					new Type.TupleReference
+					{
+						SourceAttributeNames = IdentifiersToNames(r.SourceAttributeNames),
+						Target = Name.FromQualifiedIdentifier(r.Target),
+						TargetAttributeNames = IdentifiersToNames(r.TargetAttributeNames)
+					}
+				);
+			}
+
+			return _emitter.FindOrCreateNativeFromTupleType(normalized);
 		}
 
 		private System.Type CompileFunctionType(Frame frame, Parse.FunctionType functionType)
 		{
 			throw new NotImplementedException();
-		}
-
-		private Type.TupleType TupleTypeFromDomTupleType(Frame frame, Parse.TupleType tupleType)
-		{
-			var result = new Type.TupleType();
-
-			foreach (var a in tupleType.Attributes)
-				result.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(frame, a.Type));
-
-			foreach (var r in tupleType.References)
-				result.References.Add
-				(
-					Name.FromQualifiedIdentifier(r.Name), 
-					new Type.TupleReference 
-					{ 
-						SourceAttributeNames = IdentifiersToNames(r.SourceAttributeNames),  
-						Target = Name.FromQualifiedIdentifier(r.Target),
-						TargetAttributeNames = IdentifiersToNames(r.TargetAttributeNames)
-					}
-				);
-
-			foreach (var k in tupleType.Keys)
-				result.Keys.Add(new Type.TupleKey { AttributeNames = IdentifiersToNames(k.AttributeNames) });
-
-			return result;
 		}
 
 		private static Name[] IdentifiersToNames(IEnumerable<Parse.QualifiedIdentifier> ids)
@@ -759,21 +753,29 @@ namespace Ancestry.QueryProcessor.Compile
 			throw new NotImplementedException();
 		}
 
-		private void ResolveTupleSelector(Frame frame, Parse.TupleSelector tupleSelector)
+		private Expression CompileTupleSelector(Frame frame, Parse.TupleSelector tupleSelector, System.Type typeHint)
 		{
-			var local = new Frame(null);
-			_frames.Add(tupleSelector, local);
+			var local = AddFrame(frame, tupleSelector);
+			var tupleType = new Type.TupleType();
+			var bindings = new List<MemberBinding>();
+			var valueExpressions = new Dictionary<string, Expression>();
 
-			// Resolve all attributes as symbols
+			// Compile and resolve attributes
 			foreach (var a in tupleSelector.Attributes)
 			{
-				local.Add(a.Name, a);
+				var valueExpression = CompileExpression(frame, a.Value);		// uses frame not local (attributes shouldn't be visible to each other)
+				var attributeName = Name.FromQualifiedIdentifier(EnsureAttributeName(a.Name, a.Value));
+				valueExpressions.Add(attributeName.ToString(), valueExpression);
+				local.Add(attributeName, a);
+				tupleType.Attributes.Add(attributeName, valueExpression.Type);
 			}
 
 			// Resolve source reference columns
 			foreach (var k in tupleSelector.Keys)
 			{
 				AddAllReferences(local, k.AttributeNames);
+
+				tupleType.Keys.Add(Type.TupleKey.FromParseKey(k));
 			}
 
 			// Resolve key reference columns
@@ -783,45 +785,33 @@ namespace Ancestry.QueryProcessor.Compile
 				var target = _scriptFrame.Resolve<Parse.Statement>(r.Target);
 				_references.Add(r.Target, target);
 				AddAllReferences(_frames[target], r.TargetAttributeNames);
+
+				tupleType.References.Add(Name.FromQualifiedIdentifier(r.Name), Type.TupleReference.FromParseReference(r));
 			}
-		}
-		private Expression CompileTupleSelector(Frame frame, Parse.TupleSelector tupleSelector, System.Type typeHint)
-		{
-			// Resolve internal references for checking purposes
-			ResolveTupleSelector(frame, tupleSelector);
-
-			var bindings = new List<MemberBinding>();
-			var expressions = new Dictionary<Parse.AttributeSelector, Expression>();
-			
-			// Compile attributes
-			foreach (var attribute in tupleSelector.Attributes)
-				expressions.Add(attribute, CompileExpression(frame, attribute.Value));
-
-			var tupleType = TupeTypeFromTupleSelector(tupleSelector, expressions);
 
 			var type = _emitter.FindOrCreateNativeFromTupleType(tupleType);
-			
-			// Create initialization bindings for each field
-			foreach (var attr in tupleSelector.Attributes)
+
+			// Create init bindings for each field
+			foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
-				var binding = Expression.Bind(type.GetField(Name.FromQualifiedIdentifier(attr.Name).ToString()), expressions[attr]);
+				var binding = Expression.Bind(field, valueExpressions[field.Name]);
 				bindings.Add(binding);
 			}
 
 			return Expression.MemberInit(Expression.New(type), bindings);
 		}
 
-		private static Type.TupleType TupeTypeFromTupleSelector(Parse.TupleSelector tupleSelector, Dictionary<Parse.AttributeSelector, Expression> expressions)
+		private static Parse.QualifiedIdentifier EnsureAttributeName(Parse.QualifiedIdentifier name, Parse.Expression expression)
 		{
-			// Create a tuple type for the given selector
-			var tupleType = new Type.TupleType();
-			foreach (var attribute in tupleSelector.Attributes)
-				tupleType.Attributes.Add(Name.FromQualifiedIdentifier(attribute.Name), expressions[attribute].Type);
-			foreach (var reference in tupleSelector.References)
-				tupleType.References.Add(Name.FromQualifiedIdentifier(reference.Name), Type.TupleReference.FromParseReference(reference));
-			foreach (var key in tupleSelector.Keys)
-				tupleType.Keys.Add(Type.TupleKey.FromParseKey(key));
-			return tupleType;
+			return name == null ? NameFromExpression(expression) : name; 
+		}
+
+		private static Parse.QualifiedIdentifier NameFromExpression(Parse.Expression expression)
+		{
+			if (expression is Parse.IdentifierExpression)
+				return ((Parse.IdentifierExpression)expression).Target;
+			else
+				throw new CompilerException(CompilerException.Codes.CannotInferNameFromExpression);
 		}
 
 		private string QualifiedIdentifierToName(Parse.QualifiedIdentifier qualifiedIdentifier)
@@ -895,8 +885,57 @@ namespace Ancestry.QueryProcessor.Compile
 				case Parse.Operator.InclusiveLess: return Expression.LessThanOrEqual(result, CompileExpression(frame, expression.Right));
 				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(frame, expression.Right));
 				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(frame, expression.Right));
+
+				case Parse.Operator.Dereference: return CompileDereference(frame, result, expression.Right, typeHint);
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
+		}
+
+		private Expression CompileDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		{
+			if (typeof(IEnumerable).IsAssignableFrom(left.Type) && left.Type.IsGenericType)
+				return CompileNaryDereference(frame, left, uncompiledRight, typeHint);
+			else if (left.Type.GetCustomAttribute(typeof(Type.TupleAttribute)) != null)
+				return CompileTupleDereference(frame, left, uncompiledRight, typeHint);
+			else
+				throw new CompilerException(CompilerException.Codes.CannotDereferenceOnType, left.Type);
+		}
+
+		private Expression CompileTupleDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		{
+			var local = AddFrame(frame, uncompiledRight);
+			foreach (var field in left.Type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+			{
+				local.Add(Name.FromNative(field.Name), field);
+				var fieldExpression = Expression.Field(left, field);
+				_paramsBySymbol.Add(field, fieldExpression);
+			}
+			return CompileExpression(local, uncompiledRight, typeHint);
+		}
+
+		private Expression CompileNaryDereference(Frame frame, Expression left, Parse.Expression uncompiledRight, System.Type typeHint)
+		{
+			var local = AddFrame(frame, uncompiledRight);
+			var memberType = left.Type.GenericTypeArguments[0];
+			var parameters = new List<ParameterExpression>();
+
+			var valueParam = CreateValueParam(local, left, memberType);
+			parameters.Add(valueParam);
+
+			var indexParam = CreateIndexParam(local);
+			parameters.Add(indexParam);
+
+			var selection = Expression.Lambda(CompileExpression(local, uncompiledRight, typeHint), parameters);
+			var select = typeof(Enumerable).GetMethodExt("Select", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) });
+			select = select.MakeGenericMethod(memberType, selection.ReturnType);
+			return Expression.Call(select, left, selection);
+		}
+
+		private Frame AddFrame(Frame parent, Parse.Statement statement)
+		{
+			var newFrame = new Frame(parent);
+			_frames.Add(statement, newFrame);
+			return newFrame;
 		}
 
 		private Expression CompileLiteral(Frame frame, Parse.LiteralExpression expression, System.Type typeHint)

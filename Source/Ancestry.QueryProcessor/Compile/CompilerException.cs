@@ -31,6 +31,12 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105107: "Expecting a reference of type '{0}'; actual: '{1}'."</summary>
 			IncorrectTypeReferenced = 105107,
+
+			/// <summary>Error code 105108: "Dereferencing against type '{0}' is not supported."</summary>
+			CannotDereferenceOnType = 105108,
+
+			/// <summary>Error code 105109: "Cannot infer name from an expression of this type."</summary>
+			CannotInferNameFromExpression = 105109,
 		}
 
 		// Resource manager for this exception class

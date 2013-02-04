@@ -30,8 +30,9 @@ namespace Ancestry.QueryProcessor.Compile
 		{
 			if (name.IsRooted)
 				throw new CompilerException(CompilerException.Codes.InvalidRootedIdentifier);
-			var existing = this[name];
-			if (existing != null)
+			// TODO: attempt with dequalified
+			var existing = _items.ContainsKey(name);  // Look in this scope only
+			if (existing)
 				throw new CompilerException(CompilerException.Codes.IdentifierConflict, name);
 			_items.Add(name, symbol);
 		}

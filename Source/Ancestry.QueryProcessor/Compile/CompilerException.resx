@@ -132,13 +132,19 @@
   <data name="105104" xml:space="preserve">
     <value>Invalid rooted identifier.  Rooted identifiers are only allowed in references.</value>
   </data>
-	<data name="105105" xml:space="preserve">
+  <data name="105105" xml:space="preserve">
     <value>Identifier conflict.  There is already an identifier by this name in scope.</value>
   </data>
-	<data name="105106" xml:space="preserve">
+  <data name="105106" xml:space="preserve">
     <value>Unknown identifier ({0}).</value>
   </data>
-	<data name="105107" xml:space="preserve">
+  <data name="105107" xml:space="preserve">
     <value>Expecting a reference of type '{0}'; actual: '{1}'.</value>
+  </data>
+  <data name="105108" xml:space="preserve">
+    <value>Dereferencing against type '{0}' is not supported.</value>
+  </data>
+  <data name="105109" xml:space="preserve">
+    <value>Cannot infer name from an expression of this type.</value>
   </data>
 </root>
