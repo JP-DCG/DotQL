@@ -9,6 +9,20 @@ namespace Ancestry.QueryProcessor.Runtime
 	[Type.Module(new[] { "System" })]
 	public class SystemModule
 	{
+		public static readonly Boolean Boolean;
+		public static readonly Int32 Integer;
+		public static readonly Int64 Long;
+		public static readonly Char Char;
+		public static readonly String String;
+		// TODO: public static readonly Date Date;
+		// TODO: public static readonly Time Time;
+		public static readonly DateTime DateTime;
+		public static readonly Name Name;
+		public static readonly Double Double;
+		public static readonly Guid GUID;
+		public static readonly TimeSpan TimeSpan;
+		public static readonly Version Version;
+
 		public Storage.IRepository<ISet<ModuleTuple>> Modules;
 
 		public static IList<T> ToList<T>(ISet<T> setValue)

@@ -147,4 +147,7 @@
   <data name="105109" xml:space="preserve">
     <value>Cannot infer name from an expression of this type.</value>
   </data>
+  <data name="105110" xml:space="preserve">
+    <value>Ambiguous reference '{0}'.</value>
+  </data>
 </root>

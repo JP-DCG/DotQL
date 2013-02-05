@@ -9,13 +9,13 @@ namespace Ancestry.QueryProcessor.Parse
     {
         public const string Using = "using";
         public const string Module = "module";
-        public const string TypeDef = "typedef";
+		public const string Enum = "enum";
+		public const string Const = "const";
+		public const string Var = "var";
+		public const string TypeDef = "typedef";
 		public const string TypeOf = "typeof";
-        public const string Enum = "enum";
 		public const string Ref = "ref";
 		public const string Key = "key";
-		public const string Const = "const";
-        public const string Var = "var";
         public const string Set = "set";
 		public const string IntervalType = "interval";
 		public const string Try = "try";

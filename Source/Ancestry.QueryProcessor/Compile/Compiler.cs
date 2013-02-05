@@ -100,10 +100,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 			// Usings
 			foreach (var u in script.Usings.Union(_options.DefaultUsings).Distinct(new UsingComparer()))
-			{
-				ResolveUsing(_importFrame, u, modulesFrame);
-				CompileUsing(u, vars, block);
-			}
+				CompileUsing(_importFrame, modulesFrame, u, vars, block);
 
 			// Module declarations
 			foreach (var m in script.Modules)
@@ -129,29 +126,24 @@ namespace Ancestry.QueryProcessor.Compile
 			return Expression.Block(vars, block);
 		}
 
-		private void ResolveUsing(Frame frame, Parse.Using u, Frame modulesFrame)
-		{
-			var moduleName = Name.FromQualifiedIdentifier(u.Target);
-			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(moduleName);
-			_references.Add(u.Target, module);
-			frame.Add(moduleName, module);
-			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-				frame.Add(moduleName + Name.FromNative(method.Name), method);
-			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
-				frame.Add(moduleName + Name.FromNative(type.Name), type);
-			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
-				frame.Add(moduleName + Name.FromNative(field.Name), field);
-		}
-
 		private void AddAllReferences(Frame frame, IEnumerable<Parse.QualifiedIdentifier> list)
 		{
 			foreach (var item in list)
 				_references.Add(item, frame.Resolve<object>(item));
 		}
 
-		private void CompileAssignment(Frame frame, Parse.ClausedAssignment a, List<Expression> block)
+		private void CompileAssignment(Frame frame, Parse.ClausedAssignment assignment, List<Expression> block)
 		{
-			throw new NotImplementedException();
+			// TODO: handling of for, let, and where for assignment
+
+			var local = AddFrame(frame, assignment);
+			foreach (var set in assignment.Assignments)
+			{
+				var compiledTarget = CompileExpression(local, set.Target);
+				var compiledSource = CompileExpression(local, set.Source, compiledTarget.Type);
+				// TODO: handling of more find-grained references
+				block.Add(Expression.Assign(compiledTarget, compiledSource));
+			}
 		}
 
 		private void CompileResult(Frame frame, Parse.ClausedExpression expression, List<Expression> block)
@@ -171,7 +163,7 @@ namespace Ancestry.QueryProcessor.Compile
 			var type = v.Type != null ? CompileTypeDeclaration(frame, v.Type) : null;
 
 			// Compile the (optional) initializer
-			var initializer = v.Initializer != null ? CompileExpression(frame, v.Initializer, type) : null;
+			var initializer = v.Initializer != null ? CompileExpression(frame, v.Initializer, type) : Expression.Default(type);
 
 			// Default the type to the initializer's type
 			type = type ?? initializer.Type;
@@ -217,8 +209,19 @@ namespace Ancestry.QueryProcessor.Compile
 			);
 		}
 
-		private void CompileUsing(Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
+		private void CompileUsing(Frame frame, Frame modulesFrame, Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
 		{
+			var moduleName = Name.FromQualifiedIdentifier(use.Target);
+			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(moduleName);
+			_references.Add(use.Target, module);
+			frame.Add(moduleName, module);
+			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+				frame.Add(moduleName + Name.FromNative(method.Name), method);
+			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
+				frame.Add(moduleName + Name.FromNative(type.Name), type);
+			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+				frame.Add(moduleName + Name.FromNative(field.Name), field);
+
 			// Determine the class of the module
 			var moduleType = FindReference<Runtime.ModuleTuple>(use.Target).Class;
 
@@ -252,8 +255,6 @@ namespace Ancestry.QueryProcessor.Compile
 
 			// Build code to construct instance and assign to variable
 			block.Add(Expression.Assign(moduleVar, Expression.MemberInit(Expression.New(moduleType), moduleInitializers)));
-
-			var moduleName = Name.FromQualifiedIdentifier(use.Target);
 		}
 
 		private T FindReference<T>(Parse.QualifiedIdentifier id)
@@ -479,7 +480,9 @@ namespace Ancestry.QueryProcessor.Compile
 			foreach (var p in functionSelector.Parameters)
 			{
 				local.Add(p.Name, p);
-				parameters[i++] = Expression.Parameter(CompileTypeDeclaration(frame, p.Type), p.Name.ToString());
+				var parameter = Expression.Parameter(CompileTypeDeclaration(frame, p.Type), p.Name.ToString());
+				parameters[i++]	= parameter;
+				_paramsBySymbol.Add(p, parameter);
 			}
 
 			var expression = CompileExpression(local, functionSelector.Expression, typeHint);

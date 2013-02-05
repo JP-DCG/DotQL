@@ -16,7 +16,7 @@ UsingClause :=
 	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier
 
 ModuleDeclaration :=
-	"module" Name : QualifiedIdentifier "{" Members : [ moduleMember ]* "}"
+	"module" Name : QualifiedIdentifier Version : Version "{" Members : [ moduleMember ]* "}"
 
 moduleMember =
 	TypeMember | EnumMember	| ConstMember | VarMember
@@ -221,6 +221,9 @@ LetClause :=
 	
 OrderDimension :=
 	Expression : expression [ Direction : ( "asc" | "desc" ) ]
+
+Version :=
+	Major : digit* Minor : digit* Revision : digit* [ Release : digit* ]
 
 pascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''

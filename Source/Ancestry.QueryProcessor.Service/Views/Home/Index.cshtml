@@ -43,7 +43,7 @@
 			resultEditor.setReadOnly(true);
 
 			var editor = ace.edit("requestEditor");
-			editor.setTheme("ace/theme/textmate");
+			editor.setTheme("ace/theme/github");
 			editor.getSession().setMode("ace/mode/xquery");
 			editor.setShowPrintMargin(false);
 			editor.commands.addCommand({
@@ -55,10 +55,12 @@
 						accepts: 'application/json',
 						data: { e: query },
 						success: function (result, s, h) {
+							resultEditor.getSession().setMode("ace/mode/javascript");
 							resultEditor.setValue(h.responseText);
 						},
 						error: function (h, s, message) {
 							try	{
+								resultEditor.getSession().setMode("ace/mode/text");
 								resultEditor.setValue(JSON.parse(h.responseText).ExceptionMessage);
 							}
 							catch(e) {

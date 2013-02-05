@@ -98,6 +98,10 @@ namespace Ancestry.QueryProcessor.Parse
 
             moduleDeclaration.Name = QualifiedIdentifier(lexer, true);
 
+			lexer.NextToken().CheckType(TokenType.Version);
+
+			moduleDeclaration.Version = lexer[0].AsVersion;
+
             lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 
             while (!lexer[1].IsSymbol(Keywords.EndTupleSet))

@@ -37,6 +37,9 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105109: "Cannot infer name from an expression of this type."</summary>
 			CannotInferNameFromExpression = 105109,
+
+			/// <summary>Error code 105110: "Ambiguous reference '{0}'."</summary>
+			AmbiguousReference = 105110,
 		}
 
 		// Resource manager for this exception class

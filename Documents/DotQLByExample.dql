@@ -26,15 +26,15 @@ Enumeration:
 
 Void:
 
-	return void
+(no expression)
 
 Scalar - intrinsic types:
 
 	return 456										// Integer (32bit), Long (64bit)
 	return true										// Boolean
-	return "Hello\r\nWorld"							// C-style string (UTF16)
-	return 'Hello'#13#10'World'						// Pascal-style string ('' escapes, captures whitespace) (UTF16)
-	return 'H'c										// Character
+	return "Hello\r\nWorld"							// C-style string (UTF16) ("String")
+	return 'Hello'#13#10'World'						// Pascal-style string ('' escapes, captures whitespace) (UTF16) ("String")
+	return 'H'c										// Character ("Char")
 	return 'Ancestry\Person'n						// Name
 	return '2012-12-12'd							// Date
 	return '15:30.2't								// Time
@@ -56,8 +56,8 @@ Declaration
 	Customers: 
 	{
 		{ 
-			ID : Integer 
-			City : String 
+			ID:Integer 
+			City:String 
 			ref Orders(ID) Orders(CustomerID) 
 			key { ID } 
 		}
@@ -69,9 +69,9 @@ Tables really are just sets of tuples:
 
 	Order: typedef 
 	{ 
-		ID: Integer  
-		CustomerID: Integer  
-		On: DateTime  
+		ID:Integer  
+		CustomerID:Integer  
+		On:DateTime  
 		ref Customer(CustomerID) Customers(ID)  
 		ref Items(ID) OrderItems(OrderID) 
 		key { ID }
@@ -85,9 +85,9 @@ References are not bidirectional; they must be designated from each direction:
 	OrderItems: 
 	{ 
 		{ 
-			OrderID: Integer  
-			PartID: Integer  
-			Quantity: Integer
+			OrderID:Integer  
+			PartID:Integer  
+			Quantity:Integer
 			ref Order(OrderID) Orders(ID)  
 			ref Part(PartID) Parts(ID)
 			key { OrderID PartID }
@@ -101,9 +101,9 @@ The last of the structures to be used in examples:
 	Parts:
 	{
 		{
-			ID: Integer
-			Name: Quantity
-			IsDiscontinued: Boolean
+			ID:Integer
+			Name:Quantity
+			IsDiscontinued:Boolean
 			ref OrderItems(ID) OrderItems(PartID)
 			key { ID }
 		}
@@ -179,13 +179,13 @@ Base table access:
 
 	return Customers
 
-Result: entire person table. e.g. `{ { ID: 123  City: "Nephi" } { ID: 124 ...`
+Result: entire person table. e.g. `{ { ID:123 City:"Nephi" } { ID:124 ...`
 
 Restriction on a key attribute:
 
 	return Customers?(ID = 234)
 
-e.g. `{ { ID: 234  City: "Provo" } }`
+e.g. `{ { ID:234  City:"Provo" } }`
 
 Reads: Customers where ID is 234.  The parenthesis are not optional.
 
@@ -195,13 +195,13 @@ Restriction is arbitrary boolean expression:
 
 	return Parts?(not IsDiscontinued)
 
-e.g. `{ { ID: 456  IsDiscontinued: false } ... `
+e.g. `{ { ID:456 IsDiscontinued:false } ... `
 
 Dereference:
 
 	return Customers.Orders
 
-e.g. `{ { ID: 456  CustomerID: 123  On: '2/3/2003 5:30:00'dt } { ID: 457  CustomerID: 123  On: '2/7/2003 7:30:00'dt } ... `
+e.g. `{ { ID:456  CustomerID:123  On:'2/3/2003 5:30:00'dt } { ID:457 CustomerID:123  On:'2/7/2003 7:30:00'dt } ... `
 
 Orders is a reference on the Customer tuple; accessing it gives Orders for all matching Customers.
 
@@ -223,7 +223,7 @@ Dotting through an Extention (one to zero or one) relationship:
 
 	return Customers?(ID = 123).Orders.OrderItems.Part
 
-e.g. `{ { ID: 123  Name: "Frogalbadge" ... }` 
+e.g. `{ { ID:123  Name:"Frogalbadge" ... }` 
 
 Any query that "dots" through an n-cardinality table will produce an n-cardinality result unless restricted.
 
@@ -234,7 +234,7 @@ Embedded reference:
 
 	return Customers?(ID = 123),Orders
 
-e.g. result: `{ ID: 123 City: "Provo" Orders: { { ID: 234  CustomerID: 123  On: '1/23/2002 4:20:00'dt } ... }`
+e.g. result: `{ ID:123 City:"Provo" Orders:{ { ID:234 CustomerID:123 On:'1/23/2002 4:20:00'dt } ... }`
 
 A row from the Customer table already has an Orders member, but it is a reference, not an attribute;
  this operator acts to "materialize" the reference as an embedded table attribute
@@ -243,7 +243,7 @@ Dot paths following an embedded path:
 
 	return Customers?(ID = 123),Orders.OrderItems
 
-e.g. result: `{ ID: 123  City: "Provo"  Orders\OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } ... } }`
+e.g. result: `{ ID:123  City:"Provo"  Orders\OrderItems:{ { OrderID:456  PartID:222  Quantity:3 } ... } }`
 
 Remember... because Orders\OrderItems is a qualified name, it may be accessed as just OrderItems because in this case it is not ambiguous
 
@@ -251,23 +251,23 @@ Dot paths preceding an embedded path:
 
 	return Customers?(ID = 123).Orders,OrderItems
 
-e.g. result: `{ ID: 456  CustomerID: 123  On: '1/23/2002 4:20:00'dt  OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } }`
+e.g. result: `{ ID:456 CustomerID:123 On:'1/23/2002 4:20:00'dt OrderItems:{ { OrderID:456 PartID:222 Quantity:3 } }`
 
 Embedding multiple tables:
 
-	return OrderItems,{ Order: Order  Part: Part }
+	return OrderItems,{ Order:Order  Part:Part }
 
 ...or just:
 
-	return OrderItems,{ :Order  :Part }
+	return OrderItems,{ :Order :Part }
 
 e.g. result:
 
 	{ { 
-		OrderID: 234  
-		PartID: 112  
-		Order: { ID: 234  CustomerID: 123  On: '1/23/2002 4:20:00'dt } 
-		Part: { ID: 112  Name: 'Whatzit' } 
+		OrderID:234  
+		PartID:112  
+		Order:{ ID:234  CustomerID:123  On:'1/23/2002 4:20:00'dt } 
+		Part:{ ID:112  Name:'Whatzit' } 
 	} }
 
 If an attribute name is omitted, it will be inferred from the expression. e.g. `:Order`.
@@ -279,8 +279,8 @@ Dereferencing multiple tables:
 This causes the table names to be nested as attributes in a new tuple.  e.g.:
 
 	{ { 
-		Customer: { ID: 123  City: "Provo" } 
-		OrderItems: { { OrderID: 456  PartID: 222  Quantity: 3 } } 
+		Customer: { ID:123  City:"Provo" } 
+		OrderItems: { { OrderID:456 PartID:222 Quantity:3 } } 
 	} }
 
 Using paths within claused expressions:
@@ -288,7 +288,7 @@ Using paths within claused expressions:
 	for o in Customers?(ID = 123).Orders
 	return { ID: o.ID }
 
-e.g. `{ { ID: 456 } { ID: 457 } ... }`
+e.g. `{ { ID:456 } { ID:457 } ... }`
 
 Ordering produces lists rather than sets (in order to preserve sequence)
 
@@ -296,13 +296,13 @@ Ordering produces lists rather than sets (in order to preserve sequence)
 	order (o.ID)
 	return { ID: o.ID }
 
-e.g. `[{ ID: 456 } { ID: 457 } ...]`
+e.g. `[{ ID:456 } { ID:457 } ...]`
 
 Path restriction works on lists too:
 
-	return [{ ID: 123 } { ID: 124 }]?(ID > 123)
+	return [{ ID:123 } { ID:124 }]?(ID > 123)
 
-Result: `[{ ID: 124 }]`
+Result: `[{ ID:124 }]`
 
 Reuse within paths:
 
@@ -369,7 +369,7 @@ Types for nulls:
 
 Types for tuples:
 
-	return { ID: 135 } of { ID: Long }
+	return { ID:135 } of { ID:Long }
 
 Conditions and cases
 --------------------
@@ -436,14 +436,14 @@ The expression to the left of the `->` is passed as the first argument to the fu
 
 Alternate declaration of Sign function:
 
-	let Sign := (x : Integer) =>
+	let Sign := (x:Integer) =>
 		return (0 < x)->ToInteger() - (x < 0)->ToInteger()
 
 The ToInteger function is part of the standard library; in this case it converts from Boolean to Integers (0 or 1).
 
 Recursive function:
 
-	let SequentialSum := (x : Integer) =>
+	let SequentialSum := (x:Integer) =>
 		return if x = 0 then 0 else x + (x - 1)->SequentialSum()
 	return 5->SequentialSum()
 
@@ -451,19 +451,19 @@ Result: `15`
 
 Accessing arguments as a tuple:
 
-	let Point := (x: Integer y: Integer) => 
+	let Point := (x:Integer y:Integer) => 
 		return args
 	return 5->Point(7)
 
-Result: `{ x: 5 y: 7 }`
+Result: `{ x:5 y:7 }`
 
 `args` is a tuple representation of the function's arguments, available within any function
 
 Passing arguments as a tuple:
 
-	return { y: 5 x: 7 }=>Point
+	return { y:5 x:7 }=>Point
 
-Result: `{ x: 7 y: 5 }`  (attribute order never matters)
+Result: `{ x:7 y:5 }`  (attribute order never matters)
 
 Function type declaration:
 
@@ -473,14 +473,14 @@ A function selector may specify a function type name rather than repeat the sign
 
 	InventoryFunctions: const 
 	{ 
-		{ IDs: 1..100  DetermineInventory: (PartID : Long) => return 50  key { IDs } }
-		{ IDs: 101..99999  DetermineInventory: (PartID : Long) => return 30 }
+		{ IDs:1..100 DetermineInventory:(PartID:Long) => return 50 key { IDs } }
+		{ IDs:101..99999 DetermineInventory:(PartID:Long) => return 30 }
 	}
 
 Polymorphic invocation of functions:
 
 	for PartID in Parts.ID 
-		return { :PartID  Quantity: PartID->InventoryCities?(PartID in IDs)@@.DetermineInventory()
+		return { :PartID Quantity:PartID->InventoryCities?(PartID in IDs)@@.DetermineInventory()
 
 This uses functions provided in a table to invoke a different inventory function depending on the ID of the part.
 
@@ -525,15 +525,15 @@ Result: `null` (because the value doesn't pass the restriction)
 
 Tuple with optional attribute:
 
-	return { First: "Bob" } of { Prefix: String?  First: String }
+	return { First:"Bob" } of { Prefix:String? First:String }
 
-Result: `{ Prefix: null First: "Bob" }` 
+Result: `{ Prefix:null First:"Bob" }` 
 
 ... versus tuple with defaulted attribute:
 
-	return { First: "Bob" } of { Prefix: String  First: String }
+	return { First:"Bob" } of { Prefix:String  First:String }
 
-Result: `{ Prefix: "" First: "Bob" }` 
+Result: `{ Prefix:"" First:"Bob" }` 
 
 Explicitly marking required:
 
@@ -550,7 +550,7 @@ Enumeration declaration:
 
 Enumeration usage:
 
-	let PickOpposite := (Color : Colors) =>
+	let PickOpposite := (Color:Colors) =>
 		return if Color = Red then Yellow else Red
 	return Red->PickOpposite()
 
@@ -602,8 +602,8 @@ Type Definitions provide type description reuse:
 
 Type Definitions are pure short-hands though; for instance, these represent the same type:
 
-	CustomerTuple1: typedef { Name: String  Age: Integer }
-	CustomerTuple2: typedef { Age: Integer  Name: String }
+	CustomerTuple1: typedef { Name:String Age:Integer }
+	CustomerTuple2: typedef { Age:Integer Name:String }
 
 (order of attributes doesn't matter in a tuple, so these two typedefs are equivalent)
 
@@ -618,7 +618,7 @@ Declaring a module:
 	{
 		Code: enum { Parent Sibling Child Spouse }
 		Modifier: enum { Male Female Elder Younger Legal God Former Practical }
-		Component: typedef { Code: Code  Multiplier: Integer?  Modifiers: { Modifier }? }
+		Component: typedef { Code:Code Multiplier:Integer?  Modifiers:{ Modifier }? }
 		Path: typedef [Component]
 		Normalize: const (Path: Path) =>
 			return ...
@@ -637,9 +637,9 @@ Declaring a module:
 Using a module:
 
 	using Ancestry\FamilyPaths 1.0.0
-	return [{ Code: Parent } { Code: Parent }]->Normalize()
+	return [{ Code:Parent } { Code:Parent }]->Normalize()
 
-Result: `[{ Code: Parent  Multiplier: 2  Modifiers: { } }]`
+Result: `[{ Code:Parent  Multiplier:2  Modifiers:{ } }]`
 
 Module ambiguity:
 
@@ -668,7 +668,7 @@ Modules may contain the following members:
 		Code: typedef Integer								// Type Definitions
 		Colors: enum { Red Green }							// Enumerations
 		BestNumber: const 5									// Constants
-		Square: const (x : Integer) => return x * x			// Functions (as variables or consts)
+		Square: const (x:Integer) => return x * x			// Functions (as variables or consts)
 	}
 
 Scripts
@@ -706,7 +706,7 @@ Effect: Updates the City attribute of the specified tuple of the Customer table
 Set statements follow the FLWOR pattern except for Return becomes any number of set Set clauses and there is no Order (FLWS):
 
 	let p := Customer?(ID = 123)
-	set p := { ID: p.ID  City: "Cedar City" }
+	set p := { ID:p.ID City:"Cedar City" }
 
 Effect: Updates the specified tuple of the Customer table
 
@@ -714,7 +714,7 @@ Effect: Updates the specified tuple of the Customer table
 
 Insert using the restriction predicate for defaulting:
 
-	set Customer?(ID = 123) := { City: "Spanish Fork" }
+	set Customer?(ID = 123) := { City:"Spanish Fork" }
 
 ID 123 is implicitly included in the tuple being added or updated.
 
@@ -725,7 +725,7 @@ Deletion is enabled by assignment to null:
 Practical insertion example:
 
 	let newID := "Customer.ID"->GenerateID()
-	set Customer?(ID = newID) := { City: "Saratoga Springs" }
+	set Customer?(ID = newID) := { City:"Saratoga Springs" }
 	return newID
 
 Effect: Generates a new ID, inserts a person tuple based on that ID, and returns the new ID
@@ -758,7 +758,7 @@ Usings are global to the script, including within modules
 	using Ancestry\FamilyPaths 1.0.0
 	module PeopleFinder 1.2.0
 	{
-		Connection: typedef { SourceID: Long  TargetID: Long  Path: Path }
+		Connection: typedef { SourceID:Long TargetID:Long Path:Path }
 	}
 
 Exceptions
@@ -772,11 +772,11 @@ Result: `-1`
 
 Throwing exceptions:
 
-	return if i >= 0 then i else !!{ Message: "'i' may not be negative" }
+	return if i >= 0 then i else !!{ Message:"'i' may not be negative" }
 
 Example of throwing for a null:
 
-	return Setting@@ ?? !!{	Message: "The settings are not setup." }
+	return Setting@@ ?? !!{	Message:"The settings are not setup." }
 
 Result: The singleton row from the table Setting; an exception will be thrown if there isn't one
 
@@ -785,17 +785,17 @@ Nullological Cases
 
 Empty set of attribute carrying tuples:
 
-	return { } of { { ID: Integer } }
+	return { } of { { ID:Integer } }
 
 Empty lists of normal tuples:
 
-	return [] of [{ ID: Integer }]
+	return [] of [{ ID:Integer }]
 
 Empty tuple of attribute carrying tuple:
 
-	return { : } of { ID: Integer key { ID } }
+	return { : } of { ID:Integer key { ID } }
 
-Result: `{ ID: 0 }`
+Result: `{ ID:0 }`
 
 In an expression context `{ }` means empty set; for a no-attribute tuple specify a ":" to distinguish that it is a tuple. 
 In a type context `{ : }` means a no-attribute tuple because a set requires a member type
@@ -825,7 +825,7 @@ Generics
 
 Functions may take type arguments:
 
-	let Add := (x: T y: T) => <T>
+	let Add := (x:T y:T) => <T>
 		return x + y
 	return 5->Add<Integer>(10)
 
@@ -856,7 +856,7 @@ Pop:
 
 	return [1 2 3]->Pop()
 
-Result: `{ Item: 3  Remaining: [1 2] }`
+Result: `{ Item:3  Remaining:[1 2] }`
 
 Enqueue:
 
@@ -868,7 +868,7 @@ Dequeue behaves the same as pop:
 
 	return [1 2 3]->Dequeue()
 
-Result: `{ Item: 3 Remaining: [1 2] }`
+Result: `{ Item:3 Remaining:[1 2] }`
 
 Insert:
 
@@ -917,13 +917,13 @@ Result: `[40 50]`
 
 Restriction over tuple:
 
-	return [{ Name: 'Ray' } { Name: 'Nelly' }]?(Name = 'Ray')
+	return [{ Name:'Ray' } { Name:'Nelly' }]?(Name = 'Ray')
 
 ...which is equivalent to:
 
-	return [{ Name: 'Ray' } { Name: 'Nelly' }]?(value.Name = 'Ray')
+	return [{ Name:'Ray' } { Name:'Nelly' }]?(value.Name = 'Ray')
 
-Result: `[{ Name: 'Ray' }]`
+Result: `[{ Name:'Ray' }]`
 
 Quota:
 
@@ -992,13 +992,13 @@ Attribute Extraction
 
 Extraction of an attribute set from a tuple set:
 
-	return { { ID: 123 } { ID: 234 } { ID: 345 } }.ID
+	return { { ID:123 } { ID:234 } { ID:345 } }.ID
 
 Result: `{ 123 234 345 ... }`
 
 Extraction of an attribute list from a tuple set:
 
-	let Items := { { ID: 123 Color: Red } { ID: 234 Color: Red } }
+	let Items := { { ID:123 Color:Red } { ID:234 Color:Red } }
 	return Items.Color
 
 Result: `[Red Red]`  
@@ -1006,9 +1006,9 @@ If the extracted attribute is not a key, the result is a list, not a set.  A Set
 
 Extracting multiple attributes:
 
-	return { { x: 50 y: 100 z: 0 } { x: 75 y: 125 z:25 } }.{ :x :y }
+	return { { x:50 y:100 z:0 } { x:75 y:125 z:25 } }.{ :x :y }
 
-Result: `[{ x: 50 y: 100 } { x: 75 y: 125 }]`  
+Result: `[{ x:50 y:100 } { x:75 y:125 }]`  
 Again, because x and y don't represent a superset of a key (not necessarily proper) the result is a list
 
 Aggregate Operations
@@ -1031,25 +1031,25 @@ Result: `4`
 More aggregate functions:
 
 	let i := { 1 3 5 }
-	return { Min: i->Min()  Max: i->Max()  Avg: i->Avg() }
+	return { Min:i->Min()  Max:i->Max()  Avg:i->Avg() }
 
-Result: `{ Min: 1  Max: 5  Avg: 3 }`
+Result: `{ Min:1 Max:5 Avg:3 }`
 
 Logical aggregates:
 
 	let i := { true true false }
-	return { All: All(i)  Any: Any(i) }
+	return { All:All(i)  Any:Any(i) }
 
-Result: `{ All: false  Any: true }`  
+Result: `{ All:false Any:true }`  
 
 Logically equivalent to iterated AND and OR respectively
 
 Grouped aggregation:
 	
 	for p in Customer
-	return { Customer: p  NumOrders: p.Orders->Count() }
+	return { Customer:p NumOrders:p.Orders->Count() }
 
-e.g. result: `{ Customer: { ID: 123  City: "Springville" }  NumOrders: 12 }`
+e.g. result: `{ Customer:{ ID:123 City:"Springville" } NumOrders:12 }`
 
 Count of distinct:
 
@@ -1071,9 +1071,9 @@ Result: `"Zebra Invasion"`
 
 Aggregates and nulls:
 
-	return { S: { 1 null 2 }->Count() L: [1 null 2]->Count() }
+	return { S:{ 1 null 2 }->Count() L:[1 null 2]->Count() }
 
-Result: `{ S: 2 L: 3 }`
+Result: `{ S:2 L:3 }`
 
 **Note:** Nulls are not ever treated as existing in sets
 
@@ -1082,19 +1082,19 @@ Time/Date Operations
 
 Selecting a Date from components:
 
-	return { Year: 1955  Month: 3  Day: 25 }=>Date
+	return { Year:1955 Month:3 Day:25 }=>Date
 
 Result: `'1955/03/25'd`
 
 Selecting a Time from components:
 
-	return { Hour: 10  Minute: 15  Second: 5.2 }=>Time
+	return { Hour:10 Minute:15 Second:5.2 }=>Time
 
 Result: `'10:15:5.2't`
 
 Selecting a TimeSpan from components:
 
-	return { Days: 2  Hours: 1  Minutes: 23  Seconds: 100.1 }->TimeSpan
+	return { Days:2 Hours:1 Minutes:23 Seconds:100.1 }->TimeSpan
 
 Result: `'2d 1h 23m 100.1s'ts`
 
@@ -1125,7 +1125,7 @@ Result: `323`
 Getting days in a month:
 
 	return 2004->DaysInMonth(2)		// or:
-	return { Year: 2004  Month: 2 }=>DaysInMonth
+	return { Year:2004 Month:2 }=>DaysInMonth
 
 Result: `29`
 
@@ -1145,7 +1145,7 @@ Converting a Date to a tuple:
 
 	return '1955/03/25'd->ToTuple()
 
-Result: `{ Year: 1955  Month: 3  Day: 25 }`
+Result: `{ Year:1955 Month:3 Day:25 }`
 
 Determining leap-year:
 
@@ -1196,24 +1196,24 @@ Bitwise Operations
 Bitwise operators:
 
 	let n := 2;
-	return { Shl: n << 1  Shr: n >> 1  Inv: ~n  Or: n | 1  And: n & 3  Xor: n ^ 3 }
+	return { Shl:n << 1  Shr:n >> 1  Inv:~n  Or:n | 1  And:n & 3  Xor:n ^ 3 }
 
-Result: `{ Shl: 4  Shr: 1  Inv: -3  Or: 3  And: 2  Xor: 1 }`
+Result: `{ Shl:4  Shr:1  Inv:-3  Or:3  And:2  Xor:1 }`
 
 Numeric Operations
 ------------------
 
 Arithmetic operators:
 
-	return { Add: 1 + 2  Sub: 4 - 1  IDiv: 3 / 2  DDiv: 3.0 / 2.0  Mul: 10 * 3  Neg: -55  Pow: 5**5  IMod: 5 % 3  FMod: 1.2 % 0.35 }
+	return { Add:1 + 2  Sub:4 - 1  IDiv:3 / 2  DDiv:3.0 / 2.0  Mul:10 * 3  Neg:-55  Pow:5**5  IMod:5 % 3  FMod:1.2 % 0.35 }
 
-Result: `{ Add: 3  Sub: 3  IDiv: 1  DDiv: 1.5  Mul: 30  Neg: -55  Pow: 25  IMod: 2  FMod: 0.15 }`
+Result: `{ Add:3  Sub:3  IDiv:1  DDiv:1.5  Mul:30  Neg:-55  Pow:25  IMod:2  FMod:0.15 }`
 
 Successor and predecessor for ordinal types:
 
-	return { Succ: 1++  Pred: 1-- }
+	return { Succ:1++  Pred:1-- }
 
-Result: `{ Succ: 2  Pred: 0 }`
+Result: `{ Succ:2  Pred:0 }`
 
 Absolute value:
 
@@ -1223,15 +1223,15 @@ Result: `3.2`
 
 Ceiling value:
 
-	return { Neg: -3.2->Ceiling()  Pos: 3.2->Ceiling() }
+	return { Neg:-3.2->Ceiling() Pos:3.2->Ceiling() }
 
-Result: `{ Neg: -3  Pos: 4 }`
+Result: `{ Neg:-3  Pos:4 }`
 
 Floor value:
 
-	return { Neg: -3.2->Floor()  Pos: 3.2->Floor() }
+	return { Neg:-3.2->Floor() Pos:3.2->Floor() }
 
-Result: `{ Neg: -4  Pos: 3 }`
+Result: `{ Neg:-4  Pos:3 }`
 
 Frac:
 
@@ -1278,9 +1278,9 @@ Result: `5`
 
 Comparisons:
 
-	return { Equal: 1 = 0  Compare1: 1 ?= 0  Compare2: 0 ?= 1  Compare3: 1 ?= 1  NotEqual: 1 <> 0 }
+	return { Equal:1 = 0  Compare1:1 ?= 0  Compare2:0 ?= 1  Compare3:1 ?= 1  NotEqual:1 <> 0 }
 
-Result: `{ Equal: false  Compare1: 1  Compare2: -1  Compare3: 0  NotEqual: true }`
+Result: `{ Equal:false  Compare1:1  Compare2:-1  Compare3:0  NotEqual:true }`
 
 Random
 ------
@@ -1289,7 +1289,7 @@ Create random seed and generating from it:
 
 	return { : }=>Seed->Random()
 
-Result: `{ Seed: `mutated seed value` Value: `pseudo-random double between 0 and 1` }`  
+Result: `{ Seed:`mutated seed value` Value:`pseudo-random double between 0 and 1` }`  
 **Note:** Seed() is non-deterministic, but Random() is deterministic
 
 Generating multiple from the same seed:

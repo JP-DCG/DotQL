@@ -52,7 +52,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public void SaveAssembly()
 		{
 			_module.CreateGlobalFunctions();
-			_assembly.Save(_assemblyName + ".dll");
+			// TODO: assembly saving
+			//_assembly.Save(_assemblyName + ".dll");
 
 			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
 		}
@@ -103,7 +104,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public System.Type TypeFromTupleType(Type.TupleType tupleType)
 		{
-			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public);
+			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.Serializable, typeof(ValueType));
 			var fieldsByID = new Dictionary<Name, FieldInfo>();
 
 			// Add attributes

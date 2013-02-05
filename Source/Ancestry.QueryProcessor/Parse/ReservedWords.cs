@@ -14,6 +14,10 @@ namespace Ancestry.QueryProcessor.Parse
 
 		// Also keywords
 		public const string TypeOf = "typeof";
+		public const string Enum = "enum";
+		public const string Const = "const";
+		public const string Var = "var";
+		public const string TypeDef = "typedef";
 		public const string Ref = "ref";
 		public const string Key = "key";
         public const string Set = "set";
