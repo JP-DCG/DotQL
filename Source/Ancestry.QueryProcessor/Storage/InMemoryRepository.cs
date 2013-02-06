@@ -10,7 +10,7 @@ namespace Ancestry.QueryProcessor.Storage
 	{
 		private T _value;
 
-		public T Get(Parse.Expression condition)
+		public T Get(Parse.Expression condition, Name[] order)
 		{
 			return _value;
 		}

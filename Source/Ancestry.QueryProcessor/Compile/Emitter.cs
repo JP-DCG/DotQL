@@ -63,17 +63,17 @@ namespace Ancestry.QueryProcessor.Compile
 			return _module.DefineType(name, TypeAttributes.Class | TypeAttributes.Public);
 		}
 
-		public void DeclareVariable(TypeBuilder module, string name, System.Type type)
+		public FieldBuilder DeclareVariable(TypeBuilder module, string name, System.Type type)
 		{
-			module.DefineField(name, typeof(Storage.IRepository<>).MakeGenericType(type), FieldAttributes.Public);
+			return module.DefineField(name, typeof(Storage.IRepository<>).MakeGenericType(type), FieldAttributes.Public);
 		}
 
-		public void DeclareTypeDef(TypeBuilder module, string name, System.Type type)
+		public FieldBuilder DeclareTypeDef(TypeBuilder module, string name, System.Type type)
 		{
-			module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);
+			return module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);
 		}
 
-		public void DeclareEnum(TypeBuilder module, string name, IEnumerable<string> values)
+		public System.Type DeclareEnum(TypeBuilder module, string name, IEnumerable<string> values)
 		{
 			var enumType = module.DefineNestedType(name, TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
 			enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
@@ -83,12 +83,14 @@ namespace Ancestry.QueryProcessor.Compile
 				FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
 				field.SetConstant(i++);
 			}
+			return enumType;
 		}
 
-		public void DeclareConst(TypeBuilder module, string name, object value, System.Type type)
+		public FieldBuilder DeclareConst(TypeBuilder module, string name, object value, System.Type type)
 		{
 			var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
 			constField.SetConstant(value);
+			return constField;
 		}
 
 		public System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
@@ -96,13 +98,13 @@ namespace Ancestry.QueryProcessor.Compile
 			System.Type nativeType;
 			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
 			{
-				nativeType = TypeFromTupleType(tupleType);
+				nativeType = NativeFromTupleType(tupleType);
 				_tupleToNative.Add(tupleType, nativeType);
 			}
 			return nativeType;
 		}
 
-		public System.Type TypeFromTupleType(Type.TupleType tupleType)
+		public System.Type NativeFromTupleType(Type.TupleType tupleType)
 		{
 			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.Serializable, typeof(ValueType));
 			var fieldsByID = new Dictionary<Name, FieldInfo>();
@@ -120,13 +122,26 @@ namespace Ancestry.QueryProcessor.Compile
 				var cab =
 					new CustomAttributeBuilder
 					(
-						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string[]), typeof(string), typeof(string[]) }),
+						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string), typeof(string[]), typeof(string), typeof(string[]) }),
 						new object[] 
 							{ 
+								reference.Key.ToString(),
 								(from san in reference.Value.SourceAttributeNames select san.ToString()).ToArray(),
 								reference.Value.Target.ToString(),
 								(from tan in reference.Value.TargetAttributeNames select tan.ToString()).ToArray(),
 							}
+					);
+				typeBuilder.SetCustomAttribute(cab);
+			}
+
+			// Add keys
+			foreach (var key in tupleType.Keys)
+			{
+				var cab =
+					new CustomAttributeBuilder
+					(
+						typeof(Type.TupleKeyAttribute).GetConstructor(new System.Type[] { typeof(string[]) }),
+						new object[] { (from an in key.AttributeNames select an.ToString()).ToArray() }
 					);
 				typeBuilder.SetCustomAttribute(cab);
 			}
@@ -233,6 +248,49 @@ namespace Ancestry.QueryProcessor.Compile
 			il.Emit(OpCodes.Ret);
 			typeBuilder.DefineMethodOverride(equalsMethod, ReflectionUtility.ObjectEquals);
 			return equalsMethod;
+		}
+
+		public void ImportType(System.Type type)
+		{
+			if (type.IsGenericType)
+				ImportType(type.GenericTypeArguments[0]);
+			else
+				if (type.GetCustomAttribute(typeof(Type.TupleAttribute), true) != null)
+				{
+					var tupleType = TupleTypeFromNative(type);
+					_tupleToNative.Add(tupleType, type);
+				}
+		}
+
+		private Type.TupleType TupleTypeFromNative(System.Type type)
+		{
+			var tupleType = new Type.TupleType();
+
+			// Get attributes
+			foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+				tupleType.Attributes.Add(Name.FromNative(field.Name), field.FieldType);
+
+			// Get references
+			foreach (Type.TupleReferenceAttribute r in type.GetCustomAttributes(typeof(Type.TupleReferenceAttribute)))
+				tupleType.References.Add
+				(
+					Name.FromNative(r.Name), 
+					new Type.TupleReference 
+					{ 
+						SourceAttributeNames = (from san in r.SourceAttributeNames select Name.FromNative(san)).ToArray(),
+						Target = Name.FromNative(r.Target),
+						TargetAttributeNames = (from tan in r.TargetAttributeNames select Name.FromNative(tan)).ToArray()
+					}
+				);
+
+			// Get keys
+			foreach (Type.TupleKeyAttribute k in type.GetCustomAttributes(typeof(Type.TupleKeyAttribute)))
+				tupleType.Keys.Add
+				(
+					new Type.TupleKey { AttributeNames = (from n in k.AttributeNames select Name.FromNative(n)).ToArray() }
+				);
+
+			return tupleType;
 		}
 	}
 }

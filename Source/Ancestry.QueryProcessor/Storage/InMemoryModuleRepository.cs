@@ -15,7 +15,7 @@ namespace Ancestry.QueryProcessor.Storage
 
 		private InMemoryFactory _repository;
 
-		public ISet<Runtime.ModuleTuple> Get(Parse.Expression condition)
+		public ISet<Runtime.ModuleTuple> Get(Parse.Expression condition, Name[] order)
 		{
 			if (condition == null)
 				return _repository.Modules;
@@ -34,7 +34,7 @@ namespace Ancestry.QueryProcessor.Storage
 
 		public void Set(Parse.Expression condition, ISet<Runtime.ModuleTuple> newValue)
 		{
-			foreach (var m in Get(condition).ToArray())
+			foreach (var m in Get(condition, null).ToArray())
 				_repository.Modules.Remove(m);
 			foreach (var m in newValue)
 				_repository.Modules.Add(m);

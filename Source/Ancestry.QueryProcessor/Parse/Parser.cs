@@ -63,7 +63,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-			"using" [ Alias: qualifiedIdentifier ":=" ] Target : qualifiedIdentifier
+				"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier Version : Version
 		*/
 		public Using Using(Lexer lexer)
 		{
@@ -82,6 +82,9 @@ namespace Ancestry.QueryProcessor.Parse
 			}
 
 			@using.Target = qualifiedIdentifier;
+
+			lexer.NextToken().CheckType(TokenType.Version);
+			@using.Version = lexer[0].AsVersion;
 
 			return @using;
 		}
@@ -323,7 +326,8 @@ namespace Ancestry.QueryProcessor.Parse
 					result.Attributes.Add(attribute);
 
 					// Add remaining attributes
-					TupleTypeMembers(lexer, result);
+					if (!lexer[1, false].IsSymbol(Keywords.EndTupleSet))
+						TupleTypeMembers(lexer, result);
 
 					lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
 					return result;
@@ -361,14 +365,14 @@ namespace Ancestry.QueryProcessor.Parse
 					break;
 			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 		}
-		
+
 		/*
 				TupleAttribute :=
 					Name : QualifiedIdentifier ":" Type : typeDeclaration
 
 				TupleReference :=
-					"ref" Name : QualifiedIdentifier "(" SourceAttributeNames : QualifiedIdentifier* ")" 
-						Target : QualifiedIdentifier "(" TargetAttributeNames : QualifiedIdentifier* ")"	
+					"ref" Name : QualifiedIdentifier "{" SourceAttributeNames : QualifiedIdentifier* "}" 
+						Target : QualifiedIdentifier "{" TargetAttributeNames : QualifiedIdentifier* "}"	
 
 				TupleKey :=
 					"key" "(" AttributeNames : [ QualifiedIdentifier ]* ")"
@@ -1169,8 +1173,8 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				"ref" Name : QualifiedIdentifier "(" SourceAttributeNames : QualifiedIdentifier* ")" 
-					Target : QualifiedIdentifier "(" TargetAttributeNames : QualifiedIdentifier* ")"	
+				"ref" Name : QualifiedIdentifier "{" SourceAttributeNames : QualifiedIdentifier* "}" 
+					Target : QualifiedIdentifier "{" TargetAttributeNames : QualifiedIdentifier* "}"	
 		*/
 		public TupleReference TupleReference(Lexer lexer)
 		{
@@ -1180,20 +1184,20 @@ namespace Ancestry.QueryProcessor.Parse
 			result.SetPosition(lexer);
 			result.Name = QualifiedIdentifier(lexer, true);
 
-			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+			lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 			do
 			{
 				result.SourceAttributeNames.Add(QualifiedIdentifier(lexer, false));
-			} while (!lexer[1].IsSymbol(Keywords.EndGroup));
+			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 			lexer.NextToken();
 
 			result.Target = QualifiedIdentifier(lexer, true);
 
-			lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
+			lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 			do
 			{
 				result.TargetAttributeNames.Add(QualifiedIdentifier(lexer, false));
-			} while (!lexer[1].IsSymbol(Keywords.EndGroup));
+			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 			lexer.NextToken();
 
 			return result;

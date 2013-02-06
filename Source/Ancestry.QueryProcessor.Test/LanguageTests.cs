@@ -280,23 +280,41 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void ModuleSelfReferencing()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { Forward: Int  Int: typedef Integer Backward: { x: Int } }");
+		}
+
+		[TestMethod]
 		public void SimpleModuleVar()
 		{
 			var processor = new Processor();
 			processor.Execute("module TestModule 1.0.0 { MyVar: Integer }");
 
-			var result = processor.Evaluate("using TestModule return MyVar");
+			var result = processor.Evaluate("using TestModule 1.0.0 return MyVar");
 			Assert.IsTrue(result is JValue);
 			Assert.AreEqual("0", result.ToString());
 		}
 
 		[TestMethod]
-		public void SimpleModuleTypedef()
+		public void TupleModuleVar()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyVar: { x:Integer } }");
+
+			var result = processor.Evaluate("using TestModule 1.0.0 return MyVar");
+			Assert.IsTrue(result is JObject);
+			Assert.AreEqual("0", ((JObject)result)["x"].ToString());
+		}
+
+		[TestMethod]
+		public void TupleModuleTypedef()
 		{
 			var processor = new Processor();
 			processor.Execute("module TestModule 1.0.0 { MyTypedef: typedef { x:Integer y:String key{ x } } }");
 
-			var result = processor.Evaluate("using TestModule var v : MyTypedef return v = { x:0 y:\"\" key{ x } }");
+			var result = processor.Evaluate("using TestModule 1.0.0 var v : MyTypedef return v = { x:0 y:\"\" key{ x } }");
 			Assert.IsTrue(result is JValue);
 			Assert.AreEqual("True", result.ToString());
 		}

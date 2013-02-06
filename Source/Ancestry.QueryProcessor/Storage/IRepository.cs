@@ -8,7 +8,7 @@ namespace Ancestry.QueryProcessor.Storage
 {
 	public interface IRepository<T>
 	{
-		T Get(Parse.Expression condition);
+		T Get(Parse.Expression condition, Name[] order);
 		void Set(Parse.Expression condition, T newValue);
 	}
 }

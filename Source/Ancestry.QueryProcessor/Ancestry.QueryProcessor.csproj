@@ -85,7 +85,7 @@
     <Compile Include="Parse\BasicTextEmitter.cs" />
     <Compile Include="Parse\BaseLanguage.cs" />
     <Compile Include="Parse\LanguageException.cs" />
-    <Compile Include="Parse\Tokenizer.cs" />
+    <Compile Include="Parse\Lexer.cs" />
     <Compile Include="Parse\LexerException.cs" />
     <Compile Include="Parse\ParserException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -97,6 +97,7 @@
     <Compile Include="Type\Scalar.cs" />
     <Compile Include="Type\TupleAttribute.cs" />
     <Compile Include="Type\TupleKey.cs" />
+    <Compile Include="Type\TupleKeyAttribute.cs" />
     <Compile Include="Type\TupleReference.cs" />
     <Compile Include="Type\TupleReferenceAttribute.cs" />
     <Compile Include="Type\TupleType.cs" />

@@ -55,9 +55,11 @@ namespace Ancestry.QueryProcessor.Parse
 		
 		public QualifiedIdentifier Target { get; set; }
 
+		public Version Version { get; set; }
+
 		public override string ToString()
 		{
-			return "using " + (Alias == null ? "" : Alias + " := ") + Target;
+			return "using " + (Alias == null ? "" : Alias + " := ") + Target + " " + Version;
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -268,14 +270,9 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
-	public class ListType : TypeDeclaration
+	public class NaryType : TypeDeclaration
 	{
 		public TypeDeclaration Type { get; set; }
-
-		public override string ToString()
-		{
-			return "[" + Type + "]";
-		}
 
 		public override IEnumerable<Statement> GetChildren()
 		{
@@ -283,18 +280,19 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
-	public class SetType : TypeDeclaration
+	public class ListType : NaryType
 	{
-		public TypeDeclaration Type { get; set; }
+		public override string ToString()
+		{
+			return "[" + Type + "]";
+		}
+	}
 
+	public class SetType : NaryType
+	{
 		public override string ToString()
 		{
 			return "{ " + Type + " }";
-		}
-
-		public override IEnumerable<Statement> GetChildren()
-		{
-			yield return Type;
 		}
 	}
 

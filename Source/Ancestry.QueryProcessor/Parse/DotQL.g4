@@ -13,7 +13,7 @@ Script :=
 	Expression : [ ClausedExpression ]
 
 UsingClause :=
-	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier
+	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier Version : Version
 
 ModuleDeclaration :=
 	"module" Name : QualifiedIdentifier Version : Version "{" Members : [ moduleMember ]* "}"
@@ -64,8 +64,8 @@ TupleAttribute :=
 	Name : QualifiedIdentifier ":" Type : typeDeclaration
 
 TupleReference :=
-	"ref" Name : QualifiedIdentifier "(" SourceAttributeNames : QualifiedIdentifier* ")" 
-		Target : QualifiedIdentifier "(" TargetAttributeNames : QualifiedIdentifier* ")"	
+	"ref" Name : QualifiedIdentifier "{" SourceAttributeNames : QualifiedIdentifier* "}" 
+		Target : QualifiedIdentifier "{" TargetAttributeNames : QualifiedIdentifier* "}"	
 
 TupleKey :=
 	"key" "{" AttributeNames : [ QualifiedIdentifier ]* "}"

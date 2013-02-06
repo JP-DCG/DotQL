@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reflection;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace Ancestry.QueryProcessor
 {
@@ -85,28 +88,7 @@ namespace Ancestry.QueryProcessor
 
 			var resultType = result.GetType();
 
-			// TODO: handle set, list, tuple, and custom types
-			switch (resultType.Name)
-			{
-				case "String" : 
-				case "Int32" :
-				case "Int64" :
-				case "DateTime" :
-				case "TimeSpan" :
-				case "Guid" :
-				case "Double" :
-				case "Char" : return new JValue(result);
-
-				case "HashSet`1" : return JArray.FromObject(result);
-
-				default:
-					if (resultType.GetCustomAttributes(typeof(Type.TupleAttribute), false).Length > 0)
-						return JObject.FromObject(result);
-					else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(resultType))
-						return JArray.FromObject(result);
-					else
-						return new JValue(result.ToString());
-			}
+			return JToken.FromObject(result);
 		}
 	}
 }

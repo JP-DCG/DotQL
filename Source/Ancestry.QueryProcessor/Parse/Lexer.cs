@@ -5,15 +5,6 @@ using System.Runtime.Serialization;
 
 namespace Ancestry.QueryProcessor.Parse
 {
-
-
-	/// <summary> General purpose lexical analyzer suitable for tokenizing statements of SQL. </summary>
-	/// <remarks>
-	///		Possible tokens are defined by the <see cref="LexerToken"/> enum.
-    ///     Whitespace is defined by the <see cref="Char.IsWhiteSpace"/> method.  See the file BNF.txt for a
-    ///		formal definition of the lexer.  The lexer is initially on a "crack" so the current (0th) entry 
-	///		is not valid until NextToken() is invoked.
-    /// </remarks>
     public class Lexer
     {
 		private const int LookAheadCount = 3;

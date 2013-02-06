@@ -14,7 +14,7 @@ namespace Ancestry.QueryProcessor.Storage
 			foreach 
 			(
 				var assembly in 
-					AppDomain.CurrentDomain.GetAssemblies()
+					AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
 						.Union(from an in AdditionalAssemblies select Assembly.Load(an))
 			)
 				foreach (var type in assembly.GetTypes().Where(t => t.GetCustomAttributes(typeof(Type.ModuleAttribute), true).Length > 0))
