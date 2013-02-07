@@ -367,8 +367,8 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "ref " + Name + "(" + String.Join(" ", from n in SourceAttributeNames select n.ToString()) 
-				+ ") " + Target + "(" + String.Join(" ", from n in TargetAttributeNames select n.ToString()) + ")";
+			return "ref " + Name + "{ " + String.Join(" ", from n in SourceAttributeNames select n.ToString()) 
+				+ " } " + Target + "{ " + String.Join(" ", from n in TargetAttributeNames select n.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -389,7 +389,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "key (" + String.Join(" ", from a in AttributeNames select a.ToString()) + ")";
+			return "key { " + String.Join(" ", from a in AttributeNames select a.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()

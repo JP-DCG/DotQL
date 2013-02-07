@@ -526,6 +526,16 @@ namespace Ancestry.QueryProcessor.Compile
 				if (member is Parse.EnumMember)
 					foreach (var e in ((Parse.EnumMember)member).Values)
 						local.Add(memberName + Name.FromQualifiedIdentifier(e), member);
+
+				// HACK: Pre-discover sets of tuples (tables) because these may be needed by tuple references.  Would be better to separate symbol discovery from compilation for types.
+				Parse.TypeDeclaration varType;
+				if 
+				(
+					member is Parse.VarMember 
+					&& (varType = ((Parse.VarMember)member).Type) is Parse.SetType 
+					&& ((Parse.SetType)varType).Type is Parse.TupleType
+				)
+					EnsureTupleTypeSymbols(frame, (Parse.TupleType)((Parse.SetType)varType).Type);
 			}
 
 			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
@@ -693,37 +703,49 @@ namespace Ancestry.QueryProcessor.Compile
 				throw new CompilerException(CompilerException.Codes.RecursiveDeclaration);
 		}
 
+		private void EnsureTupleTypeSymbols(Frame frame, Parse.TupleType tupleType)
+		{
+			if (!_frames.ContainsKey(tupleType))
+			{
+				var local = AddFrame(frame, tupleType);
+
+				foreach (var a in tupleType.Attributes)
+					local.Add(a.Name, a);
+
+				foreach (var k in tupleType.Keys)
+					AddAllReferences(local, k.AttributeNames);
+
+				foreach (var r in tupleType.References)
+					AddAllReferences(local, r.SourceAttributeNames);
+			}
+		}
+
 		private System.Type CompileTupleType(Frame frame, Parse.TupleType tupleType)
 		{
-			var local = AddFrame(frame, tupleType);
+			EnsureTupleTypeSymbols(frame, tupleType);
+
 			var normalized = new Type.TupleType();
 
-			// Resolve all attributes as symbols
+			// Attributes
 			foreach (var a in tupleType.Attributes)
-			{
-				local.Add(a.Name, a);
-
 				normalized.Attributes.Add(Name.FromQualifiedIdentifier(a.Name), CompileTypeDeclaration(frame, a.Type));		// uses frame, not local
-			}
 
-			// Resolve source reference columns
+			// References
 			foreach (var k in tupleType.Keys)
-			{
-				AddAllReferences(local, k.AttributeNames);
-
 				normalized.Keys.Add(new Type.TupleKey { AttributeNames = IdentifiersToNames(k.AttributeNames) });
-			}
 
-			// Resolve key reference columns
+			// Keys
 			foreach (var r in tupleType.References)
 			{
-				AddAllReferences(local, r.SourceAttributeNames);
 				var target = frame.Resolve<Parse.Statement>(r.Target);
 				_references.Add(r.Target, target);
 				if (target is Parse.VarMember)
 				{
-					var memberType = CheckTableType(((Parse.VarMember)target).Type);
-					AddAllReferences(_frames[memberType], r.TargetAttributeNames);
+					// Get the tuple type for the table
+					var targetTupleType = CheckTableType(((Parse.VarMember)target).Type);
+
+					// Add references to each target attribute
+					AddAllReferences(_frames[targetTupleType], r.TargetAttributeNames);
 				}
 				normalized.References.Add
 				(

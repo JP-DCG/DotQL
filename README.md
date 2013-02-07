@@ -3,7 +3,7 @@ DotQL
 
 DotQL is a **functional language** and **federated query processor** implemented in C# for .NET.  The intent is to provide a logical abstraction layer between applications and systems. 
 
-For more, visit the [Overview](DotQL/wiki/Overview).
+For more, visit the [Overview](https://github.com/Ancestry/DotQL/wiki/Overview).
 
 Approximate Status:
 * Front-end / SLA: 25% (only enforces time-based SLAs)
@@ -11,13 +11,13 @@ Approximate Status:
 * Lexer: 100%
 * Parser: 100%
 * Planner: 20%
-* Compiler: 20% (functioning for very basic expressions)
+* Compiler: 40% 
 * Functions and types: 10%
 * Pre-prepared query library: 0%
-* Module library: 0%
+* Module library: 60%
 * SLA authorization: 0%
-* Storage abstraction: 5%
-* Text/example stores: 0%
+* Storage abstraction: 30%
+* SQL store: 20%
 * Monitoring: 0%
 
 Language
@@ -37,7 +37,7 @@ This is equivalent to the following SQL query:
 			join Customer as C on C.CustomerID = O.CustomerID
 		where C.ZipCode = '84604'
 
-For a by-example introduction to DotQL, read [DotQL By Example](DotQL/wiki/DotQL%20By%20Example).
+For a by-example introduction to DotQL, read [DotQL By Example](https://github.com/Ancestry/DotQL/wiki/DotQL%20By%20Example).
 
 Federated Query Processor
 -------------------------
