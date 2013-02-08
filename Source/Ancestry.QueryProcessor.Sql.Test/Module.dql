@@ -1,0 +1,47 @@
+﻿module Test 1.0.0
+{
+    Customers: 
+    {
+        { 
+			ID: Integer 
+			City: String 
+			ref Orders{ ID } Orders{ CustomerID } 
+			key { ID } 
+		}
+	}
+
+	Orders: 
+	{ 
+		{ 
+			ID: Integer  
+			CustomerID: Integer  
+			On: DateTime  
+			ref Customer{ CustomerID } Customers{ ID }  
+			ref Items{ ID } OrderItems{ OrderID } 
+			key { ID }
+		}
+	}
+
+	OrderItems: 
+	{ 
+		{ 
+			OrderID: Integer  
+			PartID: Integer  
+			Quantity: Integer
+			ref Order{ OrderID } Orders{ ID }  
+			ref Part{ PartID } Parts{ ID }
+			key { OrderID PartID }
+		}
+	}
+
+	Parts:
+	{
+		{
+			ID: Integer
+			Name: String
+			IsDiscontinued: Boolean
+			ref OrderItems{ ID } OrderItems{ PartID }
+			key { ID }
+		}
+	}
+}

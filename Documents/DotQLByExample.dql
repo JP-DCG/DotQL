@@ -53,12 +53,12 @@ Declaration
 
 "Table" variable declaration:
 
-	Customers: 
-	{
-		{ 
-			ID:Integer 
-			City:String 
-			ref Orders(ID) Orders(CustomerID) 
+    Customers: 
+    {
+        { 
+			ID: Integer 
+			City: String 
+			ref Orders{ ID } Orders{ CustomerID } 
 			key { ID } 
 		}
 	}
@@ -67,15 +67,16 @@ Reads: Customers is a set of tuples, each having an ID, City, reference to Order
 
 Tables really are just sets of tuples:
 
-	Order: typedef 
-	{ 
-		ID:Integer  
-		CustomerID:Integer  
-		On:DateTime  
-		ref Customer(CustomerID) Customers(ID)  
-		ref Items(ID) OrderItems(OrderID) 
-		key { ID }
-	}
+	Order: 
+		typedef
+		{ 
+			ID: Integer  
+			CustomerID: Integer  
+			On: DateTime  
+			ref Customer{ CustomerID } Customers{ ID }  
+			ref Items{ ID } OrderItems{ OrderID } 
+			key { ID }
+		}
 	Orders: { Order }
 
 Defines a tuple type called Order with some columns and references, then a variable called Orders which is a set of Order tuples.
@@ -85,11 +86,11 @@ References are not bidirectional; they must be designated from each direction:
 	OrderItems: 
 	{ 
 		{ 
-			OrderID:Integer  
-			PartID:Integer  
-			Quantity:Integer
-			ref Order(OrderID) Orders(ID)  
-			ref Part(PartID) Parts(ID)
+			OrderID: Integer  
+			PartID: Integer  
+			Quantity: Integer
+			ref Order{ OrderID } Orders{ ID }  
+			ref Part{ PartID } Parts{ ID }
 			key { OrderID PartID }
 		}
 	}
@@ -101,10 +102,10 @@ The last of the structures to be used in examples:
 	Parts:
 	{
 		{
-			ID:Integer
-			Name:Quantity
-			IsDiscontinued:Boolean
-			ref OrderItems(ID) OrderItems(PartID)
+			ID: Integer
+			Name: String
+			IsDiscontinued: Boolean
+			ref OrderItems{ ID } OrderItems{ PartID }
 			key { ID }
 		}
 	}

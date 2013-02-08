@@ -11,9 +11,10 @@ namespace Ancestry.QueryProcessor.Sql
 {
     public class SqlFactory : IRepositoryFactory
     {
-		public SqlFactory(string providerName, IRepositoryFactory systemFactory = null)
+		public SqlFactory(string providerName, string connectionString, IRepositoryFactory systemFactory = null)
 		{
 			_dbFactory = DbProviderFactories.GetFactory(providerName);
+			_connectionString = connectionString;
 			_systemFactory = systemFactory ?? new InMemoryFactory();
 		}
 
@@ -21,6 +22,9 @@ namespace Ancestry.QueryProcessor.Sql
 		public DbProviderFactory DbFactory { get { return _dbFactory; } }
 
 		private IRepositoryFactory _systemFactory;
+
+		private string _connectionString;
+		public string ConnectionString { get { return _connectionString; } }
 
 		public IRepository<T> GetRepository<T>(System.Type module, Name varName)
 		{
