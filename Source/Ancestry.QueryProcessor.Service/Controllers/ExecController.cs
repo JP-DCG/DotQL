@@ -1,19 +1,15 @@
 ﻿using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Web.Http;
+using System.Web.Mvc;
 
 namespace Ancestry.QueryProcessor.Service.Controllers
 {
-    public class ExecController : ApiController
+    public class ExecController : Controller
     {
-		public void Post(string e, string a = null)
+		[QueryErrorHandler]
+		public void Index(string e, string a = null)
 		{
 			var service = new Processor(new ProcessorSettings());
-			service.Execute(e, a == null ? null : JObject.Parse(a));
+			service.Execute(e, a == null ? null : JsonInterop.JsonArgsToNative(JObject.Parse(a)));
 		}
 	}
 }

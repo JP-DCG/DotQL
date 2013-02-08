@@ -8,7 +8,7 @@ using System.Reflection;
 using Newtonsoft.Json;
 using System.IO;
 
-namespace Ancestry.QueryProcessor
+namespace Ancestry.QueryProcessor.Service
 {
 	public static class JsonInterop
 	{

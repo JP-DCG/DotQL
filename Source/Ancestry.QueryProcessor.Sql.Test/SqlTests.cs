@@ -2,7 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Reflection;
 using System.IO;
-using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace Ancestry.QueryProcessor.Sql.Test
 {
@@ -27,11 +27,10 @@ namespace Ancestry.QueryProcessor.Sql.Test
 		[TestMethod]
 		public void TestSelectAll()
 		{
-			var actual = _processor.Evaluate("using Test 1.0.0 return Parts");
-			Assert.IsTrue(actual is JArray);
-			Assert.IsTrue(((JArray)actual).Count > 0);
-			Assert.IsTrue(((JArray)actual)[0] is JObject);
-			Assert.IsNotNull(((JObject)((JArray)actual)[0])["ID"]);
+			dynamic actual = _processor.Evaluate("using Test 1.0.0 return Parts");
+			actual = Enumerable.ToList(actual);
+			Assert.IsTrue(actual.Count > 0);
+			Assert.IsNotNull(actual[0].ID);
 		}
 	}
 }

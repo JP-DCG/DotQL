@@ -26,19 +26,19 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public void Add(QualifiedIdentifier id, object symbol)
 		{
-			Add(Name.FromQualifiedIdentifier(id), symbol);
+			Add(id, Name.FromQualifiedIdentifier(id), symbol);
 		}
 
 		private class Ambiguity : List<object> {}
 
-		public void Add(Name name, object symbol)
+		public void Add(Parse.Statement statement, Name name, object symbol)
 		{
 			if (name.IsRooted)
-				throw new CompilerException(CompilerException.Codes.InvalidRootedIdentifier);
+				throw new CompilerException(statement, CompilerException.Codes.InvalidRootedIdentifier);
 			
 			// Check for a conflict
 			if (_items.ContainsKey(name))
-				throw new CompilerException(CompilerException.Codes.IdentifierConflict, name);
+				throw new CompilerException(statement, CompilerException.Codes.IdentifierConflict, name);
 			_items.Add(name, symbol);
 
 			// Add each fragment recursively
@@ -61,7 +61,7 @@ namespace Ancestry.QueryProcessor.Compile
 		}
 
 		/// <summary> Attempts to resolve the given symbol; return null if unable. </summary>
-		public object this[Name id]
+		public object this[Parse.Statement statement, Name id]
 		{
 			get
 			{
@@ -75,24 +75,24 @@ namespace Ancestry.QueryProcessor.Compile
 					current = current.BaseFrame;
 				}
 				if (result is Ambiguity)
-					throw new CompilerException(CompilerException.Codes.AmbiguousReference, id);
+					throw new CompilerException(statement, CompilerException.Codes.AmbiguousReference, id);
 				return result;
 			}
 		}
 
 		public T Resolve<T>(QualifiedIdentifier id)
 		{
-			return Resolve<T>(Name.FromQualifiedIdentifier(id));
+			return Resolve<T>(id, Name.FromQualifiedIdentifier(id));
 		}
 
 		/// <summary> Attempts to resolve the given symbol; throws if unable. </summary>
-		public T Resolve<T>(Name id)
+		public T Resolve<T>(Parse.Statement statement, Name id)
 		{
-			var result = this[id];
+			var result = this[statement, id];
 			if (result == null)
-				throw new CompilerException(CompilerException.Codes.UnknownIdentifier, id.ToString());
+				throw new CompilerException(statement, CompilerException.Codes.UnknownIdentifier, id.ToString());
 			if (!(result is T))
-				throw new CompilerException(CompilerException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
+				throw new CompilerException(statement, CompilerException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
 			return (T)result;
 		}
 	}

@@ -50,8 +50,18 @@
 				name: 'executeScript',
 				bindKey: { win: 'Ctrl-E', mac: 'Command-E' },
 				exec: function (editor) {
-					var query = editor.getValue();
-					$.ajax('/api/Eval', {
+
+					// Get the selection or all if nothing selected
+					var selectionLine =
+						editor.selection.isEmpty()
+							? 0
+							: editor.getSelectionRange().start.row;
+					var query =
+						editor.selection.isEmpty()
+							? editor.getValue()
+							: editor.session.getTextRange(editor.getSelectionRange());
+
+					$.ajax('/Eval/', {
 						accepts: 'application/json',
 						data: { e: query },
 						success: function (result, s, h) {
@@ -61,7 +71,9 @@
 						error: function (h, s, message) {
 							try	{
 								resultEditor.getSession().setMode("ace/mode/text");
-								resultEditor.setValue(JSON.parse(h.responseText).ExceptionMessage);
+								var response = JSON.parse(h.responseText)[0];
+								resultEditor.setValue(response.Message);
+								editor.gotoLine(response.Line + selectionLine, response.LinePos - 1, false);
 							}
 							catch(e) {
 								resultEditor.setValue(message + "\r\n" + h.responseText);

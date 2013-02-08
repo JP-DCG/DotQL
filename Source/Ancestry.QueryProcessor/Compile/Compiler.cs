@@ -60,7 +60,7 @@ namespace Ancestry.QueryProcessor.Compile
 			//var domainName = "plan" + DateTime.Now.Ticks.ToString();
 			//var domain = AppDomain.CreateDomain(domainName);
 
-			_argParam = Expression.Parameter(typeof(Dictionary<string, object>), "args");
+			_argParam = Expression.Parameter(typeof(IDictionary<string, object>), "args");
 			_factoryParam = Expression.Parameter(typeof(Storage.IRepositoryFactory), "factory");
 			_cancelParam = Expression.Parameter(typeof(CancellationToken), "cancelToken");
 
@@ -98,7 +98,7 @@ namespace Ancestry.QueryProcessor.Compile
 			// Create temporary frame for resolution of used modules from all modules
 			var modulesFrame = new Frame();
 			foreach (var module in GetModules())
-				modulesFrame.Add(module.Name, module);
+				modulesFrame.Add(script, module.Name, module);
 
 			// Usings
 			foreach (var u in script.Usings.Union(_options.DefaultUsings).Distinct(new UsingComparer()))
@@ -214,14 +214,14 @@ namespace Ancestry.QueryProcessor.Compile
 		private void CompileUsing(Frame frame, Frame modulesFrame, Parse.Using use, List<ParameterExpression> vars, List<Expression> block)
 		{
 			var moduleName = Name.FromQualifiedIdentifier(use.Target);
-			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(moduleName);
+			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(use, moduleName);
 			_references.Add(use.Target, module);
-			frame.Add(moduleName, module);
+			frame.Add(use, moduleName, module);
 			
 			// Discover methods
 			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
 			{
-				frame.Add(moduleName + Name.FromNative(method.Name), method);
+				frame.Add(use, moduleName + Name.FromNative(method.Name), method);
 				_emitter.ImportType(method.ReturnType);
 				foreach (var parameter in method.GetParameters())
 					_emitter.ImportType(parameter.ParameterType);
@@ -229,19 +229,19 @@ namespace Ancestry.QueryProcessor.Compile
 
 			// Discover enums
 			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
-				frame.Add(moduleName + Name.FromNative(type.Name), type);
+				frame.Add(use, moduleName + Name.FromNative(type.Name), type);
 			
 			// Discover variables
 			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
-				frame.Add(moduleName + Name.FromNative(field.Name), field);
+				frame.Add(use, moduleName + Name.FromNative(field.Name), field);
 				_emitter.ImportType(field.FieldType);
 			}
 
 			// Discover typedefs
 			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static))
 			{
-				frame.Add(moduleName + Name.FromNative(field.Name), field.FieldType);
+				frame.Add(use, moduleName + Name.FromNative(field.Name), field.FieldType);
 				_emitter.ImportType(field.FieldType);
 			}
 
@@ -284,9 +284,9 @@ namespace Ancestry.QueryProcessor.Compile
 		{
 			object module;
 			if (!_references.TryGetValue(id, out module))
-				throw new CompilerException(CompilerException.Codes.IdentifierNotFound, id.ToString());
+				throw new CompilerException(id, CompilerException.Codes.IdentifierNotFound, id.ToString());
 			if (!(module is T))
-				throw new CompilerException(CompilerException.Codes.IncorrectType, module.GetType(), typeof(T));
+				throw new CompilerException(id, CompilerException.Codes.IncorrectType, module.GetType(), typeof(T));
 			return (T)module;
 		}
 
@@ -421,11 +421,11 @@ namespace Ancestry.QueryProcessor.Compile
 				var parameters = new List<ParameterExpression>();
 
 				// Add value param
-				var valueParam = CreateValueParam(local, expression, memberType);
+				var valueParam = CreateValueParam(restrictExpression, local, expression, memberType);
 				parameters.Add(valueParam);
 
 				// Add index param
-				var indexParam = CreateIndexParam(local);
+				var indexParam = CreateIndexParam(restrictExpression, local);
 				parameters.Add(indexParam);
 
 				// TODO: detect tuple members and push attributes into frame
@@ -448,7 +448,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var parameters = new List<ParameterExpression>();
 
 				// Add value param
-				var valueParam = CreateValueParam(local, expression, expression.Type);
+				var valueParam = CreateValueParam(restrictExpression, local, expression, expression.Type);
 				parameters.Add(valueParam);
 
 				var condition = CompileExpression(local, restrictExpression.Condition, typeof(bool));
@@ -462,20 +462,20 @@ namespace Ancestry.QueryProcessor.Compile
 			} 
 		}
 
-		private ParameterExpression CreateIndexParam(Frame local)
+		private ParameterExpression CreateIndexParam(Parse.Statement statement, Frame local)
 		{
 			var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
 			var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
-			local.Add(Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+			local.Add(statement, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
 			_expressionsBySymbol.Add(indexSymbol, indexParam);
 			return indexParam;
 		}
 
-		private ParameterExpression CreateValueParam(Frame frame, Expression expression, System.Type type)
+		private ParameterExpression CreateValueParam(Parse.Statement statement, Frame frame, Expression expression, System.Type type)
 		{
 			var valueParam = Expression.Parameter(type, Parse.ReservedWords.Value);
 			_expressionsBySymbol.Add(expression, valueParam);
-			frame.Add(Name.FromComponents(Parse.ReservedWords.Value), expression);
+			frame.Add(statement, Name.FromComponents(Parse.ReservedWords.Value), expression);
 			return valueParam;
 		}
 
@@ -525,7 +525,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var memberName = Name.FromQualifiedIdentifier(member.Name);
 				if (member is Parse.EnumMember)
 					foreach (var e in ((Parse.EnumMember)member).Values)
-						local.Add(memberName + Name.FromQualifiedIdentifier(e), member);
+						local.Add(member, memberName + Name.FromQualifiedIdentifier(e), member);
 
 				// HACK: Pre-discover sets of tuples (tables) because these may be needed by tuple references.  Would be better to separate symbol discovery from compilation for types.
 				Parse.TypeDeclaration varType;
@@ -649,7 +649,7 @@ namespace Ancestry.QueryProcessor.Compile
 					{
 						var parameters = method.GetParameters();
 						for (var i = 0; i < parameters.Length; i++)
-							DetermineTypeParameters(resolved, parameters[i].ParameterType, args[i].Type);
+							DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].Type);
 						// TODO: Assert that all type parameters are resolved
 					}
 					method = method.MakeGenericMethod(resolved);
@@ -660,7 +660,7 @@ namespace Ancestry.QueryProcessor.Compile
 			else if (typeof(Delegate).IsAssignableFrom(expression.Type))
 				return Expression.Invoke(expression, args);
 			else
-				throw new CompilerException(CompilerException.Codes.IncorrectType, expression.Type, "function");
+				throw new CompilerException(callExpression, CompilerException.Codes.IncorrectType, expression.Type, "function");
 		}
 
 		private System.Type CompileTypeDeclaration(Frame frame, Parse.TypeDeclaration typeDeclaration)
@@ -700,7 +700,7 @@ namespace Ancestry.QueryProcessor.Compile
 		private void BeginRecursionCheck(Parse.Statement statement)
 		{
 			if (!_recursions.Add(statement))
-				throw new CompilerException(CompilerException.Codes.RecursiveDeclaration);
+				throw new CompilerException(statement, CompilerException.Codes.RecursiveDeclaration);
 		}
 
 		private void EnsureTupleTypeSymbols(Frame frame, Parse.TupleType tupleType)
@@ -742,7 +742,7 @@ namespace Ancestry.QueryProcessor.Compile
 				if (target is Parse.VarMember)
 				{
 					// Get the tuple type for the table
-					var targetTupleType = CheckTableType(((Parse.VarMember)target).Type);
+					var targetTupleType = CheckTableType(r.Target, ((Parse.VarMember)target).Type);
 
 					// Add references to each target attribute
 					AddAllReferences(_frames[targetTupleType], r.TargetAttributeNames);
@@ -763,13 +763,13 @@ namespace Ancestry.QueryProcessor.Compile
 		}
 
 		/// <summary> Validates that the given target type is a table (set or list of tuples) and returns the tuple type.</summary>
-		private static Parse.TypeDeclaration CheckTableType(Parse.TypeDeclaration targetType)
+		private static Parse.TypeDeclaration CheckTableType(Parse.Statement statement, Parse.TypeDeclaration targetType)
 		{
 			if (!(targetType is Parse.NaryType))
-				throw new CompilerException(CompilerException.Codes.IncorrectTypeReferenced, "Set or List of Tuple", targetType.GetType().Name);
+				throw new CompilerException(statement, CompilerException.Codes.IncorrectTypeReferenced, "Set or List of Tuple", targetType.GetType().Name);
 			var memberType = ((Parse.NaryType)targetType).Type;
 			if (!(memberType is Parse.TupleType))
-				throw new CompilerException(CompilerException.Codes.IncorrectTypeReferenced, "Set or List of Tuple", targetType.GetType().Name);
+				throw new CompilerException(statement, CompilerException.Codes.IncorrectTypeReferenced, "Set or List of Tuple", targetType.GetType().Name);
 			return memberType;
 		}
 		
@@ -783,7 +783,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return (from n in ids select Name.FromQualifiedIdentifier(n)).ToArray();
 		}
 
-		private void DetermineTypeParameters(System.Type[] resolved, System.Type parameterType, System.Type argumentType)
+		private void DetermineTypeParameters(Parse.Statement statement, System.Type[] resolved, System.Type parameterType, System.Type argumentType)
 		{
 			// If the given parameter contains an unresolved generic type parameter, attempt to resolve using actual arguments
 			if (parameterType.ContainsGenericParameters)
@@ -791,12 +791,12 @@ namespace Ancestry.QueryProcessor.Compile
 				var paramArgs = parameterType.GetGenericArguments();
 				var argArgs = argumentType.GetGenericArguments();
 				if (paramArgs.Length != argArgs.Length)
-					throw new CompilerException(CompilerException.Codes.MismatchedGeneric, parameterType, argumentType);
+					throw new CompilerException(statement, CompilerException.Codes.MismatchedGeneric, parameterType, argumentType);
 				for (var i = 0; i < paramArgs.Length; i++)
 					if (paramArgs[i].IsGenericParameter && resolved[paramArgs[i].GenericParameterPosition] == null)
 						resolved[paramArgs[i].GenericParameterPosition] = argArgs[i];
 					else 
-						DetermineTypeParameters(resolved, paramArgs[i], argArgs[i]);
+						DetermineTypeParameters(statement, resolved, paramArgs[i], argArgs[i]);
 			}
 		}
 
@@ -872,7 +872,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var valueExpression = CompileExpression(frame, a.Value);		// uses frame not local (attributes shouldn't be visible to each other)
 				var attributeName = Name.FromQualifiedIdentifier(EnsureAttributeName(a.Name, a.Value));
 				valueExpressions.Add(attributeName.ToString(), valueExpression);
-				local.Add(attributeName, a);
+				local.Add(a, attributeName, a);
 				tupleType.Attributes.Add(attributeName, valueExpression.Type);
 			}
 
@@ -917,7 +917,7 @@ namespace Ancestry.QueryProcessor.Compile
 			if (expression is Parse.IdentifierExpression)
 				return ((Parse.IdentifierExpression)expression).Target;
 			else
-				throw new CompilerException(CompilerException.Codes.CannotInferNameFromExpression);
+				throw new CompilerException(expression, CompilerException.Codes.CannotInferNameFromExpression);
 		}
 
 		private string QualifiedIdentifierToName(Parse.QualifiedIdentifier qualifiedIdentifier)
@@ -963,7 +963,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 				// TODO: enums and typedefs
 				default:
-					throw new CompilerException(CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
+					throw new CompilerException(identifierExpression, CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
 			}
 		}
 
@@ -1029,7 +1029,7 @@ namespace Ancestry.QueryProcessor.Compile
 			else if (left.Type.GetCustomAttribute(typeof(Type.TupleAttribute)) != null)
 				return CompileTupleDereference(frame, left, expression, typeHint);
 			else
-				throw new CompilerException(CompilerException.Codes.CannotDereferenceOnType, left.Type);
+				throw new CompilerException(expression, CompilerException.Codes.CannotDereferenceOnType, left.Type);
 		}
 
 		private Expression CompileTupleDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
@@ -1037,7 +1037,7 @@ namespace Ancestry.QueryProcessor.Compile
 			var local = AddFrame(frame, expression);
 			foreach (var field in left.Type.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
-				local.Add(Name.FromNative(field.Name), field);
+				local.Add(expression, Name.FromNative(field.Name), field);
 				var fieldExpression = Expression.Field(left, field);
 				_expressionsBySymbol.Add(field, fieldExpression);
 			}
@@ -1050,10 +1050,10 @@ namespace Ancestry.QueryProcessor.Compile
 			var memberType = left.Type.GenericTypeArguments[0];
 			var parameters = new List<ParameterExpression>();
 
-			var valueParam = CreateValueParam(local, left, memberType);
+			var valueParam = CreateValueParam(expression, local, left, memberType);
 			parameters.Add(valueParam);
 
-			var indexParam = CreateIndexParam(local);
+			var indexParam = CreateIndexParam(expression, local);
 			parameters.Add(indexParam);
 
 			var selection = Expression.Lambda(CompileExpression(local, expression.Right, typeHint), parameters);

@@ -4,7 +4,7 @@ using System.Resources;
 
 namespace Ancestry.QueryProcessor.Compile
 {
-	public class CompilerException : QPException
+	public class CompilerException : QPException, ILocatedException
 	{
 		public enum Codes : int
 		{
@@ -46,18 +46,33 @@ namespace Ancestry.QueryProcessor.Compile
 		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Compile.CompilerException", typeof(CompilerException).Assembly);
 
 		// Constructors
-		public CompilerException(Codes errorCode) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, null) {}
-		public CompilerException(Codes errorCode, params object[] paramsValue) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, paramsValue) {}
-		public CompilerException(Codes errorCode, Exception innerException) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, innerException, null) {}
-		public CompilerException(Codes errorCode, Exception innerException, params object[] paramsValue) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, innerException, paramsValue) {}
-		public CompilerException(Codes errorCode, ErrorSeverity severity) : base(_resourceManager, (int)errorCode, severity, null, null) {}
-		public CompilerException(Codes errorCode, ErrorSeverity severity, params object[] paramsValue) : base(_resourceManager, (int)errorCode, severity, null, paramsValue) {}
-		public CompilerException(Codes errorCode, ErrorSeverity severity, Exception innerException) : base(_resourceManager, (int)errorCode, severity, innerException, null) {}
-		public CompilerException(Codes errorCode, ErrorSeverity severity, Exception innerException, params object[] paramsValue) : base(_resourceManager, (int)errorCode, severity, innerException, paramsValue) {}
-		
-		public CompilerException(ErrorSeverity severity, int code, string message, string details, string serverContext, AncestryException innerException) 
+		public CompilerException(Parse.Statement statement, Codes errorCode) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, null) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, params object[] paramsValue) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, null, paramsValue) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, Exception innerException) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, innerException, null) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, Exception innerException, params object[] paramsValue) : base(_resourceManager, (int)errorCode, ErrorSeverity.Application, innerException, paramsValue) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, ErrorSeverity severity) : base(_resourceManager, (int)errorCode, severity, null, null) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, ErrorSeverity severity, params object[] paramsValue) : base(_resourceManager, (int)errorCode, severity, null, paramsValue) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, ErrorSeverity severity, Exception innerException) : base(_resourceManager, (int)errorCode, severity, innerException, null) { SetStatement(statement); }
+		public CompilerException(Parse.Statement statement, Codes errorCode, ErrorSeverity severity, Exception innerException, params object[] paramsValue) : base(_resourceManager, (int)errorCode, severity, innerException, paramsValue) { SetStatement(statement); }
+
+		public CompilerException(Parse.Statement statement, ErrorSeverity severity, int code, string message, string details, string serverContext, AncestryException innerException) 
 			: base(severity, code, message, details, serverContext, innerException)
 		{
+			SetStatement(statement);
 		}
+
+
+		public void SetStatement(Parse.Statement statement)
+		{
+			if (statement != null)
+			{
+				Line = statement.Line;
+				LinePos = statement.LinePos;
+			}
+		}
+
+		public int Line	{ get; set; }
+
+		public int LinePos { get; set; }
 	}
 }

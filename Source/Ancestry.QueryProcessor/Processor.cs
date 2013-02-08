@@ -1,6 +1,5 @@
 ﻿using Ancestry.QueryProcessor.Compile;
 using Ancestry.QueryProcessor.Parse;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,19 +17,19 @@ namespace Ancestry.QueryProcessor
 			Settings = settings ?? new ProcessorSettings();
 		}
 
-		public void Execute(string text, JObject args = null, QueryOptions options = null)
+		public void Execute(string text, IDictionary<string, object> args = null, QueryOptions options = null)
 		{
 			AdHocCall((ao, ct) => { InternalExecute(text, args, ao, ct); }, options);
 		}
 
-		public JToken Evaluate(string text, JObject args = null, QueryOptions options = null)
+		public object Evaluate(string text, IDictionary<string, object> args = null, QueryOptions options = null)
 		{
-			JToken result = null;
+			object result = null;
 			AdHocCall
 			(
 				(ao, ct) => 
 				{ 
-					result = JsonInterop.NativeToJson(InternalExecute(text, args, ao, ct)); 
+					result = InternalExecute(text, args, ao, ct); 
 				}, 
 				options
 			);
@@ -47,12 +46,12 @@ namespace Ancestry.QueryProcessor
 			throw new NotImplementedException("Not implemented.");
 		}
 
-		public void Execute(Guid token, JObject args = null)
+		public void Execute(Guid token, IDictionary<string, object> args = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
 
-		public JToken Evaluate(Guid token, JObject args = null)
+		public object Evaluate(Guid token, IDictionary<string, object> args = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
@@ -97,11 +96,8 @@ namespace Ancestry.QueryProcessor
 			actualOptions.QueryLimits = limits;
 		}
 
-		private object InternalExecute(string text, JObject args, QueryOptions actualOptions, CancellationToken cancelToken)
+		private object InternalExecute(string text, IDictionary<string, object> args, QueryOptions actualOptions, CancellationToken cancelToken)
 		{
-			// Convert arguments
-			var convertedArgs = JsonInterop.JsonArgsToNative(args);
-
 			// Create assembly and source file names
 			var assemblyName = "DotQL" + DateTime.Now.ToString("yyyyMMddhhmmssss");
 			var sourceFileName = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.ChangeExtension(assemblyName, "dql"));
@@ -111,7 +107,7 @@ namespace Ancestry.QueryProcessor
 				System.IO.File.WriteAllText(sourceFileName, text);
 
 			// Parse
-			var parser = new Parser();
+			var parser = new Parser() { ErrorIfNotEOF = true };
 			var script = Parser.ParseFrom(parser.Script, text);
 
 			// Compile
@@ -130,7 +126,7 @@ namespace Ancestry.QueryProcessor
 				);
 
 			// Run
-			return executable(convertedArgs, Settings.RepositoryFactory, cancelToken);
+			return executable(args, Settings.RepositoryFactory, cancelToken);
 		}
 	}
 }

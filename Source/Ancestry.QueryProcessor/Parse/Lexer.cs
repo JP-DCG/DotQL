@@ -257,7 +257,7 @@ namespace Ancestry.QueryProcessor.Parse
 		/// <returns> True if comment parsing should continue. </return>
 		private bool SkipLineComments()
 		{
-			if ((_next == '-') && !PeekEOF && (Peek == '-'))
+			if ((_next == '/') && !PeekEOF && (Peek == '/'))
 			{
 				Advance();
 				Advance();

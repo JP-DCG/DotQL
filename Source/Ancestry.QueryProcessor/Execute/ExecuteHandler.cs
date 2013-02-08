@@ -7,5 +7,5 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Execute
 {
-	public delegate object ExecuteHandler(Dictionary<string, object> args, Storage.IRepositoryFactory factory, CancellationToken cancelToken);
+	public delegate object ExecuteHandler(IDictionary<string, object> args, Storage.IRepositoryFactory factory, CancellationToken cancelToken);
 }

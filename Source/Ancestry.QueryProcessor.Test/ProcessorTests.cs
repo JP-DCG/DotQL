@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 
 namespace Ancestry.QueryProcessor.Test
 {
@@ -12,7 +12,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			
-			processor.Execute("\\Do nothing");
+			processor.Execute("//Do nothing");
 		}
 
 		[TestMethod]
@@ -20,8 +20,8 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			var result = processor.Evaluate("\\Nothing but a comment");
-			Assert.AreEqual(new Newtonsoft.Json.Linq.JValue((object)null), result);
+			var result = processor.Evaluate(@"//Nothing but a comment");
+			Assert.IsNull(result);
 		}
 
 		[TestMethod]
@@ -29,9 +29,9 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			var result = processor.Evaluate("var x := 5 return x", new JObject(new JProperty("x", 10)));
-			Assert.IsTrue(result is JValue);
-			Assert.AreEqual(10, ((JValue)result).Value);
+			var result = processor.Evaluate("var x := 5 return x", new Dictionary<string, object> { { "x", 10} });
+			Assert.IsTrue(result is int);
+			Assert.AreEqual(10, result);
 		}
 	}
 }

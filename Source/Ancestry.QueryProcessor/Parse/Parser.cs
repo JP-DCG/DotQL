@@ -112,6 +112,8 @@ namespace Ancestry.QueryProcessor.Parse
                     moduleDeclaration.Members.Add(ModuleMember(lexer));
             }
 
+			lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
+
             return moduleDeclaration;
         }
 
