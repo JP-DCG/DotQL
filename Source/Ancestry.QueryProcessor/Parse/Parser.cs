@@ -164,6 +164,8 @@ namespace Ancestry.QueryProcessor.Parse
 						enumMember.Values.Add(QualifiedIdentifier(lexer, true));
 					}
 
+					lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
+
 					moduleMember = enumMember;
 
 					break;

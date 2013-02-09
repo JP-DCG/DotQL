@@ -288,6 +288,26 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void SimpleModuleConst()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyConst: const 5 }");
+
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyConst");
+			Assert.AreEqual(5, result);
+		}
+
+		[TestMethod]
+		public void SimpleModuleEnum()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyEnum: enum { Red Green } }");
+
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 return Green");
+			Assert.AreEqual("Green", result.ToString());
+		}
+
+		[TestMethod]
 		public void TupleModuleVar()
 		{
 			var processor = new Processor();
@@ -305,6 +325,16 @@ namespace Ancestry.QueryProcessor.Test
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 var v : MyTypedef return v = { x:0 y:\"\" key{ x } }");
 			Assert.IsTrue(result);
+		}
+
+		[TestMethod]
+		public void SimpleModuleFunctionConst()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyFunc: const (x: Integer) => return x + 1 }");
+
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 return 5->MyFunc()");
+			Assert.AreEqual(6, result);
 		}
 	}
 }

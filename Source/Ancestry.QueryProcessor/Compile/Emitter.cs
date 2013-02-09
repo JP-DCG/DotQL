@@ -83,7 +83,7 @@ namespace Ancestry.QueryProcessor.Compile
 				FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
 				field.SetConstant(i++);
 			}
-			return enumType;
+			return enumType.CreateType();
 		}
 
 		public FieldBuilder DeclareConst(TypeBuilder module, string name, object value, System.Type type)

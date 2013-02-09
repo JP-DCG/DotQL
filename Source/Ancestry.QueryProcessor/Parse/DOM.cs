@@ -113,7 +113,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Name + " : " + Type.ToString();
+			return Name + " : typedef " + Type;
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -130,7 +130,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Name + " : " + String.Join(" ", from v in Values select v.ToString());
+			return Name + " : enum { " + String.Join(" ", from v in Values select v.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -147,7 +147,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Name + " : " + Expression;
+			return Name + " : const " + Expression;
 		}
 
 		public override IEnumerable<Statement> GetChildren()

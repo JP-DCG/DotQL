@@ -219,7 +219,7 @@ namespace Ancestry.QueryProcessor.Compile
 			frame.Add(use, moduleName, module);
 			
 			// Discover methods
-			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
+			foreach (var method in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
 			{
 				frame.Add(use, moduleName + Name.FromNative(method.Name), method);
 				_emitter.ImportType(method.ReturnType);
@@ -228,9 +228,21 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 
 			// Discover enums
-			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
-				frame.Add(use, moduleName + Name.FromNative(type.Name), type);
-			
+			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public))
+			{
+				var enumName = moduleName + Name.FromNative(type.Name);
+				frame.Add(use, enumName, type);
+				foreach (var enumItem in type.GetFields(BindingFlags.Public | BindingFlags.Static))
+					frame.Add(use, enumName + Name.FromNative(enumItem.Name), enumItem);
+			}
+
+			// Discover consts
+			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => (f.Attributes & FieldAttributes.Literal) == FieldAttributes.Literal))
+			{
+				frame.Add(use, moduleName + Name.FromNative(field.Name), field);
+				_emitter.ImportType(field.FieldType);
+			}
+
 			// Discover variables
 			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
@@ -239,7 +251,7 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 
 			// Discover typedefs
-			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static))
+			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => (f.Attributes & FieldAttributes.Literal) != FieldAttributes.Literal))
 			{
 				frame.Add(use, moduleName + Name.FromNative(field.Name), field.FieldType);
 				_emitter.ImportType(field.FieldType);
@@ -605,7 +617,7 @@ namespace Ancestry.QueryProcessor.Compile
 							}
 						);
 						break;
-						
+
 					default: throw new Exception("Internal Error: Unknown member type " + member.GetType().Name);
 				}
 			}
@@ -938,10 +950,21 @@ namespace Ancestry.QueryProcessor.Compile
 
 			switch (symbol.GetType().Name)
 			{
+				// Method
 				case "RuntimeMethodInfo": 
 					var method = (MethodInfo)symbol;
 					return Expression.Constant(method, typeof(MethodInfo)); 
+
+				// Const
+				case "MdFieldInfo":
+				{
+					var field = (FieldInfo)symbol;
+					return Expression.Constant(field.GetValue(null), field.FieldType);
+				}
+					
+				// Variable
 				case "RtFieldInfo":
+				{
 					var field = (FieldInfo)symbol;
 					
 					// Find the module instance
@@ -960,6 +983,7 @@ namespace Ancestry.QueryProcessor.Compile
 							Expression.Constant(null, typeof(Parse.Expression)),	// Condition
 							Expression.Constant(null, typeof(Name[]))		// Order
 						);
+				}
 
 				// TODO: enums and typedefs
 				default:
