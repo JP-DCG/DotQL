@@ -88,9 +88,25 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public FieldBuilder DeclareConst(TypeBuilder module, string name, object value, System.Type type)
 		{
-			var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
-			constField.SetConstant(value);
-			return constField;
+			if (type.IsValueType || typeof(String).IsAssignableFrom(type))
+			{
+				var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
+				constField.SetConstant(value);
+				return constField;
+			}
+			else
+			{
+				//var readOnlyField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly);
+				// construct value types through constructor
+				throw new NotImplementedException();
+			}
+		}
+
+		public MethodBuilder DeclareMethod(TypeBuilder module, string name, LambdaExpression expression)
+		{
+			var methodBuilder = module.DefineMethod(name, MethodAttributes.Static | MethodAttributes.Public);
+			expression.CompileToMethod(methodBuilder);
+			return methodBuilder;
 		}
 
 		public System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)

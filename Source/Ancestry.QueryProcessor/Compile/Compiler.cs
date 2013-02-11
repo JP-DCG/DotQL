@@ -608,9 +608,16 @@ namespace Ancestry.QueryProcessor.Compile
 							member, 
 							()=>
 							{
+								
+								MemberInfo result;
 								var expression = CompileExpression(local, ((Parse.ConstMember)member).Expression);
-								var expressionResult = CompileTimeEvaluate(expression);
-								var result = _emitter.DeclareConst(module, member.Name.ToString(), expressionResult, expression.Type);
+								if (expression is LambdaExpression)
+									result = _emitter.DeclareMethod(module, member.Name.ToString(), (LambdaExpression)expression);
+								else
+								{
+									var expressionResult = CompileTimeEvaluate(expression);
+									result = _emitter.DeclareConst(module, member.Name.ToString(), expressionResult, expression.Type);
+								}
 								_uncompiledMembers.Remove(member);
 								_compiledMembers.Add(member, result);
 								return result;
