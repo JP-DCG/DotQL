@@ -271,7 +271,7 @@ namespace Ancestry.QueryProcessor.Compile
 			if (type.IsGenericType)
 				ImportType(type.GenericTypeArguments[0]);
 			else
-				if (type.GetCustomAttribute(typeof(Type.TupleAttribute), true) != null)
+				if (ReflectionUtility.IsTupleType(type))
 				{
 					var tupleType = TupleTypeFromNative(type);
 					_tupleToNative.Add(tupleType, type);

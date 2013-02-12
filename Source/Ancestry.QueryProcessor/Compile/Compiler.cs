@@ -17,6 +17,9 @@ namespace Ancestry.QueryProcessor.Compile
 		private CompilerOptions _options;
 		private Emitter _emitter;
 		private SymbolDocumentInfo _symbolDocument;
+		private Dictionary<System.Type, TypeHandler> _typeHandlers = new Dictionary<System.Type, TypeHandler>();
+		private TypeHandler _scalarTypeHandler;
+		private TypeHandler _tupleTypeHandler;
 
 		// Scope management
 		private Dictionary<Parse.Statement, Frame> _frames = new Dictionary<Parse.Statement, Frame>();
@@ -24,6 +27,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public Frame _scriptFrame;
 		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
 		private Dictionary<object, Expression> _expressionsBySymbol = new Dictionary<object, Expression>();
+		public Dictionary<object, Expression> ExpressionsBySymbol { get { return _expressionsBySymbol; } }
 		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
 		private Dictionary<Parse.ModuleMember, Func<MemberInfo>> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Func<MemberInfo>>();
 		private Dictionary<Parse.ModuleMember, object> _compiledMembers = new Dictionary<Parse.ModuleMember, object>();
@@ -55,6 +59,15 @@ namespace Ancestry.QueryProcessor.Compile
 					}
 				);
 			_symbolDocument = Expression.SymbolDocument(_options.SourceFileName);
+
+			// Type handlers
+			_typeHandlers.Add(typeof(string), new StringTypeHandler());
+			_typeHandlers.Add(typeof(ISet<>), new SetTypeHandler());
+			_typeHandlers.Add(typeof(HashSet<>), new SetTypeHandler());
+			_typeHandlers.Add(typeof(IList<>), new ListTypeHandler());
+			_typeHandlers.Add(typeof(List<>), new ListTypeHandler());
+			_scalarTypeHandler = new ScalarTypeHandler();
+			_tupleTypeHandler = new TupleTypeHandler();
 
 			//// TODO: setup separate app domain with appropriate cache path, shadow copying etc.
 			//var domainName = "plan" + DateTime.Now.Ticks.ToString();
@@ -143,14 +156,30 @@ namespace Ancestry.QueryProcessor.Compile
 			{
 				var compiledTarget = CompileExpression(local, set.Target);
 				var compiledSource = CompileExpression(local, set.Source, compiledTarget.Type);
-				// TODO: handling of more find-grained references
-				block.Add(Expression.Assign(compiledTarget, compiledSource));
+				if (IsRepository(compiledTarget.Type))
+					block.Add
+					(
+						Expression.Call
+						(
+							compiledTarget, 
+							compiledTarget.Type.GetMethod("Set"), 
+							Expression.Constant(null, typeof(Parse.Expression)), 
+							compiledSource
+						)
+					);
+				else
+					block.Add(Expression.Assign(compiledTarget, compiledSource));
 			}
+		}
+
+		private static bool IsRepository(System.Type type)
+		{
+			return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Storage.IRepository<>);
 		}
 
 		private void CompileResult(Frame frame, Parse.ClausedExpression expression, List<Expression> block)
 		{
-			var result = CompileClausedExpression(frame, expression);
+			var result = MaterializeReference(CompileClausedExpression(frame, expression));
 
 			// Box the result if needed
 			if (result.Type.IsValueType)
@@ -271,7 +300,7 @@ namespace Ancestry.QueryProcessor.Compile
 			(
 				var field in
 					moduleType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-						.Where(f => f.FieldType.GetGenericTypeDefinition() == typeof(Storage.IRepository<>))
+						.Where(f => IsRepository(f.FieldType))
 			)
 				moduleInitializers.Add
 				(
@@ -405,12 +434,13 @@ namespace Ancestry.QueryProcessor.Compile
 			return Expression.Block(blocks);
 		}
 
-		private Expression CompileExpression(Frame frame, Parse.Expression expression, System.Type typeHint = null)
+		public Expression CompileExpression(Frame frame, Parse.Expression expression, System.Type typeHint = null)
 		{
 			switch (expression.GetType().Name)
 			{
 				case "LiteralExpression": return CompileLiteral(frame, (Parse.LiteralExpression)expression, typeHint);
 				case "BinaryExpression": return CompileBinaryExpression(frame, (Parse.BinaryExpression)expression, typeHint);
+				case "UnaryExpression": return CompileUnaryExpression(frame, (Parse.UnaryExpression)expression, typeHint);
 				case "ClausedExpression": return CompileClausedExpression(frame, (Parse.ClausedExpression)expression, typeHint);
 				case "IdentifierExpression": return CompileIdentifierExpression(frame, (Parse.IdentifierExpression)expression, typeHint);
 				case "TupleSelector": return CompileTupleSelector(frame, (Parse.TupleSelector)expression, typeHint);
@@ -426,7 +456,7 @@ namespace Ancestry.QueryProcessor.Compile
 		private Expression CompileRestrictExpression(Frame frame, Parse.RestrictExpression restrictExpression, System.Type typeHint)
 		{
 			var local = AddFrame(frame, restrictExpression);
-			var expression = CompileExpression(frame, restrictExpression.Expression, typeHint);
+			var expression = MaterializeReference(CompileExpression(frame, restrictExpression.Expression, typeHint));
 			if (typeof(IEnumerable).IsAssignableFrom(expression.Type) && expression.Type.IsGenericType)
 			{
 				var memberType = expression.Type.GenericTypeArguments[0];
@@ -474,7 +504,7 @@ namespace Ancestry.QueryProcessor.Compile
 			} 
 		}
 
-		private ParameterExpression CreateIndexParam(Parse.Statement statement, Frame local)
+		public ParameterExpression CreateIndexParam(Parse.Statement statement, Frame local)
 		{
 			var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
 			var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
@@ -483,7 +513,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return indexParam;
 		}
 
-		private ParameterExpression CreateValueParam(Parse.Statement statement, Frame frame, Expression expression, System.Type type)
+		public ParameterExpression CreateValueParam(Parse.Statement statement, Frame frame, Expression expression, System.Type type)
 		{
 			var valueParam = Expression.Parameter(type, Parse.ReservedWords.Value);
 			_expressionsBySymbol.Add(expression, valueParam);
@@ -649,9 +679,9 @@ namespace Ancestry.QueryProcessor.Compile
 			// Compile arguments
 			var args = new Expression[callExpression.Arguments.Count];
 			for (var i = 0; i < callExpression.Arguments.Count; i++)
-				args[i] = CompileExpression(frame, callExpression.Arguments[i]);
+				args[i] = MaterializeReference(CompileExpression(frame, callExpression.Arguments[i]));
 
-			var expression = CompileExpression(frame, callExpression.Expression);
+			var expression = MaterializeReference(CompileExpression(frame, callExpression.Expression));
 			if (typeof(MethodInfo).IsAssignableFrom(expression.Type) && expression is ConstantExpression)
 			{
 				var method = (MethodInfo)((ConstantExpression)expression).Value;
@@ -794,7 +824,9 @@ namespace Ancestry.QueryProcessor.Compile
 		
 		private System.Type CompileFunctionType(Frame frame, Parse.FunctionType functionType)
 		{
-			throw new NotImplementedException();
+			var types = new List<System.Type>(from p in functionType.Parameters select CompileTypeDeclaration(frame, p.Type));
+			types.Add(CompileTypeDeclaration(frame, functionType.ReturnType));
+			return Expression.GetDelegateType(types.ToArray());
 		}
 
 		private static Name[] IdentifiersToNames(IEnumerable<Parse.QualifiedIdentifier> ids)
@@ -978,24 +1010,29 @@ namespace Ancestry.QueryProcessor.Compile
 					if (!_expressionsBySymbol.TryGetValue(field.DeclaringType, out param))
 						throw new Exception("Internal error: unable to find module for field.");
 
-					return 
-						Expression.Call
-						(
-							Expression.Field
-							(
-								param,
-								field
-							),
-							field.FieldType.GetMethod("Get"),
-							Expression.Constant(null, typeof(Parse.Expression)),	// Condition
-							Expression.Constant(null, typeof(Name[]))		// Order
-						);
+					return Expression.Field(param, field);
 				}
 
 				// TODO: enums and typedefs
 				default:
 					throw new CompilerException(identifierExpression, CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
 			}
+		}
+
+		/// <summary> If the given expression is a repository reference, invokes the get to return a concrete value. </summary>
+		public Expression MaterializeReference(Expression expression)
+		{
+			if (IsRepository(expression.Type))
+				return
+					Expression.Call
+					(
+						expression,
+						expression.Type.GetMethod("Get"),
+						Expression.Constant(null, typeof(Parse.Expression)),	// Condition
+						Expression.Constant(null, typeof(Name[]))		// Order
+					);
+			else
+				return expression;
 		}
 
 		private object LazyCompileModuleMember(Parse.Statement statement, object symbol)
@@ -1019,81 +1056,39 @@ namespace Ancestry.QueryProcessor.Compile
 			return symbol;
 		}
 
+		private TypeHandler GetTypeHandler(System.Type type)
+		{
+			if (IsRepository(type))
+				type = type.GenericTypeArguments[0];
+
+			if (ReflectionUtility.IsTupleType(type))
+				return _tupleTypeHandler;
+			else if (type.IsGenericType)
+				type = type.GetGenericTypeDefinition();
+
+			TypeHandler handler;
+			if (_typeHandlers.TryGetValue(type, out handler))
+				return handler;
+			
+			if (type.IsValueType)
+				return _scalarTypeHandler;
+
+			throw new Exception(String.Format("Unsupported type: '{0}'", type));
+		}
+
 		private Expression CompileBinaryExpression(Frame frame, Parse.BinaryExpression expression, System.Type typeHint)
 		{
-			// TODO: if intrinsic type...
-			var result = CompileExpression(frame, expression.Left);
-			switch (expression.Operator)
-			{
-				case Parse.Operator.Addition: return Expression.Add(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.Subtract: return Expression.Subtract(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.Multiply: return Expression.Multiply(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.Modulo: return Expression.Modulo(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.Divide: return Expression.Divide(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.Power: return Expression.Power(result, CompileExpression(frame, expression.Right, typeHint));
-
-				case Parse.Operator.BitwiseAnd:
-				case Parse.Operator.And: return Expression.And(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.BitwiseOr:
-				case Parse.Operator.Or: return Expression.Or(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.BitwiseXor:
-				case Parse.Operator.Xor: return Expression.ExclusiveOr(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.ShiftLeft: return Expression.LeftShift(result, CompileExpression(frame, expression.Right, typeHint));
-				case Parse.Operator.ShiftRight: return Expression.RightShift(result, CompileExpression(frame, expression.Right, typeHint));
-
-				case Parse.Operator.Equal: return Expression.Equal(result, CompileExpression(frame, expression.Right));
-				case Parse.Operator.NotEqual: return Expression.NotEqual(result, CompileExpression(frame, expression.Right));
-				case Parse.Operator.InclusiveGreater: return Expression.GreaterThanOrEqual(result, CompileExpression(frame, expression.Right));
-				case Parse.Operator.InclusiveLess: return Expression.LessThanOrEqual(result, CompileExpression(frame, expression.Right));
-				case Parse.Operator.Greater: return Expression.GreaterThan(result, CompileExpression(frame, expression.Right));
-				case Parse.Operator.Less: return Expression.LessThan(result, CompileExpression(frame, expression.Right));
-
-				case Parse.Operator.Dereference: return CompileDereference(frame, result, expression, typeHint);
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
-			}
+			var left = CompileExpression(frame, expression.Left);
+			return GetTypeHandler(left.Type).CompileBinaryExpression(this, frame, left, expression, typeHint);
 		}
 
-		private Expression CompileDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
+		private Expression CompileUnaryExpression(Frame frame, Parse.UnaryExpression expression, System.Type typeHint)
 		{
-			if (typeof(IEnumerable).IsAssignableFrom(left.Type) && left.Type.IsGenericType)
-				return CompileNaryDereference(frame, left, expression, typeHint);
-			else if (left.Type.GetCustomAttribute(typeof(Type.TupleAttribute)) != null)
-				return CompileTupleDereference(frame, left, expression, typeHint);
-			else
-				throw new CompilerException(expression, CompilerException.Codes.CannotDereferenceOnType, left.Type);
+			var inner = CompileExpression(frame, expression.Expression);
+			return GetTypeHandler(inner.Type).CompileUnaryExpression(this, frame, inner, expression, typeHint);
 		}
 
-		private Expression CompileTupleDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
-		{
-			var local = AddFrame(frame, expression);
-			foreach (var field in left.Type.GetFields(BindingFlags.Public | BindingFlags.Instance))
-			{
-				local.Add(expression, Name.FromNative(field.Name), field);
-				var fieldExpression = Expression.Field(left, field);
-				_expressionsBySymbol.Add(field, fieldExpression);
-			}
-			return CompileExpression(local, expression.Right, typeHint);
-		}
-
-		private Expression CompileNaryDereference(Frame frame, Expression left, Parse.BinaryExpression expression, System.Type typeHint)
-		{
-			var local = AddFrame(frame, expression);
-			var memberType = left.Type.GenericTypeArguments[0];
-			var parameters = new List<ParameterExpression>();
-
-			var valueParam = CreateValueParam(expression, local, left, memberType);
-			parameters.Add(valueParam);
-
-			var indexParam = CreateIndexParam(expression, local);
-			parameters.Add(indexParam);
-
-			var selection = Expression.Lambda(CompileExpression(local, expression.Right, typeHint), parameters);
-			var select = typeof(Enumerable).GetMethodExt("Select", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) });
-			select = select.MakeGenericMethod(memberType, selection.ReturnType);
-			return Expression.Call(select, left, selection);
-		}
-
-		private Frame AddFrame(Frame parent, Parse.Statement statement)
+		public Frame AddFrame(Frame parent, Parse.Statement statement)
 		{
 			var newFrame = new Frame(parent);
 			_frames.Add(statement, newFrame);

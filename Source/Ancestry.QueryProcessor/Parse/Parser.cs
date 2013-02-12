@@ -108,9 +108,7 @@ namespace Ancestry.QueryProcessor.Parse
             lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 
             while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
-            {
-                    moduleDeclaration.Members.Add(ModuleMember(lexer));
-            }
+				moduleDeclaration.Members.Add(ModuleMember(lexer));
 
 			lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
 
@@ -878,6 +876,27 @@ namespace Ancestry.QueryProcessor.Parse
 						result.SetPosition(lexer);
 						result.Operator = UnaryKeywordToOperator(lexer[0].Token);
 						result.Expression = UnaryExpression(lexer);
+
+						// If negation against a literal number, invert the value rather than add a negate operator
+						if (result.Operator == Operator.Negate)
+						{
+							var literalExpression = result.Expression as LiteralExpression;
+							if (literalExpression != null)
+							{
+								switch (literalExpression.Value.GetType().Name)
+								{
+									case "Double":
+										literalExpression.Value = -(double)literalExpression.Value;
+										return literalExpression;
+									case "Integer":
+										literalExpression.Value = -(int)literalExpression.Value;
+										return literalExpression;
+									case "Long":
+										literalExpression.Value = -(long)literalExpression.Value;
+										return literalExpression;
+								}
+							}
+						}
 						return result;
 					}
 				}

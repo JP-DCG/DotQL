@@ -311,10 +311,25 @@ namespace Ancestry.QueryProcessor.Test
 		public void TupleModuleVar()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyVar: { x:Integer } }");
+			processor.Execute("module TestModule 1.0.0 { MyTup: { x:Integer }  MyInt: Integer  MySet: { Integer } }");
 
-			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyVar");
-			Assert.AreEqual(0, result.x);
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyTup.x");
+			Assert.AreEqual(0, result);
+
+			result = processor.Evaluate("using TestModule 1.0.0 return MyInt + 5");
+			Assert.AreEqual(5, result);
+
+			result = processor.Evaluate("using TestModule 1.0.0 set MySet := { -5 5 } return MySet?(value > 0)");
+			Assert.AreEqual(1, Enumerable.Count(result));
+
+			result = processor.Evaluate
+			(
+				@"using TestModule 1.0.0 
+				let f := (x: Integer y: Integer) => return x + y 
+				return { a:MyInt->f(5) b:5->f(MyInt) }"
+			);
+			Assert.AreEqual(5, result.a);
+			Assert.AreEqual(5, result.b);
 		}
 
 		[TestMethod]
@@ -334,6 +349,16 @@ namespace Ancestry.QueryProcessor.Test
 			processor.Execute("module TestModule 1.0.0 { MyFunc: const (x: Integer) => return x + 1 }");
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 return 5->MyFunc()");
+			Assert.AreEqual(6, result);
+		}
+
+		[TestMethod]
+		public void SimpleModuleFunctionVar()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyFunc: (x: Integer) => Integer }");
+
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 set MyFunc := (x: Integer) => return x + 1 return 5->MyFunc()");
 			Assert.AreEqual(6, result);
 		}
 	}

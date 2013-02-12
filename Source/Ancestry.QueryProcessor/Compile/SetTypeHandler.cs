@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Ancestry.QueryProcessor.Type
+namespace Ancestry.QueryProcessor.Compile
 {
-	public class Scalar
+	public class SetTypeHandler : NaryTypeHandler
 	{
-		
 	}
 }

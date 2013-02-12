@@ -14,6 +14,11 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly MethodInfo IRepositoryFactoryGetRepository = typeof(Storage.IRepositoryFactory).GetMethod("GetRepository<>");
 		public static readonly PropertyInfo ArrayLength = typeof(Array).GetProperty("Length");
 
+		public static bool IsTupleType(System.Type type)
+		{
+			return type.GetCustomAttribute(typeof(Type.TupleAttribute), true) != null;
+		}
+
 		#region GetMethodExt
 
 		// These GetMethodExt methods are from Ken Beckett's answer on Stack Overflow:
