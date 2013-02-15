@@ -8,7 +8,7 @@ namespace Ancestry.QueryProcessor.Service.Controllers
 		[QueryErrorHandler]
 		public JsonResult Index(string e, string a = null)
 		{
-			var service = new Processor(new ProcessorSettings());
+			var service = new Processor(QueryConfig.Settings);
 			var result = service.Evaluate(e, a == null ? null : JsonInterop.JsonArgsToNative(JObject.Parse(a)));
 			return Json(result, JsonRequestBehavior.AllowGet);
 		}

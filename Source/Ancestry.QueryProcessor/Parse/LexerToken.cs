@@ -156,10 +156,12 @@ namespace Ancestry.QueryProcessor.Parse
 				throw new LexerException(LexerException.Codes.TokenExpected, Enum.GetName(typeof(TokenType), token));
 		}
 
-		[System.Diagnostics.Conditional("DEBUG")]
 		public void DebugCheckType(TokenType token)
 		{
+			// WARNING: don't use the conditional attribute; that will omit the whole line in which this method is called, not just the call.  This results in skipped calls to NextToken(), causing lions and lambs to lie down together...
+			#if (!DEBUG)
 			CheckType(token);
+			#endif
 		}
 
 		/// <summary> Ensures that the current TokenType is a symbol equal to the given symbol.  </summary>
@@ -170,10 +172,12 @@ namespace Ancestry.QueryProcessor.Parse
 				throw new LexerException(LexerException.Codes.SymbolExpected, symbol);
 		}
 
-		[System.Diagnostics.Conditional("DEBUG")]
 		public void DebugCheckSymbol(string symbol)
 		{
+			// WARNING: don't use the conditional attribute; that will omit the whole line in which this method is called, not just the call.  This results in skipped calls to NextToken(), causing lions and lambs to lie down together...
+			#if (!DEBUG)
 			CheckSymbol(symbol);
+			#endif
 		}
 
 		/// <summary> Return true if the token's type is Symbol it matches the given symbol. </summary>

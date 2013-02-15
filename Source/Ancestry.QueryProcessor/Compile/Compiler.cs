@@ -1,9 +1,6 @@
-using Ancestry.QueryProcessor.Execute;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.SymbolStore;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -40,12 +37,12 @@ namespace Ancestry.QueryProcessor.Compile
 		// Using private constructor pattern because state spans single static call
 		private Compiler() { }
 
-		public static ExecuteHandler CreateExecutable(CompilerOptions options, Parse.Script script)
+		public static Runtime.ExecuteHandler CreateExecutable(CompilerOptions options, Parse.Script script)
 		{
 			return new Compiler().InternalCreateExecutable(options, script);
 		}
 
-		private ExecuteHandler InternalCreateExecutable(CompilerOptions options, Parse.Script script)
+		private Runtime.ExecuteHandler InternalCreateExecutable(CompilerOptions options, Parse.Script script)
 		{
 			_options = options;
 			_emitter =
@@ -77,8 +74,8 @@ namespace Ancestry.QueryProcessor.Compile
 			_factoryParam = Expression.Parameter(typeof(Storage.IRepositoryFactory), "factory");
 			_cancelParam = Expression.Parameter(typeof(CancellationToken), "cancelToken");
 
-			var execute =
-				Expression.Lambda<ExecuteHandler>
+			var lambda =
+				Expression.Lambda<Runtime.ExecuteHandler>
 				(
 					CompileScript(script),
 					_argParam,
@@ -86,10 +83,12 @@ namespace Ancestry.QueryProcessor.Compile
 					_cancelParam
 				);
 
-			return execute.Compile();//pdbGenerator);
+			var compiled = _emitter.DeclareProgram(lambda);
 
-			//// TODO: Pass debug info
-			//execute.CompileToMethod(method);
+			//if (_options.DebugOn)
+			//	_emitter.SaveAssembly();
+
+			return compiled;
 		}
 
 		private IEnumerable<Runtime.ModuleTuple> GetModules()
@@ -214,11 +213,16 @@ namespace Ancestry.QueryProcessor.Compile
 					(
 						typeof(Runtime.Runtime).GetMethod("GetInitializer").MakeGenericMethod(type), 
 						initializer, 
-						_argParam, 
-						Expression.Constant(Name.FromQualifiedIdentifier(v.Name))
+						_argParam,
+						MakeNameConstant(Name.FromQualifiedIdentifier(v.Name))
 					)
 				)
 			);
+		}
+
+		private static Expression MakeNameConstant(Name name)
+		{
+			return Builder.Name(name.Components);
 		}
 
 		private void CompileModule(Frame frame, List<Expression> block, Parse.ModuleDeclaration module)
@@ -232,9 +236,9 @@ namespace Ancestry.QueryProcessor.Compile
 				Expression.Call
 				(
 					typeof(Runtime.Runtime).GetMethod("DeclareModule"),
-					Expression.Constant(Name.FromQualifiedIdentifier(module.Name)),
-					Expression.Constant(module.Version),
-					Expression.Constant(moduleType),
+					MakeNameConstant(Name.FromQualifiedIdentifier(module.Name)),
+					Builder.Version(module.Version),
+					Expression.Constant(moduleType, typeof(System.Type)),
 					_factoryParam
 				)
 			);
@@ -311,8 +315,8 @@ namespace Ancestry.QueryProcessor.Compile
 						(
 							_factoryParam,
 							typeof(Storage.IRepositoryFactory).GetMethod("GetRepository").MakeGenericMethod(field.FieldType.GenericTypeArguments),
-							Expression.Constant(moduleType),
-							Expression.Constant(Name.FromNative(field.Name))
+							Expression.Constant(moduleType, typeof(System.Type)),
+							Expression.Call(ReflectionUtility.NameFromNative, Expression.Constant(field.Name))
 						)
 					)
 				);
@@ -663,7 +667,7 @@ namespace Ancestry.QueryProcessor.Compile
 			while (_uncompiledMembers.Count > 0)
 				_uncompiledMembers.First().Value();
 
-			return module.CreateType();
+			return _emitter.EndModule(module);
 		}
 
 		private static object CompileTimeEvaluate(Expression expression)
@@ -1097,7 +1101,21 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private Expression CompileLiteral(Frame frame, Parse.LiteralExpression expression, System.Type typeHint)
 		{
-			return Expression.Constant(expression.Value);
+			if (expression.Value == null)
+				return Expression.Constant(null, typeHint);
+			switch (expression.Value.GetType().ToString())
+			{
+				case "System.DateTime": 
+					return Expression.New
+					(
+						typeof(DateTime).GetConstructor(new[] { typeof(long) }), 
+						Expression.Constant(((DateTime)expression.Value).Ticks)
+					);
+				case "System.Version":
+					var version = (Version)expression.Value;
+					return Builder.Version(version);
+				default: return Expression.Constant(expression.Value);
+			}
 		}
 	}
 }

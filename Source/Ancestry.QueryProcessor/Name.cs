@@ -21,6 +21,11 @@ namespace Ancestry.QueryProcessor
 			return new Name { Components = components };
 		}
 
+		public Parse.QualifiedIdentifier ToQualifiedIdentifier()
+		{
+			return new Parse.QualifiedIdentifier { IsRooted = this.IsRooted, Components = this.Components };
+		}
+
 		public override bool Equals(object obj)
 		{
 			if (!(obj is Name))

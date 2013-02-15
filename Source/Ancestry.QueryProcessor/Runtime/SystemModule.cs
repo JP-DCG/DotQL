@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+[assembly: Ancestry.QueryProcessor.Type.Module(typeof(Ancestry.QueryProcessor.Runtime.SystemModule), new[] { "System" })]
+
 namespace Ancestry.QueryProcessor.Runtime
 {
-	[Type.Module(new[] { "System" })]
 	public class SystemModule
 	{
 		public static readonly Boolean Boolean;
@@ -24,6 +25,8 @@ namespace Ancestry.QueryProcessor.Runtime
 		public static readonly Version Version;
 
 		public Storage.IRepository<ISet<ModuleTuple>> Modules;
+
+		public Storage.IRepository<ISet<UsingTuple>> DefaultUsings;
 
 		public static IList<T> ToList<T>(ISet<T> setValue)
 		{

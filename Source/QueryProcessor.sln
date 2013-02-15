@@ -17,6 +17,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F6558DB2-B164-4FC3-865D-C4F4E4588C1E}"
 	ProjectSection(SolutionItems) = preProject
 		..\Documents\DotQLByExample.dql = ..\Documents\DotQLByExample.dql
+		Performance1.psess = Performance1.psess
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
@@ -59,5 +60,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal

@@ -46,8 +46,12 @@ namespace Ancestry.QueryProcessor.Test
 		public void TupleKeyAndComparison()
 		{
 			var processor = new Processor();
+			
 			dynamic result = processor.Evaluate("return { x:2 y:'hello' key{ x } } = { x:2 y:'other' key{ x } }");
 			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return { x:2 y:'hello' key{ y } } = { x:2 y:'other' key{ y } }");
+			Assert.IsFalse(result);
 		}
 
 		[TestMethod]
@@ -69,6 +73,25 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[0], 2);
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
+
+			result = processor.Evaluate("return { 'a' 'b' 'c' }");
+			Assert.IsTrue(result.Count == 3);
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(result[0], "a");
+			Assert.AreEqual(result[1], "b");
+			Assert.AreEqual(result[2], "c");
+
+			result = processor.Evaluate("return { { x:1 } { x:2 } { x:3 } }");
+			Assert.IsTrue(result.Count == 3);
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(result[0].x, 1);
+			Assert.AreEqual(result[1].x, 2);
+			Assert.AreEqual(result[2].x, 3);
+
+			result = processor.Evaluate("return { { x:1 y:'a' key{ x } } { x:1 y:'b' key{ x } } }");
+			Assert.IsTrue(result.Count == 1);
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(result[0].x, 1);
 		}
 
 		[TestMethod]

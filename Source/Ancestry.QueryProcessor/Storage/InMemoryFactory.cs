@@ -9,7 +9,7 @@ namespace Ancestry.QueryProcessor.Storage
 {
 	public class InMemoryFactory : IRepositoryFactory
 	{
-		private IEnumerable<System.Type> FindModules()
+		private IEnumerable<KeyValuePair<Name, System.Type>> FindModules()
 		{
 			foreach 
 			(
@@ -17,17 +17,8 @@ namespace Ancestry.QueryProcessor.Storage
 					AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
 						.Union(from an in AdditionalAssemblies select Assembly.Load(an))
 			)
-				foreach (var type in assembly.GetTypes().Where(t => t.GetCustomAttributes(typeof(Type.ModuleAttribute), true).Length > 0))
-					yield return type;
-		}
-
-		private static Runtime.ModuleTuple GetModuleTuple(System.Type module)
-		{
-			var attribute = (Type.ModuleAttribute)module.GetCustomAttribute(typeof(Type.ModuleAttribute));
-			if (attribute != null)
-				return new Runtime.ModuleTuple { Name = attribute.Name, Version = new Version(1, 0), Class = module };
-			else
-				return new Runtime.ModuleTuple { Name = Name.FromComponents(module.FullName.Split('.')), Version = new Version(1, 0), Class = module };
+				foreach (var moduleAttribute in assembly.GetCustomAttributes<Type.ModuleAttribute>())
+					yield return new KeyValuePair<Name, System.Type>(moduleAttribute.Name, moduleAttribute.ModuleClass);
 		}
 
 		private Dictionary<ModuleVar, object> _repositories = new Dictionary<ModuleVar, object>();
@@ -45,7 +36,7 @@ namespace Ancestry.QueryProcessor.Storage
 				{
 					_modules = new HashSet<Runtime.ModuleTuple>();
 					foreach (var module in FindModules())
-						_modules.Add(GetModuleTuple(module));
+						_modules.Add(new Runtime.ModuleTuple { Name = module.Key, Version = new Version(1, 0), Class = module.Value });
 				}
 				return _modules; 
 			} 
@@ -77,12 +68,21 @@ namespace Ancestry.QueryProcessor.Storage
 
 		public IRepository<T> GetRepository<T>(System.Type module, Name varName)
 		{
-			if (module == typeof(Runtime.SystemModule))
+			if (module == typeof(Runtime.SystemModule) && varName.ToString() == "Modules")
 			{
-				// if (varName == "Modules")
-				if (_moduleRepository == null)
-					_moduleRepository = new InMemoryModuleRepository(this);
-				return (IRepository<T>)_moduleRepository;
+				switch (varName.ToString())
+				{
+					case "Modules":
+						if (_moduleRepository == null)
+							_moduleRepository = new InMemoryModuleRepository(this);
+						return (IRepository<T>)_moduleRepository;
+					//case "DefaultUsings":
+					//	if (_usingsRepository == null)
+					//		_usingsRepository = new InMemoryUsingRepository(this);
+					//	return _usingsRepository;
+					default:
+						throw new NotSupportedException();
+				}
 			}
 			else
 			{

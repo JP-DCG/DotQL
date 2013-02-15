@@ -54,5 +54,24 @@ namespace Ancestry.QueryProcessor.Compile
 				Expression.Bind(typeof(Parse.BinaryExpression).GetProperty("Right"), rightValue)
 			);
 		}
+
+		public static Expression Version(Version version)
+		{
+			var components = new List<Expression>() { Expression.Constant(version.Major) };
+			if (version.Minor >= 0)
+				components.Add(Expression.Constant(version.Minor));
+			if (version.Build >= 0)
+				components.Add(Expression.Constant(version.Build));
+			if (version.Revision >= 0)
+				components.Add(Expression.Constant(version.Revision));
+			var types = new List<System.Type>() { typeof(int) };
+			while (types.Count < components.Count)
+				types.Add(typeof(int));
+			return Expression.New
+			(
+				typeof(Version).GetConstructor(types.ToArray()),
+				components
+			);
+		}
 	}
 }

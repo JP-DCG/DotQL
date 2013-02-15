@@ -12,6 +12,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly MethodInfo ObjectEquals = typeof(object).GetMethod("Equals", new System.Type[] { typeof(object) });
 		public static readonly MethodInfo ObjectGetHashCode = typeof(object).GetMethod("GetHashCode");
 		public static readonly MethodInfo IRepositoryFactoryGetRepository = typeof(Storage.IRepositoryFactory).GetMethod("GetRepository<>");
+		public static readonly MethodInfo NameFromNative = typeof(Name).GetMethod("FromNative");
+		public static readonly MethodInfo NameFromComponents = typeof(Name).GetMethod("FromComponents");
 		public static readonly PropertyInfo ArrayLength = typeof(Array).GetProperty("Length");
 
 		public static bool IsTupleType(System.Type type)

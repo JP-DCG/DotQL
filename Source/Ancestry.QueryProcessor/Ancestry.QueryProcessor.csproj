@@ -57,7 +57,7 @@
     <Compile Include="Compile\UsingComparer.cs" />
     <Compile Include="Parse\ReservedWords.cs" />
     <Compile Include="Processor.cs" />
-    <Compile Include="Execute\ExecuteHandler.cs" />
+    <Compile Include="Runtime\ExecuteHandler.cs" />
     <Compile Include="Compile\Characteristics.cs" />
     <Compile Include="Compile\Frame.cs" />
     <Compile Include="IProcessor.cs" />
@@ -73,6 +73,7 @@
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
     <Compile Include="Compile\SetTypeHandler.cs" />
+    <Compile Include="Runtime\UsingTuple.cs" />
     <Compile Include="Storage\InMemoryModuleRepository.cs" />
     <Compile Include="Storage\InMemoryRepository.cs" />
     <Compile Include="Storage\InMemoryFactory.cs" />
@@ -119,7 +120,9 @@
   <ItemGroup>
     <None Include="Parse\DotQL.g4" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Execute\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

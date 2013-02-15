@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Compile
@@ -43,7 +44,7 @@ namespace Ancestry.QueryProcessor.Compile
 						}
 					)
 				);
-			_module = _assembly.DefineDynamicModule(_assemblyName.Name + ".dll", _options.DebugOn);
+			_module = _assembly.DefineDynamicModule(_assemblyName.Name, _assemblyName.Name + ".dll", _options.DebugOn);
 			if (_options.DebugOn)
 				_symbolWriter = _module.DefineDocument(_options.SourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
 			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
@@ -52,8 +53,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public void SaveAssembly()
 		{
 			_module.CreateGlobalFunctions();
-			// TODO: assembly saving
-			//_assembly.Save(_assemblyName + ".dll");
+			_assembly.Save(_assemblyName + ".dll");
 
 			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
 		}
@@ -107,6 +107,23 @@ namespace Ancestry.QueryProcessor.Compile
 			var methodBuilder = module.DefineMethod(name, MethodAttributes.Static | MethodAttributes.Public);
 			expression.CompileToMethod(methodBuilder);
 			return methodBuilder;
+		}
+
+		public System.Type EndModule(TypeBuilder module)
+		{
+			var result = module.CreateType();
+			_assembly.SetCustomAttribute
+				(
+					new CustomAttributeBuilder
+					(
+						typeof(Type.ModuleAttribute).GetConstructor
+						(
+							new System.Type[] { typeof(System.Type), typeof(string[]) }
+						),
+						new object[] { result, Name.FromNative(result.Name).Components }
+					)
+				); 
+			return result;
 		}
 
 		public System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
@@ -228,15 +245,12 @@ namespace Ancestry.QueryProcessor.Compile
 			foreach (var keyItem in tupleType.GetKeyAttributes())
 			{
 				var field = fieldsByID[keyItem];
-				var hashMethod = field.FieldType.GetMethod("GetHashCode");
 
 				// result ^= this.<field>.GetHashCode();
 				il.Emit(OpCodes.Ldarg_0);
 				il.Emit(OpCodes.Ldflda, field);
-				if (hashMethod != null)
-					il.EmitCall(OpCodes.Call, hashMethod, null);
-				else
-					il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectGetHashCode, null);
+				il.Emit(OpCodes.Constrained, field.FieldType);
+				il.EmitCall(OpCodes.Callvirt, ReflectionUtility.ObjectGetHashCode, null);
 				il.Emit(OpCodes.Xor);
 			}
 			il.Emit(OpCodes.Ret);
@@ -249,18 +263,23 @@ namespace Ancestry.QueryProcessor.Compile
 			var equalsMethod = typeBuilder.DefineMethod("Equals", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(bool), new System.Type[] { typeof(object) });
 			var il = equalsMethod.GetILGenerator();
 			var baseLabel = il.DefineLabel();
+			var theEnd = il.DefineLabel();
 			il.Emit(OpCodes.Ldarg_1);
 			il.Emit(OpCodes.Isinst, typeBuilder);
 			il.Emit(OpCodes.Brfalse, baseLabel);
 			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Castclass, typeBuilder);
+			il.Emit(OpCodes.Unbox_Any, typeBuilder);
 			il.Emit(OpCodes.Ldarg_0);
+			il.Emit(OpCodes.Ldobj, typeBuilder);
 			il.EmitCall(OpCodes.Call, equalityMethod, null);
-			il.Emit(OpCodes.Ret);
+			il.Emit(OpCodes.Br_S, theEnd);
 			il.MarkLabel(baseLabel);
 			il.Emit(OpCodes.Ldarg_0);
+			il.Emit(OpCodes.Ldobj, typeBuilder);
+			il.Emit(OpCodes.Box, typeBuilder);
 			il.Emit(OpCodes.Ldarg_1);
 			il.EmitCall(OpCodes.Call, ReflectionUtility.ObjectEquals, null);
+			il.MarkLabel(theEnd);
 			il.Emit(OpCodes.Ret);
 			typeBuilder.DefineMethodOverride(equalsMethod, ReflectionUtility.ObjectEquals);
 			return equalsMethod;
@@ -308,5 +327,22 @@ namespace Ancestry.QueryProcessor.Compile
 
 			return tupleType;
 		}
+
+		public Runtime.ExecuteHandler DeclareProgram(Expression<Runtime.ExecuteHandler> lambda)
+		{
+			var typeBuilder = _module.DefineType("Program", TypeAttributes.Class | TypeAttributes.Public);
+			var methodBuilder = 
+				typeBuilder.DefineMethod
+				(
+					"Main", 
+					MethodAttributes.Public | MethodAttributes.Static, 
+					typeof(void), 
+					new[] { typeof(IDictionary<string, object>), typeof(Storage.IRepositoryFactory), typeof(CancellationToken) }
+				);
+			lambda.CompileToMethod(methodBuilder);
+			var type = typeBuilder.CreateType();
+			return (Runtime.ExecuteHandler)type.GetMethod("Main").CreateDelegate(typeof(Runtime.ExecuteHandler));
+		}
+
 	}
 }

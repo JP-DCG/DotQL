@@ -123,9 +123,11 @@
   <ItemGroup>
     <Compile Include="App_Code\JsonInterop.cs" />
     <Compile Include="App_Code\JsonNetResult.cs" />
+    <Compile Include="App_Code\QueryConfiguration.cs" />
     <Compile Include="App_Code\QueryErrorHandlerAttribute.cs" />
     <Compile Include="App_Start\BundleConfig.cs" />
     <Compile Include="App_Start\FilterConfig.cs" />
+    <Compile Include="App_Start\QueryConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="Controllers\ExecController.cs" />
@@ -193,6 +195,7 @@
     <Content Include="Content\themes\base\minified\jquery.ui.theme.min.css" />
     <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
+    <None Include="Properties\PublishProfiles\Local.pubxml" />
     <None Include="Scripts\jquery-1.7.1.intellisense.js" />
     <Content Include="Scripts\jquery-1.7.1.js" />
     <Content Include="Scripts\jquery-1.7.1.min.js" />
@@ -244,6 +247,10 @@
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Ancestry.QueryProcessor.Sql\Ancestry.QueryProcessor.Sql.csproj">
+      <Project>{62117f0b-36af-4c45-96fc-fe6e46c17b77}</Project>
+      <Name>Ancestry.QueryProcessor.Sql</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Ancestry.QueryProcessor\Ancestry.QueryProcessor.csproj">
       <Project>{53a4f3dd-b519-4269-a9af-ceab0a030b39}</Project>
       <Name>Ancestry.QueryProcessor</Name>
