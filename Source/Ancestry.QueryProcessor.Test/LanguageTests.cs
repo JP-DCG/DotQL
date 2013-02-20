@@ -18,18 +18,42 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
-		public void BasicEvaluate()
+		public void ReturnLiterals()
 		{
 			var processor = new Processor();
 
-			var result = processor.Evaluate("return 'Hello world.'");
-			Assert.AreEqual("Hello world.", result);
+			dynamic result = processor.Evaluate("return 5");
+			Assert.AreEqual(result, 5);
+			result = processor.Evaluate("return 'Test String'");
+			Assert.AreEqual(result, "Test String");
+			result = processor.Evaluate("return '2/3/2013'dt");
+			Assert.AreEqual(result, DateTime.Parse("2/3/2013"));
+			result = processor.Evaluate("return '01:02:00'ts");
+			Assert.AreEqual(result, TimeSpan.Parse("01:02:00"));
+			result = processor.Evaluate("return 23.45");
+			Assert.AreEqual(result, 23.45);
+			result = processor.Evaluate("return true");
+			Assert.AreEqual(result, true);
+			// TODO: remaining literal types
+			//result = processor.Evaluate("return '59A94476-175E-4A83-875B-BD23F71ABDC1'g");
+			//Assert.AreEqual(result, Guid.Parse("59A94476-175E-4A83-875B-BD23F71ABDC1"));
+		}
 
-			result = processor.Evaluate("return 5 - 10 * 3");
+		[TestMethod]
+		public void IntOperators()
+		{
+			var processor = new Processor();
+
+			// Test basic precedence
+			dynamic result = processor.Evaluate("return 5 - 10 * 3");
 			Assert.AreEqual((5 - 10 * 3), result);
 
 			result = processor.Evaluate("return 5 * 3 + 1");
 			Assert.AreEqual((5 * 3 + 1), result);
+
+			// Test remaining operators
+			result = processor.Evaluate("return ~(5**3 / 1 ^ 23 % 2)");
+			Assert.AreEqual((~(Runtime.Runtime.IntPower(5, 3) / 1 ^ 23 % 2)), result);
 		}
 
 		[TestMethod]

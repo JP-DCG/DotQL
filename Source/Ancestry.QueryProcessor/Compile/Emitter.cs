@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ancestry.QueryProcessor.Type;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.SymbolStore;
@@ -21,11 +22,14 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private EmitterOptions _options;
 
-		private Dictionary<Type.TupleType, System.Type> _tupleToNative;
+		private Dictionary<TupleType, System.Type> _tupleToNative;
 
 		public Emitter(EmitterOptions options)
 		{
 			_options = options;
+			//// TODO: setup separate app domain with appropriate cache path, shadow copying etc.
+			//var domainName = "plan" + DateTime.Now.Ticks.ToString();
+			//var domain = AppDomain.CreateDomain(domainName);
 			_assemblyName = new AssemblyName(_options.AssemblyName);
 			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
 			if (_options.DebugOn)
@@ -47,13 +51,14 @@ namespace Ancestry.QueryProcessor.Compile
 			_module = _assembly.DefineDynamicModule(_assemblyName.Name, _assemblyName.Name + ".dll", _options.DebugOn);
 			if (_options.DebugOn)
 				_symbolWriter = _module.DefineDocument(_options.SourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
-			_tupleToNative = new Dictionary<Type.TupleType, System.Type>();
+			_tupleToNative = new Dictionary<TupleType, System.Type>();
 		}
 
 		public void SaveAssembly()
 		{
 			_module.CreateGlobalFunctions();
-			_assembly.Save(_assemblyName + ".dll");
+			if (Debugger.IsAttached)
+				_assembly.Save(_assemblyName + ".dll");
 
 			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
 		}
@@ -109,6 +114,49 @@ namespace Ancestry.QueryProcessor.Compile
 			return methodBuilder;
 		}
 
+		public ExpressionContext EmitLiteral(MethodContext method, object value, BaseType typeHint)
+		{
+			if (value == null)
+			{
+				method.IL.Emit(OpCodes.Ldnull);
+				return new ExpressionContext { Type = typeHint };
+			}
+			switch (value.GetType().ToString())
+			{
+				case "System.Boolean":
+					method.IL.Emit(((bool)value) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+					break;
+				case "System.DateTime":
+					method.IL.Emit(OpCodes.Ldc_I8, ((DateTime)value).Ticks);
+					method.IL.Emit(OpCodes.Newobj, ReflectionUtility.DateTimeTicksConstructor);
+					break;
+				case "System.TimeSpan":
+					method.IL.Emit(OpCodes.Ldc_I8, ((TimeSpan)value).Ticks);
+					method.IL.Emit(OpCodes.Newobj, ReflectionUtility.TimeSpanTicksConstructor);
+					break;
+				case "System.Version":
+					method.EmitVersion((Version)value);
+					break;
+				case "System.String":
+					method.IL.Emit(OpCodes.Ldstr, (string)value);
+					return new ExpressionContext { Type = SystemTypes.String };
+				case "System.Int32":
+					method.IL.Emit(OpCodes.Ldc_I4, (int)value);
+					return new ExpressionContext { Type = SystemTypes.Integer };
+				case "System.Int64":
+					method.IL.Emit(OpCodes.Ldc_I8, (long)value);
+					return new ExpressionContext { Type = SystemTypes.Long };
+				case "System.Double":
+					method.IL.Emit(OpCodes.Ldc_R8, (double)value);
+					break;
+				case "System.Char":
+					method.IL.Emit(OpCodes.Ldc_I4, (char)value);
+					break;
+				default: throw new NotSupportedException(String.Format("Literal type {0} not yet supported.", value.GetType().ToString()));
+			}
+			return new ExpressionContext { Type = new ScalarType { Type = value.GetType() } };
+		}
+
 		public System.Type EndModule(TypeBuilder module)
 		{
 			var result = module.CreateType();
@@ -116,7 +164,7 @@ namespace Ancestry.QueryProcessor.Compile
 				(
 					new CustomAttributeBuilder
 					(
-						typeof(Type.ModuleAttribute).GetConstructor
+						typeof(ModuleAttribute).GetConstructor
 						(
 							new System.Type[] { typeof(System.Type), typeof(string[]) }
 						),
@@ -126,7 +174,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return result;
 		}
 
-		public System.Type FindOrCreateNativeFromTupleType(Type.TupleType tupleType)
+		public System.Type FindOrCreateNativeFromTupleType(TupleType tupleType)
 		{
 			System.Type nativeType;
 			if (!_tupleToNative.TryGetValue(tupleType, out nativeType))
@@ -137,7 +185,7 @@ namespace Ancestry.QueryProcessor.Compile
 			return nativeType;
 		}
 
-		public System.Type NativeFromTupleType(Type.TupleType tupleType)
+		public System.Type NativeFromTupleType(TupleType tupleType)
 		{
 			var typeBuilder = _module.DefineType("Tuple" + tupleType.GetHashCode(), TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.Serializable, typeof(ValueType));
 			var fieldsByID = new Dictionary<Name, FieldInfo>();
@@ -145,7 +193,7 @@ namespace Ancestry.QueryProcessor.Compile
 			// Add attributes
 			foreach (var attribute in tupleType.Attributes)
 			{
-				var field = typeBuilder.DefineField(attribute.Key.ToString(), attribute.Value, FieldAttributes.Public);
+				var field = typeBuilder.DefineField(attribute.Key.ToString(), attribute.Value.GetNative(this), FieldAttributes.Public);
 				fieldsByID.Add(attribute.Key, field);
 			}
 
@@ -155,7 +203,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var cab =
 					new CustomAttributeBuilder
 					(
-						typeof(Type.TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string), typeof(string[]), typeof(string), typeof(string[]) }),
+						typeof(TupleReferenceAttribute).GetConstructor(new System.Type[] { typeof(string), typeof(string[]), typeof(string), typeof(string[]) }),
 						new object[] 
 							{ 
 								reference.Key.ToString(),
@@ -173,7 +221,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var cab =
 					new CustomAttributeBuilder
 					(
-						typeof(Type.TupleKeyAttribute).GetConstructor(new System.Type[] { typeof(string[]) }),
+						typeof(TupleKeyAttribute).GetConstructor(new System.Type[] { typeof(string[]) }),
 						new object[] { (from an in key.AttributeNames select an.ToString()).ToArray() }
 					);
 				typeBuilder.SetCustomAttribute(cab);
@@ -183,7 +231,7 @@ namespace Ancestry.QueryProcessor.Compile
 			var attributeBuilder =
 				new CustomAttributeBuilder
 				(
-					typeof(Type.TupleAttribute).GetConstructor(new System.Type[] { }),
+					typeof(TupleAttribute).GetConstructor(new System.Type[] { }),
 					new object[] { }
 				);
 			typeBuilder.SetCustomAttribute(attributeBuilder);
@@ -210,11 +258,11 @@ namespace Ancestry.QueryProcessor.Compile
 			return inequalityMethod;
 		}
 
-		private static MethodBuilder EmitTupleEquality(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
+		private static MethodBuilder EmitTupleEquality(TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
 		{
 			var equalityMethod = typeBuilder.DefineMethod("op_Equality", MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, CallingConventions.Standard, typeof(bool), new System.Type[] { typeBuilder, typeBuilder });
 			var il = equalityMethod.GetILGenerator();
-			bool first = true;
+			var end = il.DefineLabel();
 			foreach (var keyItem in tupleType.GetKeyAttributes())
 			{
 				var field = fieldsByID[keyItem];
@@ -227,16 +275,17 @@ namespace Ancestry.QueryProcessor.Compile
 					il.EmitCall(OpCodes.Call, fieldEqualityMethod, null);
 				else
 					il.Emit(OpCodes.Ceq);
-				if (first)
-					first = false;
-				else
-					il.Emit(OpCodes.And);
+				il.Emit(OpCodes.Dup);
+				il.Emit(OpCodes.Brfalse_S, end);
+				il.Emit(OpCodes.Pop);
 			}
+			il.Emit(OpCodes.Ldc_I4_1);	// True
+			il.MarkLabel(end);
 			il.Emit(OpCodes.Ret);
 			return equalityMethod;
 		}
 
-		private static MethodBuilder EmitTupleGetHashCode(Type.TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
+		private static MethodBuilder EmitTupleGetHashCode(TupleType tupleType, TypeBuilder typeBuilder, Dictionary<Name, FieldInfo> fieldsByID)
 		{
 			var getHashCodeMethod = typeBuilder.DefineMethod("GetHashCode", MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot, CallingConventions.HasThis, typeof(Int32), new System.Type[] { });
 			var il = getHashCodeMethod.GetILGenerator();
@@ -297,20 +346,20 @@ namespace Ancestry.QueryProcessor.Compile
 				}
 		}
 
-		private Type.TupleType TupleTypeFromNative(System.Type type)
+		private TupleType TupleTypeFromNative(System.Type type)
 		{
-			var tupleType = new Type.TupleType();
+			var tupleType = new TupleType();
 
 			// Get attributes
 			foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
-				tupleType.Attributes.Add(Name.FromNative(field.Name), field.FieldType);
+				tupleType.Attributes.Add(Name.FromNative(field.Name), TypeFromNative(field.FieldType));
 
 			// Get references
-			foreach (Type.TupleReferenceAttribute r in type.GetCustomAttributes(typeof(Type.TupleReferenceAttribute)))
+			foreach (TupleReferenceAttribute r in type.GetCustomAttributes(typeof(TupleReferenceAttribute)))
 				tupleType.References.Add
 				(
 					Name.FromNative(r.Name), 
-					new Type.TupleReference 
+					new TupleReference 
 					{ 
 						SourceAttributeNames = (from san in r.SourceAttributeNames select Name.FromNative(san)).ToArray(),
 						Target = Name.FromNative(r.Target),
@@ -319,30 +368,54 @@ namespace Ancestry.QueryProcessor.Compile
 				);
 
 			// Get keys
-			foreach (Type.TupleKeyAttribute k in type.GetCustomAttributes(typeof(Type.TupleKeyAttribute)))
+			foreach (TupleKeyAttribute k in type.GetCustomAttributes(typeof(TupleKeyAttribute)))
 				tupleType.Keys.Add
 				(
-					new Type.TupleKey { AttributeNames = (from n in k.AttributeNames select Name.FromNative(n)).ToArray() }
+					new TupleKey { AttributeNames = (from n in k.AttributeNames select Name.FromNative(n)).ToArray() }
 				);
 
 			return tupleType;
 		}
 
-		public Runtime.ExecuteHandler DeclareProgram(Expression<Runtime.ExecuteHandler> lambda)
+		public BaseType TypeFromNative(System.Type type)
 		{
-			var typeBuilder = _module.DefineType("Program", TypeAttributes.Class | TypeAttributes.Public);
+			if (ReflectionUtility.IsTupleType(type))
+				return TupleTypeFromNative(type);
+			if (ReflectionUtility.IsSet(type))
+				return new SetType { Of = TypeFromNative(type.GenericTypeArguments[0]) };
+			if (ReflectionUtility.IsNary(type))
+				return new ListType { Of = TypeFromNative(type.GenericTypeArguments[0]) };
+			BaseType scalarType;
+			if (_options.ScalarTypes == null || !_options.ScalarTypes.TryGetValue(type.ToString(), out scalarType))
+				return new ScalarType { Type = type };
+			return scalarType;
+		}
+
+		public MethodContext DeclareMain()
+		{
+			var typeBuilder = _module.DefineType("Program", TypeAttributes.Public);
 			var methodBuilder = 
 				typeBuilder.DefineMethod
 				(
 					"Main", 
-					MethodAttributes.Public | MethodAttributes.Static, 
-					typeof(void), 
+					MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, 
+					typeof(object), 
 					new[] { typeof(IDictionary<string, object>), typeof(Storage.IRepositoryFactory), typeof(CancellationToken) }
 				);
-			lambda.CompileToMethod(methodBuilder);
-			var type = typeBuilder.CreateType();
-			return (Runtime.ExecuteHandler)type.GetMethod("Main").CreateDelegate(typeof(Runtime.ExecuteHandler));
+			return new MethodContext { Builder = methodBuilder, IL = methodBuilder.GetILGenerator() };
 		}
 
+		public System.Type CompleteMain(MethodContext main)
+		{
+			main.IL.Emit(OpCodes.Ret);
+			return ((TypeBuilder)main.Builder.DeclaringType).CreateType();
+		}
+
+		public Runtime.ExecuteHandler Complete(System.Type program)
+		{
+			if (_options.DebugOn)
+				SaveAssembly();
+			return (Runtime.ExecuteHandler)program.GetMethod("Main").CreateDelegate(typeof(Runtime.ExecuteHandler));
+		}
 	}
 }

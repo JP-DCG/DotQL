@@ -518,6 +518,7 @@ namespace Ancestry.QueryProcessor.Parse
 				case Keywords.Exists: return Operator.Exists;
 				case Keywords.Negate: return Operator.Negate;
 				case Keywords.Not: return Operator.Not;
+				case Keywords.BitwiseNot: return Operator.BitwiseNot;
 				case Keywords.ExtractSingleton: return Operator.IsNull;
 				case Keywords.Successor: return Operator.Successor;
 				case Keywords.Predicessor: return Operator.Predicessor;
@@ -1314,11 +1315,24 @@ namespace Ancestry.QueryProcessor.Parse
 		{
 			lexer.NextToken().DebugCheckSymbol(Keywords.BeginGroup);
 			var startToken = lexer[0];
+
+			// Check for function with no arguments
+			if (lexer[1, false].IsSymbol(Keywords.EndGroup))
+			{
+				lexer.NextToken();
+				var result = new FunctionSelector();
+				result.SetPosition(startToken);
+				lexer.NextToken().CheckSymbol(Keywords.Function);
+				result.Expression = ClausedExpression(lexer);
+				return result;
+			}
+
 			var expressionToken = lexer[1];
 			var expression = Expression(lexer);
+
+			// Check for function - look for an attribute separator
 			if (lexer[1].IsSymbol(Keywords.AttributeSeparator))
 			{
-				// We've discovered that this is a function, there is an attribute separator - validate the name
 				if (!(expression is IdentifierExpression))
 					throw new ParserException(ParserException.Codes.InvalidAttributeName);
 				lexer.NextToken();

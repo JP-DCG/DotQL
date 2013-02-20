@@ -34,5 +34,21 @@ namespace Ancestry.QueryProcessor.Runtime
 				return (T)arg;
 			return initializer;
 		}
+
+		/// <remarks> http://www.johndcook.com/blog/2008/12/10/fast-exponentiation/ </remarks>
+		public static long IntPower(int x, int power)
+		{
+			if (power == 0) return 1;
+			if (power == 1) return x;
+
+			int n = 15;
+			while ((power <<= 1) >= 0) n--;
+
+			long tmp = x;
+			while (--n > 0)
+				tmp = tmp * tmp *
+					 (((power <<= 1) < 0) ? x : 1);
+			return tmp;
+		}
 	}
 }

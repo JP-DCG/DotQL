@@ -8,6 +8,7 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class TupleKey
 	{
+		// Note: this array is assumed immutable
 		public Name[] AttributeNames { get; set; }
 
 		public override string ToString()
@@ -45,6 +46,11 @@ namespace Ancestry.QueryProcessor.Type
 		public static TupleKey FromParseKey(Parse.TupleKey key)
 		{
 			return new TupleKey { AttributeNames = (from an in key.AttributeNames select Name.FromQualifiedIdentifier(an)).ToArray() };
+		}
+
+		public TupleKey Clone()
+		{
+			return new TupleKey { AttributeNames = this.AttributeNames };
 		}
 	}
 }

@@ -8,6 +8,7 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class TupleReference
 	{
+		// Note: these arrays are assumed immutable
 		public Name[] SourceAttributeNames { get; set; }
 		public Name Target { get; set; }
 		public Name[] TargetAttributeNames { get; set; }
@@ -56,6 +57,11 @@ namespace Ancestry.QueryProcessor.Type
 					Target = Name.FromQualifiedIdentifier(reference.Target),
 					TargetAttributeNames = (from tan in reference.TargetAttributeNames select Name.FromQualifiedIdentifier(tan)).ToArray()
 				};
+		}
+
+		public TupleReference Clone()
+		{
+			return new TupleReference { SourceAttributeNames = this.SourceAttributeNames, Target = this.Target, TargetAttributeNames = this.TargetAttributeNames };
 		}
 	}
 }

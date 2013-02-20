@@ -13,5 +13,6 @@ namespace Ancestry.QueryProcessor.Compile
 		public string AssemblyName { get; set; }
 		public string SourceFileName { get; set; }
 		public Storage.IRepositoryFactory Factory { get; set; }
+		public Dictionary<string, Type.BaseType> ScalarTypes { get; set; }
 	}
 }

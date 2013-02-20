@@ -11,7 +11,7 @@ namespace Ancestry.QueryProcessor.Runtime
 		public Optional(T value)
 		{
 			_value = value;
-			_hasValue = true;
+			_hasValue = !object.Equals(value, null);
 		}
 
 		public Optional(bool hasValue)
@@ -61,5 +61,10 @@ namespace Ancestry.QueryProcessor.Runtime
 		{
 			return HasValue ? Value.ToString() : "";
 		}
+
+        public static implicit operator Optional<T>(T value)
+        {
+            return new Optional<T>(value);
+        }
 	}
 }

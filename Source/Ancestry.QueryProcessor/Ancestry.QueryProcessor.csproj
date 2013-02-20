@@ -49,11 +49,9 @@
     <Compile Include="Compile\CompilerOptions.cs" />
     <Compile Include="Compile\Emitter.cs" />
     <Compile Include="Compile\EmitterOptions.cs" />
-    <Compile Include="Compile\ListTypeHandler.cs" />
-    <Compile Include="Compile\NaryTypeHandler.cs" />
+    <Compile Include="Compile\ExpressionContext.cs" />
+    <Compile Include="Compile\MethodContext.cs" />
     <Compile Include="Compile\ReflectionUtility.cs" />
-    <Compile Include="Compile\StringTypeHandler.cs" />
-    <Compile Include="Compile\TupleTypeHandler.cs" />
     <Compile Include="Compile\UsingComparer.cs" />
     <Compile Include="Parse\ReservedWords.cs" />
     <Compile Include="Processor.cs" />
@@ -72,7 +70,6 @@
     <Compile Include="Runtime\Optional.cs" />
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
-    <Compile Include="Compile\SetTypeHandler.cs" />
     <Compile Include="Runtime\UsingTuple.cs" />
     <Compile Include="Storage\InMemoryModuleRepository.cs" />
     <Compile Include="Storage\InMemoryRepository.cs" />
@@ -94,16 +91,23 @@
     <Compile Include="Parse\SyntaxException.cs" />
     <Compile Include="Parse\TextEmitter.cs" />
     <Compile Include="Storage\IRepositoryFactory.cs" />
+    <Compile Include="Type\BaseIntegerType.cs" />
+    <Compile Include="Type\BaseType.cs" />
+    <Compile Include="Type\FunctionType.cs" />
+    <Compile Include="Type\ListType.cs" />
+    <Compile Include="Type\NaryType.cs" />
     <Compile Include="Type\ModuleAttribute.cs" />
     <Compile Include="Type\Reference.cs" />
-    <Compile Include="Compile\ScalarTypeHandler.cs" />
+    <Compile Include="Type\ScalarType.cs" />
+    <Compile Include="Type\SetType.cs" />
+    <Compile Include="Type\StringType.cs" />
+    <Compile Include="Type\SystemTypes.cs" />
     <Compile Include="Type\TupleAttribute.cs" />
     <Compile Include="Type\TupleKey.cs" />
     <Compile Include="Type\TupleKeyAttribute.cs" />
     <Compile Include="Type\TupleReference.cs" />
     <Compile Include="Type\TupleReferenceAttribute.cs" />
     <Compile Include="Type\TupleType.cs" />
-    <Compile Include="Compile\TypeHandler.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -15,10 +16,23 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly MethodInfo NameFromNative = typeof(Name).GetMethod("FromNative");
 		public static readonly MethodInfo NameFromComponents = typeof(Name).GetMethod("FromComponents");
 		public static readonly PropertyInfo ArrayLength = typeof(Array).GetProperty("Length");
+		public static readonly ConstructorInfo DateTimeTicksConstructor = typeof(DateTime).GetConstructor(new[] { typeof(long) });
+		public static readonly ConstructorInfo TimeSpanTicksConstructor = typeof(DateTime).GetConstructor(new[] { typeof(long) });
+		public static readonly MethodInfo TypeGetTypeFromHandle = typeof(System.Type).GetMethod("GetTypeFromHandle");
 
 		public static bool IsTupleType(System.Type type)
 		{
 			return type.GetCustomAttribute(typeof(Type.TupleAttribute), true) != null;
+		}
+
+		public static bool IsSet(System.Type type)
+		{
+			return type.IsGenericType && typeof(ISet<>).IsAssignableFrom(type.GetGenericTypeDefinition());
+		}
+
+		public static bool IsNary(System.Type type)
+		{
+			return type.IsGenericType && typeof(IEnumerable).IsAssignableFrom(type);
 		}
 
 		#region GetMethodExt
