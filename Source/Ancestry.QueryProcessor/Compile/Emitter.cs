@@ -119,13 +119,13 @@ namespace Ancestry.QueryProcessor.Compile
 			if (value == null)
 			{
 				method.IL.Emit(OpCodes.Ldnull);
-				return new ExpressionContext { Type = typeHint };
+				return new ExpressionContext(typeHint);
 			}
 			switch (value.GetType().ToString())
 			{
 				case "System.Boolean":
 					method.IL.Emit(((bool)value) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case "System.DateTime":
 					method.IL.Emit(OpCodes.Ldc_I8, ((DateTime)value).Ticks);
 					method.IL.Emit(OpCodes.Newobj, ReflectionUtility.DateTimeTicksConstructor);
@@ -139,13 +139,13 @@ namespace Ancestry.QueryProcessor.Compile
 					break;
 				case "System.String":
 					method.IL.Emit(OpCodes.Ldstr, (string)value);
-					return new ExpressionContext { Type = SystemTypes.String };
+					return new ExpressionContext(SystemTypes.String);
 				case "System.Int32":
 					method.IL.Emit(OpCodes.Ldc_I4, (int)value);
-					return new ExpressionContext { Type = SystemTypes.Integer };
+					return new ExpressionContext(SystemTypes.Integer);
 				case "System.Int64":
 					method.IL.Emit(OpCodes.Ldc_I8, (long)value);
-					return new ExpressionContext { Type = SystemTypes.Long };
+					return new ExpressionContext(SystemTypes.Long);
 				case "System.Double":
 					method.IL.Emit(OpCodes.Ldc_R8, (double)value);
 					break;
@@ -154,7 +154,7 @@ namespace Ancestry.QueryProcessor.Compile
 					break;
 				default: throw new NotSupportedException(String.Format("Literal type {0} not yet supported.", value.GetType().ToString()));
 			}
-			return new ExpressionContext { Type = new ScalarType { Type = value.GetType() } };
+			return new ExpressionContext(new ScalarType(value.GetType()));
 		}
 
 		public System.Type EndModule(TypeBuilder module)
@@ -377,17 +377,17 @@ namespace Ancestry.QueryProcessor.Compile
 			return tupleType;
 		}
 
-		public BaseType TypeFromNative(System.Type type)
+		public BaseType TypeFromNative(System.Type native)
 		{
-			if (ReflectionUtility.IsTupleType(type))
-				return TupleTypeFromNative(type);
-			if (ReflectionUtility.IsSet(type))
-				return new SetType { Of = TypeFromNative(type.GenericTypeArguments[0]) };
-			if (ReflectionUtility.IsNary(type))
-				return new ListType { Of = TypeFromNative(type.GenericTypeArguments[0]) };
+			if (ReflectionUtility.IsTupleType(native))
+				return TupleTypeFromNative(native);
+			if (ReflectionUtility.IsSet(native))
+				return new SetType { Of = TypeFromNative(native.GenericTypeArguments[0]) };
+			if (ReflectionUtility.IsNary(native))
+				return new ListType { Of = TypeFromNative(native.GenericTypeArguments[0]) };
 			BaseType scalarType;
-			if (_options.ScalarTypes == null || !_options.ScalarTypes.TryGetValue(type.ToString(), out scalarType))
-				return new ScalarType { Type = type };
+			if (_options.ScalarTypes == null || !_options.ScalarTypes.TryGetValue(native.ToString(), out scalarType))
+				return new ScalarType(native);
 			return scalarType;
 		}
 
@@ -402,7 +402,7 @@ namespace Ancestry.QueryProcessor.Compile
 					typeof(object), 
 					new[] { typeof(IDictionary<string, object>), typeof(Storage.IRepositoryFactory), typeof(CancellationToken) }
 				);
-			return new MethodContext { Builder = methodBuilder, IL = methodBuilder.GetILGenerator() };
+			return new MethodContext(methodBuilder);
 		}
 
 		public System.Type CompleteMain(MethodContext main)

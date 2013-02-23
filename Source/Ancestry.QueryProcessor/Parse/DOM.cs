@@ -617,7 +617,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Left + " " + Operator.ToString() + " " + Right;
+			return "(" + Left + " " + Operator.ToString() + " " + Right + ")";
 		}
 
 		public override IEnumerable<Statement> GetChildren()

@@ -20,8 +20,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public Frame _importFrame;
 		public Frame _scriptFrame;
 		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
-		private Dictionary<object, Func<MethodContext, ExpressionContext>> _writersBySymbol = new Dictionary<object, Func<MethodContext, ExpressionContext>>();
-		public Dictionary<object, Func<MethodContext, ExpressionContext>> WritersBySymbol { get { return _writersBySymbol; } }
+		private Dictionary<object, Func<MethodContext, ExpressionContext?>> _writersBySymbol = new Dictionary<object, Func<MethodContext, ExpressionContext?>>();
+		public Dictionary<object, Func<MethodContext, ExpressionContext?>> WritersBySymbol { get { return _writersBySymbol; } }
 		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
 		private Dictionary<Parse.ModuleMember, Func<MemberInfo>> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Func<MemberInfo>>();
 		private Dictionary<Parse.ModuleMember, object> _compiledMembers = new Dictionary<Parse.ModuleMember, object>();
@@ -138,11 +138,6 @@ namespace Ancestry.QueryProcessor.Compile
 		//	}
 		//}
 
-		private static bool IsRepository(System.Type type)
-		{
-			return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Storage.IRepository<>);
-		}
-
 		private void CompileResult(MethodContext method, Frame frame, Parse.ClausedExpression expression)
 		{
 			var result = MaterializeRepository(method, CompileClausedExpression(method, frame, expression));
@@ -216,13 +211,20 @@ namespace Ancestry.QueryProcessor.Compile
 			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(use, moduleName);
 			_references.Add(use.Target, module);
 			frame.Add(use, moduleName, module);
-			
+
+			// Determine the class of the module
+			var moduleType = FindReference<Runtime.ModuleTuple>(use.Target).Class;
+
+			// Create a variable to hold the module instance
+			var moduleVar = method.DeclareLocal(use, moduleType, (use.Alias ?? use.Target).ToString());
+			_writersBySymbol.Add(moduleType, m => { m.IL.Emit(OpCodes.Ldloc, moduleVar); return null; });
+
 			// Discover methods
-			foreach (var meth in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+			foreach (var methodInfo in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
 			{
-				frame.Add(use, moduleName + Name.FromNative(meth.Name), method);
-				_emitter.ImportType(meth.ReturnType);
-				foreach (var parameter in meth.GetParameters())
+				frame.Add(use, moduleName + Name.FromNative(methodInfo.Name), methodInfo);
+				_emitter.ImportType(methodInfo.ReturnType);
+				foreach (var parameter in methodInfo.GetParameters())
 					_emitter.ImportType(parameter.ParameterType);
 			}
 
@@ -246,7 +248,19 @@ namespace Ancestry.QueryProcessor.Compile
 			foreach (var field in module.Class.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
 				frame.Add(use, moduleName + Name.FromNative(field.Name), field);
-				_emitter.ImportType(field.FieldType);
+				var native = field.FieldType.GenericTypeArguments[0];
+				_emitter.ImportType(native);
+				var type = _emitter.TypeFromNative(native);
+				_writersBySymbol.Add
+				(
+					field, 
+					m => 
+					{ 
+						m.IL.Emit(OpCodes.Ldloc, moduleVar); 
+						m.IL.Emit(OpCodes.Ldfld, field);
+						return new ExpressionContext(type, field.FieldType); 
+					}
+				);
 			}
 
 			// Discover typedefs
@@ -256,26 +270,14 @@ namespace Ancestry.QueryProcessor.Compile
 				_emitter.ImportType(field.FieldType);
 			}
 
-			// Determine the class of the module
-			var moduleType = FindReference<Runtime.ModuleTuple>(use.Target).Class;
-
-			// Create a variable to hold the module instance
-			var moduleVar = method.DeclareLocal(use, moduleType, (use.Alias ?? use.Target).ToString());
-			_writersBySymbol.Add(moduleType, m => { m.IL.Emit(OpCodes.Ldloca, moduleVar); return null; });
-
 			// Build code to construct instance and assign to variable
 			method.IL.Emit(OpCodes.Newobj, moduleType.GetConstructor(new System.Type[] { }));
 			// Initialize each variable bound to a repository
-			foreach
-			(
-				var field in
-					moduleType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-						.Where(f => IsRepository(f.FieldType))
-			)
+			foreach (var field in moduleType.GetFields(BindingFlags.Public | BindingFlags.Instance))
 			{
 				method.IL.Emit(OpCodes.Dup);
 				method.IL.Emit(OpCodes.Ldarg_1);
-				method.IL.Emit(OpCodes.Ldtoken, typeof(System.Type));
+				method.IL.Emit(OpCodes.Ldtoken, moduleType);
 				method.IL.EmitCall(OpCodes.Call, ReflectionUtility.TypeGetTypeFromHandle, null);
 				method.IL.Emit(OpCodes.Ldstr, field.Name);
 				method.IL.EmitCall(OpCodes.Call, ReflectionUtility.NameFromNative, null);
@@ -291,7 +293,7 @@ namespace Ancestry.QueryProcessor.Compile
 			if (!_references.TryGetValue(id, out module))
 				throw new CompilerException(id, CompilerException.Codes.IdentifierNotFound, id.ToString());
 			if (!(module is T))
-				throw new CompilerException(id, CompilerException.Codes.IncorrectType, module.GetType(), typeof(T));
+				throw new CompilerException(id, CompilerException.Codes.IncorrectTypeReferenced, typeof(T), module.GetType());
 			return (T)module;
 		}
 
@@ -310,68 +312,121 @@ namespace Ancestry.QueryProcessor.Compile
 		private ExpressionContext CompileClausedExpression(MethodContext method, Frame frame, Parse.ClausedExpression expression, BaseType typeHint = null)
 		{
 			var local = AddFrame(frame, expression);
+			method.IL.BeginScope();
+			try
+			{
+				if (expression.ForClauses.Count > 0)
+				{
+					var result = CompileForClause(method, local, 0, expression, false);
+					method.IL.Emit(OpCodes.Ldloc, result.resultVar);
+					
+					// Reset the result var in case this expression is in a loop
+					method.IL.Emit(OpCodes.Ldnull);
+					method.IL.Emit(OpCodes.Stloc, result.resultVar);
 
-			//if (expression.ForClauses.Count > 0)
-			//// TODO: foreach (var forClause in clausedExpression.ForClauses)
-			//{
-			//	var forClause = expression.ForClauses[0];
-			//	var forExpression = CompileExpression(method, local, forClause.Expression);
-			//	local.Add(forClause.Name, forClause);
-			//	var elementType = 
-			//		forExpression.Type.IsConstructedGenericType
-			//			? forExpression.Type.GetGenericArguments()[0]
-			//			: forExpression.Type.GetElementType();
-			//	var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
-			//	var enumeratorType = typeof(IEnumerator<>).MakeGenericType(elementType);
-			//	var enumerator = method.DeclareLocal(forClause, enumeratorType, "enumerator" + Name.FromQualifiedIdentifier(forClause.Name).ToString());
-			//	var forVariable = method.DeclareLocal(forClause, elementType, Name.FromQualifiedIdentifier(forClause.Name).ToString());
-			//	_writersBySymbol.Add(forClause, m => { m.IL.Emit(OpCodes.Ldloc, forVariable); });
+					return result.context;
+				}
+				else
+					return CompileClausedReturn(method, local, expression, typeHint);
+			}
+			finally
+			{
+				method.IL.EndScope();
+			}
+		}
 
-			//	var returnBlock = CompileClausedReturn(method, local, expression);
-			//	var resultIsSet = expression.OrderDimensions.Count == 0
-			//		&& forExpression.Type.IsConstructedGenericType
-			//		&& (forExpression.Type.GetGenericTypeDefinition() == typeof(HashSet<>));
-			//	var resultType = resultIsSet 
-			//		? typeof(HashSet<>).MakeGenericType(returnBlock.Type)
-			//		: typeof(List<>).MakeGenericType(returnBlock.Type);
-			//	var resultVariable = Expression.Variable(resultType, "result");
-			//	vars.Add(resultVariable);
-			//	var resultAddMethod = resultType.GetMethod("Add");
-			//	var breakLabel = Expression.Label("break");
+		private ForResult CompileForClause(MethodContext method, Frame local, int i, Parse.ClausedExpression expression, bool listEncountered)
+		{
+			if (i < expression.ForClauses.Count)
+			{
+				var forClause = expression.ForClauses[i];
 
+				// Compile target expression
+				var forExpression = MaterializeRepository(method, CompileExpression(method, local, forClause.Expression));
+				local.Add(forClause.Name, forClause);
+				if (!(forExpression.Type is IComponentType))
+					throw new CompilerException(forClause, CompilerException.Codes.InvalidForExpressionTarget, forExpression.Type);
 
-			//	return Expression.Block
-			//	(
-			//		vars,
-			//		GetDebugInfo(expression),
-			//		Expression.Assign(enumerator, Expression.Call(forExpression, enumerableType.GetMethod("GetEnumerator"))),
-			//		Expression.Assign(resultVariable, Expression.New(resultType)),
-			//		Expression.Loop
-			//		(
-			//			Expression.IfThenElse
-			//			(
-			//				Expression.Call(enumerator, typeof(IEnumerator).GetMethod("MoveNext")),
-			//				Expression.Block
-			//				(
-			//					Expression.Assign(forVariable, Expression.Property(enumerator, enumeratorType.GetProperty("Current"))),
-								
-			//					expression.WhereClause == null
-			//						? (Expression)Expression.Call(resultVariable, resultAddMethod, returnBlock)
-			//						: Expression.IfThen
-			//						(
-			//							CompileExpression(local, expression.WhereClause, typeof(bool)), 
-			//							Expression.Call(resultVariable, resultAddMethod, returnBlock)
-			//						)
-			//				),
-			//				Expression.Break(breakLabel)
-			//			),
-			//			breakLabel
-			//		),
-			//		resultVariable
-			//	);
-			//}
+				// Declare enumerator and item variables
+				var elementType = ((IComponentType)forExpression.Type).Of;
+				var nativeElementType = elementType.GetNative(_emitter);
+				var enumerableType = typeof(IEnumerable<>).MakeGenericType(nativeElementType);
+				var enumeratorType = typeof(IEnumerator<>).MakeGenericType(nativeElementType);
+				var enumerator = method.DeclareLocal(forClause, enumeratorType, "enumerator" + Name.FromQualifiedIdentifier(forClause.Name).ToString());
+				var forVariable = method.DeclareLocal(forClause, nativeElementType, Name.FromQualifiedIdentifier(forClause.Name).ToString());
+				_writersBySymbol.Add(forClause, m => { m.IL.Emit(OpCodes.Ldloc, forVariable); return new ExpressionContext(elementType); });
 
-			return CompileClausedReturn(method, local, expression, typeHint);
+				// enumerator = GetEnumerator()
+				method.IL.EmitCall(OpCodes.Callvirt, enumerableType.GetMethod("GetEnumerator"), null);
+				method.IL.Emit(OpCodes.Stloc, enumerator);
+
+				// while (MoveNext)
+				var loopStart = method.IL.DefineLabel();
+				var loopEnd = method.IL.DefineLabel();
+				method.IL.MarkLabel(loopStart);
+				method.IL.Emit(OpCodes.Ldloc, enumerator);
+				method.IL.EmitCall(OpCodes.Callvirt, ReflectionUtility.IEnumerableMoveNext, null);
+				method.IL.Emit(OpCodes.Brfalse, loopEnd);
+
+				// forVariable = enumerator.Current
+				method.IL.Emit(OpCodes.Ldloc, enumerator);
+				method.IL.EmitCall(OpCodes.Callvirt, enumeratorType.GetProperty("Current").GetGetMethod(), null);
+				method.IL.Emit(OpCodes.Stloc, forVariable);
+
+				if (expression.WhereClause != null)
+				{
+					// if (<where expression>) continue
+					var whereResult = CompileExpression(method, local, expression.WhereClause, SystemTypes.Boolean);
+					if (!(whereResult.Type is BooleanType))
+						throw new CompilerException(expression.WhereClause, CompilerException.Codes.IncorrectType, whereResult.Type, SystemTypes.Boolean);
+					method.IL.Emit(OpCodes.Brfalse, loopStart);
+				}
+
+				var result = CompileForClause(method, local, i + 1, expression, listEncountered | !(forExpression.Type is SetType));
+
+				method.IL.Emit(OpCodes.Br, loopStart);
+				method.IL.MarkLabel(loopEnd);
+
+				return result;
+			}
+			else
+			{
+				// Compile the return block	and store it in a variable
+				var returnBlock = CompileClausedReturn(method, local, expression);
+				var returnVariable = method.DeclareLocal(expression.Expression, returnBlock.NativeType ?? returnBlock.Type.GetNative(_emitter), "return");
+				method.IL.Emit(OpCodes.Stloc, returnVariable);
+
+				// Determine the result type
+				var resultType = listEncountered
+					? (BaseType)new ListType { Of = returnBlock.Type }
+					: new SetType { Of = returnBlock.Type };
+				var resultNative = resultType.GetNative(_emitter);
+				var resultVariable = method.DeclareLocal(expression.Expression, resultNative, "result");
+
+				// Initialize the result array first time through
+				var skipInit = method.IL.DefineLabel();
+				method.IL.Emit(OpCodes.Ldloc, resultVariable);
+				method.IL.Emit(OpCodes.Brtrue, skipInit);
+				method.IL.Emit(OpCodes.Newobj, resultNative.GetConstructor(new System.Type[] { }));
+				method.IL.Emit(OpCodes.Stloc, resultVariable);
+				method.IL.MarkLabel(skipInit);
+
+				// Add the current item to the result
+				method.IL.Emit(OpCodes.Ldloc, resultVariable);
+				method.IL.Emit(OpCodes.Ldloc, returnVariable);
+				var addMethod = resultNative.GetMethod("Add");
+				method.IL.EmitCall(OpCodes.Call, addMethod, null);
+				if (addMethod.ReturnType != typeof(void))
+					method.IL.Emit(OpCodes.Pop);	// ignore any add result
+
+				return new ForResult { context = new ExpressionContext(resultType), resultVar = resultVariable };
+			}
+		}
+
+		private struct ForResult
+		{
+			public ExpressionContext context;
+			public LocalBuilder resultVar;
 		}
 
 		private ExpressionContext CompileClausedReturn(MethodContext method, Frame frame, Parse.ClausedExpression clausedExpression, BaseType typeHint = null)
@@ -400,10 +455,10 @@ namespace Ancestry.QueryProcessor.Compile
 				case "ClausedExpression": return CompileClausedExpression(method, frame, (Parse.ClausedExpression)expression, typeHint);
 				case "IdentifierExpression": return CompileIdentifierExpression(method, frame, (Parse.IdentifierExpression)expression, typeHint);
 				case "TupleSelector": return CompileTupleSelector(method, frame, (Parse.TupleSelector)expression, typeHint);
-				//case "ListSelector": return CompileListSelector(method, frame, (Parse.ListSelector)expression, typeHint);
-				//case "SetSelector": return CompileSetSelector(method, frame, (Parse.SetSelector)expression, typeHint);
-				//case "FunctionSelector": return CompileFunctionSelector(method, frame, (Parse.FunctionSelector)expression, typeHint);
-				//case "CallExpression": return CompileCallExpression(method, frame, (Parse.CallExpression)expression, typeHint);
+				case "ListSelector": return CompileListSelector(method, frame, (Parse.ListSelector)expression, typeHint);
+				case "SetSelector": return CompileSetSelector(method, frame, (Parse.SetSelector)expression, typeHint);
+				case "FunctionSelector": return CompileFunctionSelector(method, frame, (Parse.FunctionSelector)expression, typeHint);
+				case "CallExpression": return CompileCallExpression(method, frame, (Parse.CallExpression)expression, typeHint);
 				//case "RestrictExpression": return CompileRestrictExpression(method, frame, (Parse.RestrictExpression)expression, typeHint);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
@@ -492,23 +547,53 @@ namespace Ancestry.QueryProcessor.Compile
 		//	return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Runtime.Optional<>);
 		//}
 
-		//private Expression CompileFunctionSelector(Frame frame, Parse.FunctionSelector functionSelector, BaseType typeHint)
-		//{
-		//	var local = AddFrame(frame, functionSelector);
+		private ExpressionContext CompileFunctionSelector(MethodContext method, Frame frame, Parse.FunctionSelector functionSelector, BaseType typeHint)
+		{
+			// Extract return type as the type hint
+			if (typeHint is FunctionType)
+				typeHint = ((FunctionType)typeHint).Type;
+			else
+				typeHint = null;
 
-		//	var parameters = new ParameterExpression[functionSelector.Parameters.Count];
-		//	var i = 0;
-		//	foreach (var p in functionSelector.Parameters)
-		//	{
-		//		local.Add(p.Name, p);
-		//		var parameter = Expression.Parameter(CompileTypeDeclaration(frame, p.Type), p.Name.ToString());
-		//		parameters[i++]	= parameter;
-		//		_writersBySymbol.Add(p, parameter);
-		//	}
+			var local = AddFrame(_importFrame, functionSelector);
 
-		//	var expression = CompileExpression(local, functionSelector.Expression, typeHint);
-		//	return Expression.Lambda(expression, parameters);
-		//}
+			var type = new FunctionType();
+
+			// Create a new private method within the same type as the current method
+			var typeBuilder = (TypeBuilder)method.Builder.DeclaringType;
+			var innerMethod = typeBuilder.DefineMethod("Function" + functionSelector.GetHashCode(), MethodAttributes.Private | MethodAttributes.Static);
+
+			// Compile each parameter
+			var i = 0;
+			foreach (var p in functionSelector.Parameters)
+			{
+				local.Add(p.Name, p);
+				var parameter = new FunctionParameter { Name = Name.FromQualifiedIdentifier(p.Name), Type = CompileTypeDeclaration(_importFrame, p.Type) };
+				type.Parameters.Add(parameter);
+				var paramBuilder = innerMethod.DefineParameter(++i, ParameterAttributes.In, parameter.Name.ToString());
+				_writersBySymbol.Add
+				(
+					p, 
+					m => 
+					{ 
+						m.IL.Emit(OpCodes.Ldarg, paramBuilder.Position); 
+						return new ExpressionContext(parameter.Type); 
+					}
+				);
+			}
+
+			var expression = CompileExpression(new MethodContext(innerMethod), local, functionSelector.Expression, typeHint);
+			type.Type = expression.Type;
+			innerMethod.SetReturnType(expression.NativeType ?? expression.Type.GetNative(_emitter));
+
+			// Instantiate a delegate pointing to the new method
+			var delegateType = type.GetNative(_emitter);
+			method.IL.Emit(OpCodes.Ldnull);				// instance
+			method.IL.Emit(OpCodes.Ldftn, innerMethod);	// method
+			method.IL.Emit(OpCodes.Newobj, delegateType.GetConstructor(new[] { typeof(object), typeof(IntPtr) }));
+
+			return new ExpressionContext(type);
+		}
 
 		//private System.Type TypeFromModule(Frame frame, Parse.ModuleDeclaration moduleDeclaration)
 		//{
@@ -629,43 +714,57 @@ namespace Ancestry.QueryProcessor.Compile
 		//	return result;
 		//}
 
-		//private Expression CompileCallExpression(Frame frame, Parse.CallExpression callExpression, BaseType typeHint)
-		//{
-		//	// Compile arguments
-		//	var args = new Expression[callExpression.Arguments.Count];
-		//	for (var i = 0; i < callExpression.Arguments.Count; i++)
-		//		args[i] = MaterializeReference(CompileExpression(frame, callExpression.Arguments[i]));
+		private ExpressionContext CompileCallExpression(MethodContext method, Frame frame, Parse.CallExpression callExpression, BaseType typeHint)
+		{
+			/* 
+			 * Functions are implemented as delegates if referencing a variable, or as methods if referencing a constant.
+			 * The logical type will always be a FunctionType, but the native type with either be a MethodInfo
+			 * or a Delegate.
+			 */
 
-		//	var expression = MaterializeReference(CompileExpression(frame, callExpression.Expression));
-		//	if (typeof(MethodInfo).IsAssignableFrom(expression.Type) && expression is ConstantExpression)
-		//	{
-		//		var method = (MethodInfo)((ConstantExpression)expression).Value;
-		//		if (method.ContainsGenericParameters)
-		//		{
-		//			var genericArgs = method.GetGenericArguments();
-		//			var resolved = new System.Type[genericArgs.Length];
-		//			if (callExpression.TypeArguments.Count > 0)
-		//			{
-		//				for (var i = 0; i < resolved.Length; i++)
-		//					resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]);
-		//			}
-		//			else
-		//			{
-		//				var parameters = method.GetParameters();
-		//				for (var i = 0; i < parameters.Length; i++)
-		//					DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].Type);
-		//				// TODO: Assert that all type parameters are resolved
-		//			}
-		//			method = method.MakeGenericMethod(resolved);
-		//			// http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
-		//		}	
-		//		return Expression.Call(method, args);
-		//	}
-		//	else if (typeof(Delegate).IsAssignableFrom(expression.Type))
-		//		return Expression.Invoke(expression, args);
-		//	else
-		//		throw new CompilerException(callExpression, CompilerException.Codes.IncorrectType, expression.Type, "function");
-		//}
+			// Compile expression
+			var expression = MaterializeRepository(method, CompileExpression(method, frame, callExpression.Expression));
+			if (!(expression.Type is FunctionType))
+				throw new CompilerException(callExpression.Expression, CompilerException.Codes.CannotInvokeNonFunction);
+
+			// Compile arguments
+			var args = new ExpressionContext[callExpression.Arguments.Count];
+			for (var i = 0; i < callExpression.Arguments.Count; i++)
+				args[i] = MaterializeRepository(method, CompileExpression(method, frame, callExpression.Arguments[i]));
+
+			if (expression.Member != null)
+			{
+				var methodType = (MethodInfo)(expression.Member);
+
+				// Resolve generic arguments
+				if (methodType.ContainsGenericParameters)
+				{
+					var genericArgs = methodType.GetGenericArguments();
+					var resolved = new System.Type[genericArgs.Length];						      
+					if (callExpression.TypeArguments.Count > 0)
+					{
+						for (var i = 0; i < resolved.Length; i++)
+							resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(_emitter);
+					}
+					else
+					{
+						var parameters = methodType.GetParameters();
+						for (var i = 0; i < parameters.Length; i++)
+							DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(_emitter));
+						// TODO: Assert that all type parameters are resolved
+					}
+					methodType = methodType.MakeGenericMethod(resolved);
+					// http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
+				}
+				method.IL.EmitCall(OpCodes.Call, methodType, null);
+			}
+			else 
+			{
+				var delegateType = expression.Type.GetNative(_emitter);
+				method.IL.EmitCall(OpCodes.Callvirt, delegateType.GetMethod("Invoke"), null);
+			}
+			return new ExpressionContext(((FunctionType)expression.Type).Type);
+		}
 
 		private Type.BaseType CompileTypeDeclaration(Frame frame, Parse.TypeDeclaration typeDeclaration)
 		{
@@ -806,59 +905,122 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
-		//private Expression CompileSetSelector(Frame frame, Parse.SetSelector setSelector, BaseType typeHint)
-		//{
-		//	// Compile each item's expression
-		//	var initializers = new ElementInit[setSelector.Items.Count];
-		//	System.Type type = null;
-		//	System.Type setType = null;
-		//	MethodInfo addMethod = null;
-		//	for (var i = 0; i < setSelector.Items.Count; i++)
-		//	{
-		//		var expression = CompileExpression(frame, setSelector.Items[i], type);
-		//		if (type == null)
-		//		{
-		//			type = expression.Type;
-		//			GetSetTypeAndAddMethod(type, ref setType, ref addMethod);
-		//		}
-		//		else if (type != expression.Type)
-		//			expression = Convert(expression, type);
-		//		initializers[i] = Expression.ElementInit(addMethod, expression);
-		//	}
-		//	if (type == null)
-		//	{
-		//		type = typeof(void);
-		//		GetSetTypeAndAddMethod(type, ref setType, ref addMethod);
-		//	}
-
-		//	return Expression.ListInit(Expression.New(setType), initializers);
-		//}
-
-		private static void GetSetTypeAndAddMethod(System.Type type, ref System.Type setType, ref MethodInfo addMethod)
+		private ExpressionContext CompileSetSelector(MethodContext method, Frame frame, Parse.SetSelector setSelector, BaseType typeHint)
 		{
-			setType = typeof(HashSet<>).MakeGenericType(type);
-			addMethod = setType.GetMethod("Add");
+			// Get the component type
+			if (typeHint is SetType)
+				typeHint = ((SetType)typeHint).Of;
+			else
+				typeHint = null;
+
+			method.IL.BeginScope();
+			LocalBuilder element = null;
+			BaseType elementType = null;
+			BaseType setType = null;
+			MethodInfo addMethod = null;
+			for (var i = 0; i < setSelector.Items.Count; i++)
+			{
+				var expression = MaterializeRepository(method, CompileExpression(method, frame, setSelector.Items[i], elementType ?? typeHint));
+				if (elementType == null)
+				{
+					// Save the element into a local
+					elementType = expression.Type;
+					var native = elementType.GetNative(_emitter);
+					element = method.DeclareLocal(setSelector, native, "element");
+					method.IL.Emit(OpCodes.Stloc, element);
+					
+					// Construct the set
+					setType = new SetType { Of = elementType };
+					var setNative = NewObject(method, setType);
+					addMethod = setNative.GetMethod("Add");
+				}
+				else
+				{ 
+					// Convert the element and store into local
+					if (elementType != expression.Type)
+						Convert(method, expression, elementType);
+					method.IL.Emit(OpCodes.Stloc, element);
+				}
+				method.IL.Emit(OpCodes.Dup);	// collection
+				method.IL.Emit(OpCodes.Ldloc, element);
+				method.IL.Emit(OpCodes.Call, addMethod);
+				method.IL.Emit(OpCodes.Pop);	// ignore result bool
+			}
+			if (elementType == null)
+			{
+				elementType = SystemTypes.Void;
+				setType = new SetType { Of = elementType };
+				NewObject(method, setType);
+			}
+			method.IL.EndScope();
+
+			return new ExpressionContext(setType);
 		}
 
-		//private Expression CompileListSelector(Frame frame, Parse.ListSelector listSelector, BaseType typeHint)
-		//{
-		//	// Compile each item's expression
-		//	var initializers = new Expression[listSelector.Items.Count];
-		//	System.Type type = null;
-		//	for (var i = 0; i < listSelector.Items.Count; i++)
-		//	{
-		//		var expression = CompileExpression(frame, listSelector.Items[i], type);
-		//		if (type == null)
-		//			type = expression.Type;
-		//		else if (type != expression.Type)
-		//			expression = Convert(expression, type);
-		//		initializers[i] = expression;
-		//	}
-		//	if (type == null)
-		//		type = typeof(void);
+		private System.Type NewObject(MethodContext method, BaseType type)
+		{
+			var native = type.GetNative(_emitter);
+			method.IL.Emit(OpCodes.Newobj, native.GetConstructor(new System.Type[] { }));
+			return native;
+		}
 
-		//	return Expression.NewArrayInit(type, initializers);
-		//}
+		private ExpressionContext CompileListSelector(MethodContext method, Frame frame, Parse.ListSelector listSelector, BaseType typeHint)
+		{
+			// Get the component type
+			if (typeHint is ListType)
+				typeHint = ((ListType)typeHint).Of;
+			else
+				typeHint = null;
+
+			method.IL.BeginScope();
+			LocalBuilder element = null;
+			BaseType elementType = null;
+			System.Type elementNative = null;
+			BaseType listType = null;
+			for (var i = 0; i < listSelector.Items.Count; i++)
+			{
+				var expression = MaterializeRepository(method, CompileExpression(method, frame, listSelector.Items[i], elementType ?? typeHint));
+				if (elementType == null)
+				{
+					// Save the element into a local
+					elementType = expression.Type;
+					elementNative = elementType.GetNative(_emitter);
+					element = method.DeclareLocal(listSelector, elementNative, "element");
+					method.IL.Emit(OpCodes.Stloc, element);
+
+					// Construct the array
+					listType = new ListType { Of = elementType };
+					NewArray(method, elementNative, listSelector.Items.Count);
+				}
+				else
+				{
+					// Convert the element and store into local
+					if (elementType != expression.Type)
+						Convert(method, expression, elementType);
+					method.IL.Emit(OpCodes.Stloc, element);
+				}
+				method.IL.Emit(OpCodes.Dup);			// array
+				method.IL.Emit(OpCodes.Ldc_I4, i);		// index
+				method.IL.Emit(OpCodes.Ldloc, element);	// element
+				method.IL.Emit(OpCodes.Stelem, elementNative);
+			}
+			if (elementType == null)
+			{
+				elementType = SystemTypes.Void;
+				elementNative = elementType.GetNative(_emitter);
+				listType = new ListType { Of = elementType };
+				NewArray(method, elementNative, 0);
+			}
+			method.IL.EndScope();
+
+			return new ExpressionContext(listType);
+		}
+
+		private void NewArray(MethodContext method, System.Type elementNative, int size)
+		{
+			method.IL.Emit(OpCodes.Ldc_I4, size);
+			method.IL.Emit(OpCodes.Newarr, elementNative);
+		}
 
 		private ExpressionContext Convert(MethodContext method, ExpressionContext expression, BaseType target)
 		{
@@ -878,7 +1040,7 @@ namespace Ancestry.QueryProcessor.Compile
 			{
 				var attributeName = Name.FromQualifiedIdentifier(EnsureAttributeName(a.Name, a.Value));
 				var attributeNameAsString = attributeName.ToString();
-				var valueExpression = CompileExpression(method, frame, a.Value);		// uses frame not local (attributes shouldn't be visible to each other)
+				var valueExpression = MaterializeRepository(method, CompileExpression(method, frame, a.Value));		// uses frame not local (attributes shouldn't be visible to each other)
 				var fieldVar = method.DeclareLocal(a, valueExpression.Type.GetNative(_emitter), attributeNameAsString);
 				method.IL.Emit(OpCodes.Stloc, fieldVar);
 				fieldVars.Add(attributeNameAsString, fieldVar);
@@ -920,7 +1082,7 @@ namespace Ancestry.QueryProcessor.Compile
 			method.IL.Emit(OpCodes.Ldloc, instance);
 			method.IL.EndScope();
 
-			return new ExpressionContext { Type = tupleType };
+			return new ExpressionContext(tupleType);
 		}
 
 		private static Parse.QualifiedIdentifier EnsureAttributeName(Parse.QualifiedIdentifier name, Parse.Expression expression)
@@ -945,12 +1107,12 @@ namespace Ancestry.QueryProcessor.Compile
 		{
 			var symbol = frame.Resolve<object>(identifierExpression.Target);
 			_references.Add(identifierExpression.Target, symbol);
-			Func<MethodContext, ExpressionContext> writer;
+			Func<MethodContext, ExpressionContext?> writer;
 			if (_writersBySymbol.TryGetValue(symbol, out writer))
 			{
 				var result = writer(method);
-				if (result != null)
-					return result;
+				if (result.HasValue)
+					return result.Value;
 			}
 
 			// Lazy-compile module member if needed
@@ -959,10 +1121,7 @@ namespace Ancestry.QueryProcessor.Compile
 			switch (symbol.GetType().Name)
 			{
 				// Method
-				case "RuntimeMethodInfo":
-					var member = (MethodInfo)symbol;
-					method.IL.Emit(OpCodes.Ldtoken, member);
-					return new ExpressionContext { Type = new FunctionType() };
+				case "RuntimeMethodInfo": return EmitMethodReference(method, (MethodInfo)symbol);
 
 				// Const
 				case "MdFieldInfo":
@@ -976,14 +1135,12 @@ namespace Ancestry.QueryProcessor.Compile
 				{
 					var field = (FieldInfo)symbol;
 
-					// Find the module instance
-					if (!_writersBySymbol.TryGetValue(field.DeclaringType, out writer))
-						throw new Exception("Internal error: unable to find module for field.");
-					writer(method);
-
+					EmitModuleInstance(method, field.DeclaringType);
 					method.IL.Emit(OpCodes.Ldfld, field);
 					
-					return new ExpressionContext { Type = _emitter.TypeFromNative(field.FieldType) };
+					var type = _emitter.TypeFromNative(field.FieldType);
+					var native = type.GetNative(_emitter) == field.FieldType ? null : field.FieldType;
+					return new ExpressionContext(type, native);
 				}
 
 				// TODO: enums and typedefs
@@ -992,17 +1149,42 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
+		private ExpressionContext EmitMethodReference(MethodContext method, MethodInfo member)
+		{
+			EmitModuleInstance(method, member.DeclaringType);
+			var type = new FunctionType();
+			type.Parameters.AddRange
+			(
+				from p in member.GetParameters()
+				select new FunctionParameter { Name = Name.FromNative(p.Name), Type = _emitter.TypeFromNative(p.ParameterType) }
+			);
+			type.Type = _emitter.TypeFromNative(member.ReturnType);
+			return new ExpressionContext(type, member.DeclaringType, member);
+		}
+
+		private void EmitModuleInstance(MethodContext method, System.Type module)
+		{
+			Func<MethodContext, ExpressionContext?> writer;
+			if (!_writersBySymbol.TryGetValue(module, out writer))
+				throw new Exception(String.Format("Internal error: unable to find module ({0}).", module.ToString()));
+			writer(method);
+		}
+
 		/// <summary> If the given expression is a repository reference, invokes the get to return a concrete value. </summary>
 		public ExpressionContext MaterializeRepository(MethodContext method, ExpressionContext expression)
 		{
-			if (expression.Type.IsRepository)
+			if (expression.IsRepository())
 			{
+				var naturalNative = expression.Type.GetNative(_emitter);
 				method.IL.Emit(OpCodes.Ldnull);	// Condition
 				method.IL.Emit(OpCodes.Ldnull);	// Order
-				method.IL.EmitCall(OpCodes.Callvirt, expression.Type.GetNative(_emitter).GetMethod("Get"), null);
-				var resultType = expression.Type.Clone();
-				resultType.IsRepository = false;
-				return new ExpressionContext { Type = resultType };
+				method.IL.EmitCall(OpCodes.Callvirt, (expression.NativeType ?? naturalNative).GetMethod("Get"), null);
+				// Reset the native type to the repository's type parameter if unnatural, or null if natural
+				expression.NativeType = 
+					expression.NativeType != null && expression.NativeType.IsGenericType && expression.NativeType.GenericTypeArguments[0] != naturalNative
+						? expression.NativeType.GenericTypeArguments[0]
+						: null;
+				return expression;
 			}
 			else
 				return expression;

@@ -10,6 +10,8 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class StringType : ScalarType
 	{
+		public StringType() : base(typeof(string)) { }
+
 		public override ExpressionContext CompileOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.Operator op)
 		{
 			switch (op)
@@ -27,11 +29,6 @@ namespace Ancestry.QueryProcessor.Type
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", op));
 			}
 			return left;
-		}
-
-		public override BaseType Clone()
-		{
-			return new StringType { IsRepository = this.IsRepository, Type = this.Type };
 		}
 	}
 }

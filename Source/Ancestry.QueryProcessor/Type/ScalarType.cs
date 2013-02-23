@@ -10,16 +10,21 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class ScalarType : BaseType
 	{
-		public System.Type Type { get; set; }
+		public ScalarType(System.Type native)
+		{
+			Native = native;
+		}
+
+		public System.Type Native { get; set; }
 
 		public override System.Type GetNative(Emitter emitter)
 		{
-			return Type;
+			return Native;
 		}
 
 		public override int GetHashCode()
 		{
-			return IsRepository.GetHashCode() * 83 + Type.GetHashCode();
+			return Native.GetHashCode();
 		}
 
 		public override bool Equals(object obj)
@@ -33,7 +38,7 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(ScalarType left, ScalarType right)
 		{
 			return Object.ReferenceEquals(left, right)
-				|| (left.IsRepository == right.IsRepository && left.Type == right.Type);
+				|| (left.Native == right.Native);
 		}
 
 		public static bool operator !=(ScalarType left, ScalarType right)
@@ -41,9 +46,9 @@ namespace Ancestry.QueryProcessor.Type
 			return !(left == right);
 		}
 
-		public override BaseType Clone()
+		public override string ToString()
 		{
-			return new ScalarType { IsRepository = this.IsRepository, Type = this.Type };
+			return Native.Name;
 		}
 
 		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
@@ -65,18 +70,17 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.Xor:
 				case Parse.Operator.ShiftLeft:
 				case Parse.Operator.ShiftRight:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
-						return CompileOperator(method, compiler, left, right, expression.Operator);
-					}
+				{
+					var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
+					return CompileOperator(method, compiler, left, right, expression.Operator);
+				}
 
 				case Parse.Operator.And:
 				case Parse.Operator.Or:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
-						return CompileShortCircuit(method, compiler, frame, left, expression, typeHint);
-					}
-
+				{
+					var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
+					return CompileShortCircuit(method, compiler, frame, left, expression, typeHint);
+				}
 
 				case Parse.Operator.Equal:
 				case Parse.Operator.NotEqual:
@@ -84,10 +88,10 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.InclusiveLess:
 				case Parse.Operator.Greater:
 				case Parse.Operator.Less:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right));	// (no type hint)
-						return CompileOperator(method, compiler, left, right, expression.Operator);
-					}
+				{
+					var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right));	// (no type hint)
+					return CompileOperator(method, compiler, left, right, expression.Operator);
+				}
 
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
@@ -150,7 +154,7 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.Equal:
 					if (!CallClassOp(method, "op_Equality", leftType, rightType))
 						method.IL.Emit(OpCodes.Ceq);
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.NotEqual: 
 					if (!CallClassOp(method, "op_Inequality", leftType, rightType))
 					{
@@ -158,7 +162,7 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.InclusiveGreater:
 					if (!CallClassOp(method, "op_GreaterThanOrEqual", leftType, rightType))
 					{
@@ -166,7 +170,7 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.InclusiveLess:
 					if (!CallClassOp(method, "op_LessThanOrEqual", leftType, rightType))
 					{
@@ -174,15 +178,15 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.Greater:
 					if (!CallClassOp(method, "op_GreaterThan", leftType, rightType))
-						method.IL.Emit(OpCodes.Cgt); 
-					break;
+						method.IL.Emit(OpCodes.Cgt);
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.Less:
 					if (!CallClassOp(method, "op_LessThan", leftType, rightType))
-						method.IL.Emit(OpCodes.Clt); 
-					break;
+						method.IL.Emit(OpCodes.Clt);
+					return new ExpressionContext(SystemTypes.Boolean);
 
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", op));
 			}
@@ -233,11 +237,11 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.Exists:
 					method.IL.Emit(OpCodes.Pop); 
 					method.IL.Emit(OpCodes.Ldc_I4_1);	// true
-					break;	
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.IsNull: 
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_0);	// false 
-					break;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.Negate: 
 					if (!CallClassOp(method, "op_UnaryNegation", innerType))
 						method.IL.Emit(OpCodes.Neg); 
@@ -250,8 +254,14 @@ namespace Ancestry.QueryProcessor.Type
 					if (!CallClassOp(method, "op_OnesComplement", innerType))
 						method.IL.Emit(OpCodes.Not);
 					break;
-				//case Parse.Operator.Successor: 
-				//case Parse.Operator.Predicessor:
+				case Parse.Operator.Successor: 
+					method.IL.Emit(OpCodes.Ldc_I4_1);
+					method.IL.Emit(OpCodes.Add);
+					break;
+				case Parse.Operator.Predicessor:
+					method.IL.Emit(OpCodes.Ldc_I4_1);
+					method.IL.Emit(OpCodes.Sub);
+					break;
 
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}

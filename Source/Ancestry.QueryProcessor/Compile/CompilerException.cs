@@ -11,12 +11,12 @@ namespace Ancestry.QueryProcessor.Compile
 			/// <summary>Error code 105100: "Identifier '{0}' not found."</summary>
 			IdentifierNotFound = 105100,
 
-			/// <summary>Error code 105101: "Reference to type '{0}', expecting '{1}'."</summary>
+			/// <summary>Error code 105101: "Encountered type '{0}', expecting '{1}'."</summary>
 			IncorrectType = 105101,
 
 			/// <summary>Error code 105102: "The generic type ({0}) passed does not match the type of the target ({1})."</summary>
 			MismatchedGeneric = 105102,
-			
+
 			/// <summary>Error code 105103: "Recursive declaration.  A declaration must not reference itself directly or indirectly."</summary>
 			RecursiveDeclaration = 105103,
 
@@ -40,6 +40,12 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105110: "Ambiguous reference '{0}'."</summary>
 			AmbiguousReference = 105110,
+
+			/// <summary>Error code 105111: "Cannot invoke non function type ({0})." </summary>
+			CannotInvokeNonFunction = 105111,
+
+			/// <summary>Error code 105112: "'for' clause cannot iterate over type ({0})."</summary>
+			InvalidForExpressionTarget = 105112,
 		}
 
 		// Resource manager for this exception class

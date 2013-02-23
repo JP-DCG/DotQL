@@ -99,7 +99,7 @@ namespace Ancestry.QueryProcessor
 		private object InternalExecute(string text, IDictionary<string, object> args, QueryOptions actualOptions, CancellationToken cancelToken)
 		{
 			// Create assembly and source file names
-			var assemblyName = "DotQL" + DateTime.Now.ToString("yyyyMMddhhmmssss");
+			var assemblyName = "DotQL" + DateTime.Now.Ticks;
 			var sourceFileName = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.ChangeExtension(assemblyName, "dql"));
 
 			// Save the file if we're debugging

@@ -71,6 +71,7 @@
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
     <Compile Include="Runtime\UsingTuple.cs" />
+    <Compile Include="Runtime\Void.cs" />
     <Compile Include="Storage\InMemoryModuleRepository.cs" />
     <Compile Include="Storage\InMemoryRepository.cs" />
     <Compile Include="Storage\InMemoryFactory.cs" />
@@ -93,7 +94,10 @@
     <Compile Include="Storage\IRepositoryFactory.cs" />
     <Compile Include="Type\BaseIntegerType.cs" />
     <Compile Include="Type\BaseType.cs" />
+    <Compile Include="Type\BooleanType.cs" />
+    <Compile Include="Type\FunctionParameter.cs" />
     <Compile Include="Type\FunctionType.cs" />
+    <Compile Include="Type\IComponentType.cs" />
     <Compile Include="Type\ListType.cs" />
     <Compile Include="Type\NaryType.cs" />
     <Compile Include="Type\ModuleAttribute.cs" />
@@ -108,6 +112,8 @@
     <Compile Include="Type\TupleReference.cs" />
     <Compile Include="Type\TupleReferenceAttribute.cs" />
     <Compile Include="Type\TupleType.cs" />
+    <Compile Include="Type\VoidType.cs" />
+    <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BaseException.resx" />

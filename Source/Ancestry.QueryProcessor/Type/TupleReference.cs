@@ -58,10 +58,5 @@ namespace Ancestry.QueryProcessor.Type
 					TargetAttributeNames = (from tan in reference.TargetAttributeNames select Name.FromQualifiedIdentifier(tan)).ToArray()
 				};
 		}
-
-		public TupleReference Clone()
-		{
-			return new TupleReference { SourceAttributeNames = this.SourceAttributeNames, Target = this.Target, TargetAttributeNames = this.TargetAttributeNames };
-		}
 	}
 }

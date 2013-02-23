@@ -13,10 +13,5 @@ namespace Ancestry.QueryProcessor.Type
 		{
 			return typeof(List<>).MakeGenericType(Of.GetNative(emitter));
 		}
-
-		public override BaseType Clone()
-		{
-			return new ListType { IsRepository = this.IsRepository, Of = this.Of };
-		}
 	}
 }

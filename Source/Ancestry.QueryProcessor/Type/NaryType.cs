@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Type
 {
-	public abstract class NaryType : BaseType
+	public abstract class NaryType : BaseType, IComponentType
 	{
 		public BaseType Of { get; set; }
 
@@ -63,18 +63,18 @@ namespace Ancestry.QueryProcessor.Type
 					method.IL.EmitCall(OpCodes.Callvirt, typeof(ICollection<>).MakeGenericType(inner.Type.GetNative(compiler.Emitter)).GetProperty("Count").GetGetMethod(), null);
 					method.IL.Emit(OpCodes.Ldc_I4_0);
 					method.IL.Emit(OpCodes.Cgt);
-					return ExpressionContext.Boolean;
+					return new ExpressionContext(SystemTypes.Boolean);
 				case Parse.Operator.IsNull: 
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_0);
-					return ExpressionContext.Boolean;
+					return new ExpressionContext(SystemTypes.Boolean);
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
 		}
 
 		public override int GetHashCode()
 		{
-			return IsRepository.GetHashCode() * 83 + GetType().GetHashCode() * 83 + Of.GetHashCode();
+			return GetType().GetHashCode() * 83 + Of.GetHashCode();
 		}
 
 		public override bool Equals(object obj)
@@ -88,7 +88,7 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(NaryType left, NaryType right)
 		{
 			return Object.ReferenceEquals(left, right) 
-				|| (left.IsRepository == right.IsRepository && left.GetType() == right.GetType() && left.Of == right.Of);
+				|| (left.GetType() == right.GetType() && left.Of == right.Of);
 		}
 
 		public static bool operator !=(NaryType left, NaryType right)

@@ -19,6 +19,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly ConstructorInfo DateTimeTicksConstructor = typeof(DateTime).GetConstructor(new[] { typeof(long) });
 		public static readonly ConstructorInfo TimeSpanTicksConstructor = typeof(DateTime).GetConstructor(new[] { typeof(long) });
 		public static readonly MethodInfo TypeGetTypeFromHandle = typeof(System.Type).GetMethod("GetTypeFromHandle");
+		public static readonly MethodInfo IEnumerableMoveNext = typeof(IEnumerator).GetMethod("MoveNext");
 
 		public static bool IsTupleType(System.Type type)
 		{
@@ -33,6 +34,11 @@ namespace Ancestry.QueryProcessor.Compile
 		public static bool IsNary(System.Type type)
 		{
 			return type.IsGenericType && typeof(IEnumerable).IsAssignableFrom(type);
+		}
+
+		public static bool IsRepository(System.Type type)
+		{
+			return type != null && type.IsGenericType && typeof(Storage.IRepository<>) == type.GetGenericTypeDefinition();
 		}
 
 		#region GetMethodExt

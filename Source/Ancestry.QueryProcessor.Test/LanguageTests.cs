@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace Ancestry.QueryProcessor.Test
 {
@@ -70,12 +71,21 @@ namespace Ancestry.QueryProcessor.Test
 		public void TupleKeyAndComparison()
 		{
 			var processor = new Processor();
-			
+
 			dynamic result = processor.Evaluate("return { x:2 y:'hello' key{ x } } = { x:2 y:'other' key{ x } }");
 			Assert.IsTrue(result);
 
 			result = processor.Evaluate("return { x:2 y:'hello' key{ y } } = { x:2 y:'other' key{ y } }");
 			Assert.IsFalse(result);
+
+			result = processor.Evaluate("return { x:2 y:'hello' } = { x:2 y:'other' }");
+			Assert.IsFalse(result);
+
+			result = processor.Evaluate("return { x:2 y:'hello' } = { x:2 y:'hello' }");
+			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return { : } = { : }");
+			Assert.IsTrue(result);
 		}
 
 		[TestMethod]
@@ -98,6 +108,9 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
 
+			result = processor.Evaluate("return { }");
+			Assert.IsTrue(result.Count == 0);
+
 			result = processor.Evaluate("return { 'a' 'b' 'c' }");
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
@@ -119,6 +132,26 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void SetOperations()
+		{
+			var processor = new Processor();
+
+			dynamic result = processor.Evaluate("return { 2 3 } = { 3 2 }");
+			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return { } = { }");
+			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return { 2 3 } | { 3 4 }");
+			Assert.AreEqual(3, result.Count);
+			Assert.IsTrue(result.Contains(2));
+			Assert.IsTrue(result.Contains(3));
+			Assert.IsTrue(result.Contains(4));
+
+			// TODO: remaining set operations
+		}
+
+		[TestMethod]
 		public void ListSelector()
 		{
 			var processor = new Processor();
@@ -128,6 +161,32 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[0], 2);
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
+
+			result = processor.Evaluate("return [ 'blah' 'boo' ]");
+			Assert.IsTrue(result.Length == 2);
+			Assert.AreEqual(result[0], "blah");
+			Assert.AreEqual(result[1], "boo");
+
+			result = processor.Evaluate("return [ ]");
+			Assert.IsTrue(result.Length == 0);
+		}
+
+		[TestMethod]
+		public void ListOperations()
+		{
+			var processor = new Processor();
+
+			dynamic result = processor.Evaluate("return [ 2 3 ] = [ 2 3 ]");
+			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return [ 2 3 ] | [ 2 3 ]");
+			Assert.AreEqual(4, result.Count);
+			Assert.AreEqual(2, result[0]);
+			Assert.AreEqual(3, result[1]);
+			Assert.AreEqual(2, result[2]);
+			Assert.AreEqual(3, result[3]);
+
+			// TODO: Remaining list operations
 		}
 
 		[TestMethod]
@@ -159,18 +218,32 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("for i in { 2 3 4 5 6 7 } return i + 10");
+			Assert.IsTrue(result is ISet<int>);
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(6, result.Count);
 			Assert.AreEqual(12, result[0]);
 			Assert.AreEqual(17, result[5]);
+
+			result = processor.Evaluate("for i in [ 2 3 4 ] return -i");
+			Assert.IsTrue(!(result is ISet<int>));
+			Assert.AreEqual(3, result.Count);
+			Assert.AreEqual(-2, result[0]);
+			Assert.AreEqual(-4, result[2]);
+
+			result = processor.Evaluate("for i in { 2 4 } for j in [ 0 1 ] return i + j");
+			Assert.IsTrue(!(result is ISet<int>));
+			Assert.AreEqual(4, result.Count);
+			Assert.AreEqual(2, result[0]);
+			Assert.AreEqual(3, result[1]);
+			Assert.AreEqual(4, result[2]);
+			Assert.AreEqual(5, result[3]);
 		}
 
 		[TestMethod]
 		public void Where()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("for i in { 2 3 4 5 6 7 } where i % 2 = 0 return i");
-			result = Enumerable.ToList(result);
+			dynamic result = processor.Evaluate("for i in [ 2 3 4 5 6 7 ] where i % 2 = 0 return i");
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(2, result[0]);
 			Assert.AreEqual(6, result[2]);
@@ -179,6 +252,7 @@ namespace Ancestry.QueryProcessor.Test
 		[TestMethod]
 		public void NestedFLWOR()
 		{
+			// Note: the for clauses in this test are not part of the same claused expression, one is nested in the return expression
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("for i in { 2 4 6 } \r\n return for j in [ 0 1 ] return i + j");
 			result = Enumerable.ToList(result);
@@ -216,6 +290,13 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(4, result[0]);
 			Assert.AreEqual(6, result[2]);
+
+			// TODO: change this to (x < 4) when tuple attributes are available in restriction
+			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }?(value.x < 4)");
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(2, result.Count);
+			Assert.AreEqual(2, result[0]);
+			Assert.AreEqual(3, result[1]);
 		}
 
 		[TestMethod]
@@ -243,6 +324,10 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { x: 2 }.(x * 2)");
 			Assert.AreEqual(4, result);
+
+			result = processor.Evaluate("return { x: 2 }.{ :x y:x * 2)");
+			Assert.AreEqual(2, result.x);
+			Assert.AreEqual(4, result.y);
 		}
 
 		[TestMethod]
@@ -250,6 +335,19 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { 2 3 4 }.(value * 5)");
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(3, result.Count);
+			Assert.AreEqual(10, result[0]);
+			Assert.AreEqual(20, result[2]);
+
+			result = processor.Evaluate("return { 2 3 4 }.{ x:value * 5 }");
+			result = Enumerable.ToList(result);
+			Assert.AreEqual(3, result.Count);
+			Assert.AreEqual(10, result[0].x);
+			Assert.AreEqual(20, result[2].x);
+
+			// TODO: change this to (x * 5) once tuple attributes are made available
+			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }.(value.x * 5)");
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0]);

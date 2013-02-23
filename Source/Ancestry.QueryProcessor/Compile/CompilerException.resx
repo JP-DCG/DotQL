@@ -121,7 +121,7 @@
     <value>Identifier '{0}' not found.</value>
   </data>
   <data name="105101" xml:space="preserve">
-    <value>Reference to type '{0}', expecting '{1}'.</value>
+    <value>Encountered type '{0}', expecting '{1}'.</value>
   </data>
   <data name="105102" xml:space="preserve">
     <value>The generic type ({0}) passed does not match the type of the target ({1}).</value>
@@ -149,5 +149,11 @@
   </data>
   <data name="105110" xml:space="preserve">
     <value>Ambiguous reference '{0}'.</value>
+  </data>
+  <data name="105111" xml:space="preserve">
+    <value>Cannot invoke non function type ({0}).</value>
+  </data>
+  <data name="105112" xml:space="preserve">
+    <value>'for' clause cannot iterate over type ({0}).</value>
   </data>
 </root>

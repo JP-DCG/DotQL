@@ -10,6 +10,8 @@ namespace Ancestry.QueryProcessor.Type
 {
 	public class BaseIntegerType : ScalarType
 	{
+		public BaseIntegerType(System.Type native) : base(native) { }
+
 		public override ExpressionContext CompileOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.Operator op)
 		{
 			switch (op)
@@ -24,11 +26,6 @@ namespace Ancestry.QueryProcessor.Type
 				default: return base.CompileOperator(method, compiler, left, right, op);
 			}
 			return left;
-		}
-
-		public override BaseType Clone()
-		{
-			return new BaseIntegerType { IsRepository = this.IsRepository, Type = this.Type };
 		}
 	}
 }

@@ -9,8 +9,14 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public class MethodContext
 	{
-		public MethodBuilder Builder { get; set; }
-		public ILGenerator IL { get; set; }
+		public MethodContext(MethodBuilder builder)
+		{
+			 Builder = builder;
+			 IL = builder.GetILGenerator();
+		}
+
+		public MethodBuilder Builder { get; private set; }
+		public ILGenerator IL { get; private set; }
 
 		public LocalBuilder DeclareLocal(Parse.Statement statement, System.Type type, string name)
 		{

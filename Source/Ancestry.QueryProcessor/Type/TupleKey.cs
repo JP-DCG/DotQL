@@ -47,10 +47,5 @@ namespace Ancestry.QueryProcessor.Type
 		{
 			return new TupleKey { AttributeNames = (from an in key.AttributeNames select Name.FromQualifiedIdentifier(an)).ToArray() };
 		}
-
-		public TupleKey Clone()
-		{
-			return new TupleKey { AttributeNames = this.AttributeNames };
-		}
 	}
 }
