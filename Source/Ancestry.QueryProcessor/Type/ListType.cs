@@ -11,7 +11,7 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public override System.Type GetNative(Emitter emitter)
 		{
-			return typeof(List<>).MakeGenericType(Of.GetNative(emitter));
+			return typeof(Runtime.ListEx<>).MakeGenericType(Of.GetNative(emitter));
 		}
 	}
 }

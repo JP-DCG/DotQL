@@ -30,12 +30,13 @@ namespace Ancestry.QueryProcessor.Runtime
 
 		public static IList<T> ToList<T>(ISet<T> setValue)
 		{
-			return new List<T>(setValue);
+			// TODO: ensure that the items coming from the set are ordered so that this is deterministic
+			return new ListEx<T>(setValue);
 		}
 
 		public static ISet<T> ToSet<T>(IList<T> listValue)
 		{
-			return new HashSet<T>(listValue);
+			return new Set<T>(listValue);
 		}
 
 		public static DateTime AddMonth(DateTime start, int months)

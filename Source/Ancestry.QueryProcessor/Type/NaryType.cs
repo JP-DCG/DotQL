@@ -12,13 +12,30 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public BaseType Of { get; set; }
 
-		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, BaseType typeHint)
 		{
 			switch (expression.Operator)
 			{
-				//case Parse.Operator.Dereference: return CompileDereference(method, compiler, frame, left, expression, typeHint);
+				//case Parse.Operator.Dereference: 
+				//	return CompileDereference(method, compiler, frame, left, expression, typeHint);
 
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
+				default: return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+			}
+		}
+		
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		{
+			switch (expression.Operator)
+			{
+				case Parse.Operator.Equal:
+				case Parse.Operator.NotEqual:
+					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
+
+				//// TODO: nary intersection and union
+				//case Parse.Operator.BitwiseOr:
+				//case Parse.Operator.BitwiseAnd:
+
+				default: throw NotSupported(expression);
 			}
 		}
 
@@ -53,10 +70,8 @@ namespace Ancestry.QueryProcessor.Type
 		//	return Expression.Call(select, left, selection);
 		//}
 
-		public override ExpressionContext CompileUnaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext inner, Parse.UnaryExpression expression, Type.BaseType typeHint)
+		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
-			inner = compiler.MaterializeRepository(method, inner);
-
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Exists:
@@ -64,11 +79,11 @@ namespace Ancestry.QueryProcessor.Type
 					method.IL.Emit(OpCodes.Ldc_I4_0);
 					method.IL.Emit(OpCodes.Cgt);
 					return new ExpressionContext(SystemTypes.Boolean);
-				case Parse.Operator.IsNull: 
+				case Parse.Operator.IsNull:
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_0);
 					return new ExpressionContext(SystemTypes.Boolean);
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
+				default: throw NotSupported(expression);
 			}
 		}
 

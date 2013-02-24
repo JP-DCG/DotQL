@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Ancestry.QueryProcessor;
+using Ancestry.QueryProcessor.Compile;
 
 namespace Ancestry.QueryProcessor.Type
 {
@@ -14,14 +15,20 @@ namespace Ancestry.QueryProcessor.Type
 
 		public BaseType Type { get; set; }
 
-		public override Compile.ExpressionContext CompileBinaryExpression(Compile.MethodContext method, Compile.Compiler compiler, Compile.Frame frame, Compile.ExpressionContext left, Parse.BinaryExpression expression, BaseType typeHint)
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
-			return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+			switch (expression.Operator)
+			{
+				default: throw NotSupported(expression);
+			}
 		}
 
-		public override Compile.ExpressionContext CompileUnaryExpression(Compile.MethodContext method, Compile.Compiler compiler, Compile.Frame frame, Compile.ExpressionContext inner, Parse.UnaryExpression expression, BaseType typeHint)
+		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
-			return base.CompileUnaryExpression(method, compiler, frame, inner, expression, typeHint);
+			switch (expression.Operator)
+			{
+				default: throw NotSupported(expression);
+			}
 		}
 
 		public override System.Type GetNative(Compile.Emitter emitter)

@@ -12,21 +12,52 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public StringType() : base(typeof(string)) { }
 
-		public override ExpressionContext CompileOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.Operator op)
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
-			switch (op)
+			switch (expression.Operator)
 			{
 				case Parse.Operator.Addition: 
-					method.IL.EmitCall(OpCodes.Call, typeof(string).GetMethod("Concat", new System.Type[] { typeof(string), typeof(string) }), null);
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringConcat, null);
 					break;
-				case Parse.Operator.Equal: 
-				case Parse.Operator.NotEqual: 
-				case Parse.Operator.InclusiveGreater: 
-				case Parse.Operator.InclusiveLess: 
-				case Parse.Operator.Greater: 
-				case Parse.Operator.Less: return base.CompileOperator(method, compiler, left, right, op);
 
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", op));
+				case Parse.Operator.Equal: 
+					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
+				case Parse.Operator.NotEqual:
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringCompare, null);
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Ceq);
+					// Not
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Ceq);
+					return new ExpressionContext(SystemTypes.Boolean);
+				case Parse.Operator.InclusiveGreater:
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringCompare, null);
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Clt);
+					// Not
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Ceq);
+					return new ExpressionContext(SystemTypes.Boolean);
+				case Parse.Operator.InclusiveLess:
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringCompare, null);
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Cgt);
+					// Not
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Ceq);
+					return new ExpressionContext(SystemTypes.Boolean);
+				case Parse.Operator.Greater:
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringCompare, null);
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Cgt);
+					return new ExpressionContext(SystemTypes.Boolean);
+				case Parse.Operator.Less:
+					method.IL.EmitCall(OpCodes.Call, ReflectionUtility.StringCompare, null);
+					method.IL.Emit(OpCodes.Ldc_I4_0);
+					method.IL.Emit(OpCodes.Clt);
+					return new ExpressionContext(SystemTypes.Boolean);
+
+				default: throw NotSupported(expression);
 			}
 			return left;
 		}

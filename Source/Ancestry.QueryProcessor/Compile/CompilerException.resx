@@ -156,4 +156,7 @@
   <data name="105112" xml:space="preserve">
     <value>'for' clause cannot iterate over type ({0}).</value>
   </data>
+  <data name="105113" xml:space="preserve">
+    <value>Operator '{0}' is not supported for type '{1}'.</value>
+  </data>
 </root>

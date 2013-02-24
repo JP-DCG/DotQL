@@ -12,9 +12,9 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public BaseIntegerType(System.Type native) : base(native) { }
 
-		public override ExpressionContext CompileOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.Operator op)
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
-			switch (op)
+			switch (expression.Operator)
 			{
 				case Parse.Operator.Power:
 					var intPower = typeof(Runtime.Runtime).GetMethod("IntPower", new[] { typeof(int), typeof(int) });
@@ -23,7 +23,7 @@ namespace Ancestry.QueryProcessor.Type
 					method.IL.EmitCall(OpCodes.Call, intPower, null);
 					break;
 				
-				default: return base.CompileOperator(method, compiler, left, right, op);
+				default: return base.DefaultBinaryOperator(method, compiler, left, right, expression);
 			}
 			return left;
 		}

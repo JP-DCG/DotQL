@@ -1088,41 +1088,49 @@ namespace Ancestry.QueryProcessor.Parse
 			{
 				// Capture the beginning token for position information
 				var beginToken = lexer[0];
-				var firstExpression = Expression(lexer);
-				if (lexer[1].IsSymbol(Keywords.AttributeSeparator))
+
+				Expression firstExpression = null;
+
+				// Check for empty set
+				if (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 				{
-					// Treat as an attribute selector
+					// Obtain expression, which may need to be reinterpreted as an attribute name
+					firstExpression = Expression(lexer);
 
-					// Validate that the first expression was nothing but an identifier (the attribute name)
-					var identifier = firstExpression as IdentifierExpression;
-					if (identifier == null)
-						throw new ParserException(ParserException.Codes.InvalidAttributeName);
+					// Check if an attribute selector and thus a tuple
+					if (lexer[1].IsSymbol(Keywords.AttributeSeparator))
+					{
+						// Validate that the first expression was nothing but an identifier (the attribute name)
+						var identifier = firstExpression as IdentifierExpression;
+						if (identifier == null)
+							throw new ParserException(ParserException.Codes.InvalidAttributeName);
 
-					lexer.NextToken();
+						lexer.NextToken();
 
-					// Manually construct the first attribute and add it
-					var attribute = new AttributeSelector();
-					attribute.Name = identifier.Target;
-					attribute.LineInfo = identifier.LineInfo;
-					attribute.Value = Expression(lexer);
-					var result = new TupleSelector();
-					result.SetPosition(beginToken);
-					result.Attributes.Add(attribute);
+						// Manually construct the first attribute and add it
+						var attribute = new AttributeSelector();
+						attribute.Name = identifier.Target;
+						attribute.LineInfo = identifier.LineInfo;
+						attribute.Value = Expression(lexer);
+						var result = new TupleSelector();
+						result.SetPosition(beginToken);
+						result.Attributes.Add(attribute);
 
-					// Add remaining attributes
-					TupleSelectorMembers(lexer, result);
+						// Add remaining attributes
+						TupleSelectorMembers(lexer, result);
 					
-					lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
-					return result;
+						lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
+						return result;
+					}
 				}
-				else
-				{
-					// Treat as a set selector
 
+				// Treat as a set selector
+				{
 					// Manually add already parsed first expression
 					var result = new SetSelector();
 					result.SetPosition(beginToken);
-					result.Items.Add(firstExpression);
+					if (firstExpression != null)
+						result.Items.Add(firstExpression);
 
 					// Add remaining items
 					while (lexer[1].Type != TokenType.EOF && !lexer[1].IsSymbol(Keywords.EndTupleSet))

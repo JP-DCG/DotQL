@@ -27,7 +27,7 @@ namespace Ancestry.QueryProcessor.Storage
 					&& Name.FromQualifiedIdentifier(((Parse.IdentifierExpression)((Parse.BinaryExpression)condition).Left).Target) == Name.FromComponents("Name")
 					&& ((Parse.BinaryExpression)condition).Right is Parse.LiteralExpression
 			)
-				return new HashSet<Runtime.ModuleTuple>(from m in _repository.Modules where m.Name == (Name)((Parse.LiteralExpression)((Parse.BinaryExpression)condition).Right).Value select m);
+				return new Runtime.Set<Runtime.ModuleTuple>(from m in _repository.Modules where m.Name == (Name)((Parse.LiteralExpression)((Parse.BinaryExpression)condition).Right).Value select m);
 			else
 				throw new Exception("InMemoryModuleRepository is unable to process complex expressions.");
 		}

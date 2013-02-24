@@ -17,8 +17,8 @@ namespace Ancestry.QueryProcessor.Type
 		private Dictionary<Name, TupleReference> _references = new Dictionary<Name,TupleReference>();
 		public Dictionary<Name, TupleReference> References { get { return _references; } }
 
-		private HashSet<TupleKey> _keys = new HashSet<TupleKey>();
-		public HashSet<TupleKey> Keys { get { return _keys; } }
+		private Runtime.Set<TupleKey> _keys = new Runtime.Set<TupleKey>();
+		public Runtime.Set<TupleKey> Keys { get { return _keys; } }
 
 		public override int GetHashCode()
 		{
@@ -47,7 +47,7 @@ namespace Ancestry.QueryProcessor.Type
 				(
 					left.Attributes.Equivalent(right.Attributes)
 						&& left.References.Equivalent(right.References)
-						&& left.Keys.Equivalent(right.Keys)
+						&& left.Keys == right.Keys
 				);
 		}
 
@@ -80,30 +80,26 @@ namespace Ancestry.QueryProcessor.Type
 		{
 			switch (expression.Operator)
 			{
+				case Parse.Operator.Dereference: 
+					return CompileDereference(method, compiler, frame, left, expression, typeHint);
+
+				default: 
+					return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+			}
+		}
+
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		{
+			switch (expression.Operator)
+			{
 				case Parse.Operator.Equal:
 				case Parse.Operator.NotEqual:
-					left = compiler.MaterializeRepository(method, left);
-					var leftType = left.Type.GetNative(compiler.Emitter);
-					var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right));
-					var rightType = right.Type.GetNative(compiler.Emitter);
+					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
 
-					switch (expression.Operator)
-					{
-						case Parse.Operator.Equal:
-							if (!CallClassOp(method, "op_Equality", leftType, rightType))
-								return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
-							break;
-						case Parse.Operator.NotEqual:
-							if (!CallClassOp(method, "op_Inequality", leftType, rightType))
-								return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
-							break;
-						default: throw new NotSupportedException();
-					}
-					return new ExpressionContext(SystemTypes.Boolean);
+				//// TODO: Tuple union
+				//case Parse.Operator.BitwiseOr:
 
-				case Parse.Operator.Dereference: return CompileDereference(method, compiler, frame, left, expression, typeHint);
-
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
+				default: throw NotSupported(expression);
 			}
 		}
 

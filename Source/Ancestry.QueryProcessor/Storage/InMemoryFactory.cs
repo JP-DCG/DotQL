@@ -27,14 +27,14 @@ namespace Ancestry.QueryProcessor.Storage
 		/// <summary> Additional assemblies to look in for modules. </summary>
 		public IList<AssemblyName> AdditionalAssemblies { get { return _additionalAssemblies; } }
 
-		private HashSet<Runtime.ModuleTuple> _modules;
+		private Runtime.Set<Runtime.ModuleTuple> _modules;
 		public ISet<Runtime.ModuleTuple> Modules 
 		{ 
 			get 
 			{ 
 				if (_modules == null)
 				{
-					_modules = new HashSet<Runtime.ModuleTuple>();
+					_modules = new Runtime.Set<Runtime.ModuleTuple>();
 					foreach (var module in FindModules())
 						_modules.Add(new Runtime.ModuleTuple { Name = module.Key, Version = new Version(1, 0), Class = module.Value });
 				}

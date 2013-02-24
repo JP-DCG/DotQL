@@ -46,6 +46,9 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105112: "'for' clause cannot iterate over type ({0})."</summary>
 			InvalidForExpressionTarget = 105112,
+
+			/// <summary>Error code 105113: "Operator '{0}' is not supported for type '{1}'."</summary>
+			OperatorNotSupported = 105113,
 		}
 
 		// Resource manager for this exception class

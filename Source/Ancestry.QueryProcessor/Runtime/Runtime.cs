@@ -18,7 +18,7 @@ namespace Ancestry.QueryProcessor.Runtime
 					Operator = Parse.Operator.Equal,
 					Right = new Parse.LiteralExpression { Value = moduleId }
 				},
-				new HashSet<ModuleTuple> { new ModuleTuple { Name = moduleId, Version = version, Class = module } }
+				new Set<ModuleTuple> { new ModuleTuple { Name = moduleId, Version = version, Class = module } }
 			);
 		}
 

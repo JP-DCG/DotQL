@@ -74,8 +74,6 @@ namespace Ancestry.QueryProcessor.Compile
 			_importFrame = new Frame();
 			_scriptFrame = AddFrame(_importFrame, script);
 
-			var vars = new List<LocalBuilder>();
-
 			// Create temporary frame for resolution of used modules from all modules
 			var modulesFrame = new Frame();
 			foreach (var module in GetModules())
@@ -771,8 +769,8 @@ namespace Ancestry.QueryProcessor.Compile
 			switch (typeDeclaration.GetType().Name)
 			{
 				//case "OptionalType": return typeof(Nullable<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.OptionalType)typeDeclaration).Type));
-				//case "ListType": return typeof(IList<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.ListType)typeDeclaration).Type));
-				//case "SetType": return typeof(ISet<>).MakeGenericType(CompileTypeDeclaration(frame, ((Parse.SetType)typeDeclaration).Type));
+				case "ListType": return new ListType { Of = CompileTypeDeclaration(frame, ((Parse.ListType)typeDeclaration).Type) };
+				case "SetType": return new SetType { Of = CompileTypeDeclaration(frame, ((Parse.SetType)typeDeclaration).Type) };
 				//case "TupleType": return CompileTupleType(frame, (Parse.TupleType)typeDeclaration);
 				//case "FunctionType": return CompileFunctionType(frame, (Parse.FunctionType)typeDeclaration);
 				//case "NamedType": return CompileNamedType(frame, (Parse.NamedType)typeDeclaration);
@@ -913,55 +911,7 @@ namespace Ancestry.QueryProcessor.Compile
 			else
 				typeHint = null;
 
-			method.IL.BeginScope();
-			LocalBuilder element = null;
-			BaseType elementType = null;
-			BaseType setType = null;
-			MethodInfo addMethod = null;
-			for (var i = 0; i < setSelector.Items.Count; i++)
-			{
-				var expression = MaterializeRepository(method, CompileExpression(method, frame, setSelector.Items[i], elementType ?? typeHint));
-				if (elementType == null)
-				{
-					// Save the element into a local
-					elementType = expression.Type;
-					var native = elementType.GetNative(_emitter);
-					element = method.DeclareLocal(setSelector, native, "element");
-					method.IL.Emit(OpCodes.Stloc, element);
-					
-					// Construct the set
-					setType = new SetType { Of = elementType };
-					var setNative = NewObject(method, setType);
-					addMethod = setNative.GetMethod("Add");
-				}
-				else
-				{ 
-					// Convert the element and store into local
-					if (elementType != expression.Type)
-						Convert(method, expression, elementType);
-					method.IL.Emit(OpCodes.Stloc, element);
-				}
-				method.IL.Emit(OpCodes.Dup);	// collection
-				method.IL.Emit(OpCodes.Ldloc, element);
-				method.IL.Emit(OpCodes.Call, addMethod);
-				method.IL.Emit(OpCodes.Pop);	// ignore result bool
-			}
-			if (elementType == null)
-			{
-				elementType = SystemTypes.Void;
-				setType = new SetType { Of = elementType };
-				NewObject(method, setType);
-			}
-			method.IL.EndScope();
-
-			return new ExpressionContext(setType);
-		}
-
-		private System.Type NewObject(MethodContext method, BaseType type)
-		{
-			var native = type.GetNative(_emitter);
-			method.IL.Emit(OpCodes.Newobj, native.GetConstructor(new System.Type[] { }));
-			return native;
+			return EmitNarySelector(method, frame, new SetType(), setSelector, setSelector.Items, typeHint);
 		}
 
 		private ExpressionContext CompileListSelector(MethodContext method, Frame frame, Parse.ListSelector listSelector, BaseType typeHint)
@@ -972,54 +922,70 @@ namespace Ancestry.QueryProcessor.Compile
 			else
 				typeHint = null;
 
+			return EmitNarySelector(method, frame, new ListType(), listSelector, listSelector.Items, typeHint);
+		}
+
+		private ExpressionContext EmitNarySelector(MethodContext method, Frame frame, NaryType naryType, Parse.Statement statement, List<Parse.Expression> items, BaseType elementTypeHint)
+		{
 			method.IL.BeginScope();
 			LocalBuilder element = null;
 			BaseType elementType = null;
-			System.Type elementNative = null;
-			BaseType listType = null;
-			for (var i = 0; i < listSelector.Items.Count; i++)
+			MethodInfo addMethod = null;
+			if (items.Count > 0)
 			{
-				var expression = MaterializeRepository(method, CompileExpression(method, frame, listSelector.Items[i], elementType ?? typeHint));
-				if (elementType == null)
-				{
-					// Save the element into a local
-					elementType = expression.Type;
-					elementNative = elementType.GetNative(_emitter);
-					element = method.DeclareLocal(listSelector, elementNative, "element");
-					method.IL.Emit(OpCodes.Stloc, element);
+				// Compile the first item outside of the loop to determine the data type
+				var expression = MaterializeRepository(method, CompileExpression(method, frame, items[0], elementType ?? elementTypeHint));
 
-					// Construct the array
-					listType = new ListType { Of = elementType };
-					NewArray(method, elementNative, listSelector.Items.Count);
-				}
+				// Save the element into a local
+				elementType = expression.Type;
+				var native = elementType.GetNative(_emitter);
+				element = method.DeclareLocal(statement, native, "element");
+				method.IL.Emit(OpCodes.Stloc, element);
+
+				// Construct the set/list			
+				naryType.Of = elementType;
+				var naryNative = naryType.GetNative(_emitter);
+				// Attempt to find constructor that takes an initial capacity
+				var constructor = naryNative.GetConstructor(new System.Type[] { typeof(int) });
+				if (constructor == null)
+					constructor = naryNative.GetConstructor(new System.Type[] { });
 				else
+					method.IL.Emit(OpCodes.Ldc_I4, items.Count);
+				method.IL.Emit(OpCodes.Newobj, constructor);
+				addMethod = naryNative.GetMethod("Add");
+
+				Action performAdd = () =>
 				{
+					method.IL.Emit(OpCodes.Dup);	// collection
+					method.IL.Emit(OpCodes.Ldloc, element);
+					method.IL.Emit(OpCodes.Call, addMethod);
+					if (addMethod.ReturnType != typeof(void))
+						method.IL.Emit(OpCodes.Pop);	// ignore any add result
+				};
+				performAdd();
+
+				// Add remaining items
+				for (var i = 1; i < items.Count; i++)
+				{
+					expression = MaterializeRepository(method, CompileExpression(method, frame, items[i], elementType ?? elementTypeHint));
+
 					// Convert the element and store into local
 					if (elementType != expression.Type)
 						Convert(method, expression, elementType);
 					method.IL.Emit(OpCodes.Stloc, element);
+					
+					performAdd();
 				}
-				method.IL.Emit(OpCodes.Dup);			// array
-				method.IL.Emit(OpCodes.Ldc_I4, i);		// index
-				method.IL.Emit(OpCodes.Ldloc, element);	// element
-				method.IL.Emit(OpCodes.Stelem, elementNative);
 			}
-			if (elementType == null)
+			else
 			{
-				elementType = SystemTypes.Void;
-				elementNative = elementType.GetNative(_emitter);
-				listType = new ListType { Of = elementType };
-				NewArray(method, elementNative, 0);
+				// Construct empty list
+				naryType.Of = elementTypeHint ?? SystemTypes.Void;
+				method.IL.Emit(OpCodes.Newobj, naryType.GetNative(_emitter).GetConstructor(new System.Type[] { }));
 			}
 			method.IL.EndScope();
 
-			return new ExpressionContext(listType);
-		}
-
-		private void NewArray(MethodContext method, System.Type elementNative, int size)
-		{
-			method.IL.Emit(OpCodes.Ldc_I4, size);
-			method.IL.Emit(OpCodes.Newarr, elementNative);
+			return new ExpressionContext(naryType);
 		}
 
 		private ExpressionContext Convert(MethodContext method, ExpressionContext expression, BaseType target)

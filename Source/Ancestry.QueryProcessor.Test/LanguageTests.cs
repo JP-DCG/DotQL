@@ -58,6 +58,22 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void StringOperators()
+		{
+			var processor = new Processor();
+
+			// Test basic precedence
+			dynamic result = processor.Evaluate("return 'hello ' + 'world'");
+			Assert.AreEqual("hello world", result);
+
+			result = processor.Evaluate("return 'hello ' <> 'hello' and ('hello' = 'hello') and ('hello' <> 'HELLO')");
+			Assert.IsTrue(result);
+
+			result = processor.Evaluate("return ('zebra' > 'apple') and ('bob' < 'fran') and ('Z' <= 'Z') and ('Z' <= 'Zoe') and ('Z' >= 'Z') and ('Z' >= 'Y')");
+			Assert.IsTrue(result);
+		}
+
+		[TestMethod]
 		public void TupleSelection()
 		{
 			var processor = new Processor();
@@ -65,6 +81,9 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(2, result.x);
 			Assert.AreEqual("hello", result.y);
 			Assert.AreEqual(2.0, result.z);
+
+			result = processor.Evaluate("return { : }");
+			Assert.IsNotNull(result);
 		}
 
 		[TestMethod]
@@ -86,6 +105,18 @@ namespace Ancestry.QueryProcessor.Test
 
 			result = processor.Evaluate("return { : } = { : }");
 			Assert.IsTrue(result);
+		}
+
+		[TestMethod]
+		public void TupleOperators()
+		{
+			var processor = new Processor();
+
+			//// TODO: Tuple operators
+			//dynamic result = processor.Evaluate("return { x:2 y:'hello' key{ x } } | { z:5 key{ z } }");
+			//Assert.AreEqual(2, result.x);
+			//Assert.AreEqual("hello", result.y);
+			//Assert.AreEqual(5, result.z);
 		}
 
 		[TestMethod]
@@ -142,13 +173,16 @@ namespace Ancestry.QueryProcessor.Test
 			result = processor.Evaluate("return { } = { }");
 			Assert.IsTrue(result);
 
-			result = processor.Evaluate("return { 2 3 } | { 3 4 }");
-			Assert.AreEqual(3, result.Count);
-			Assert.IsTrue(result.Contains(2));
-			Assert.IsTrue(result.Contains(3));
-			Assert.IsTrue(result.Contains(4));
+			//// TODO: remaining set operations
+			//result = processor.Evaluate("return { 2 3 } | { 3 4 }");
+			//Assert.AreEqual(3, result.Count);
+			//Assert.IsTrue(result.Contains(2));
+			//Assert.IsTrue(result.Contains(3));
+			//Assert.IsTrue(result.Contains(4));
 
-			// TODO: remaining set operations
+			//result = processor.Evaluate("return { 2 3 } & { 3 4 }");
+			//Assert.AreEqual(1, result.Count);
+			//Assert.IsTrue(result.Contains(3));
 		}
 
 		[TestMethod]
@@ -156,19 +190,20 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			dynamic result = processor.Evaluate("return [ 2 3 4 ]");
-			Assert.IsTrue(result.Length == 3);
+			dynamic result = processor.Evaluate("return [2 3 4]");
+			Assert.IsTrue(result.Count == 3);
 			Assert.AreEqual(result[0], 2);
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
 
-			result = processor.Evaluate("return [ 'blah' 'boo' ]");
-			Assert.IsTrue(result.Length == 2);
+			result = processor.Evaluate("return ['blah' 'boo']");
+			Assert.IsTrue(result.Count == 2);
 			Assert.AreEqual(result[0], "blah");
 			Assert.AreEqual(result[1], "boo");
 
-			result = processor.Evaluate("return [ ]");
-			Assert.IsTrue(result.Length == 0);
+			result = processor.Evaluate("return []");
+			Assert.IsTrue(result.Count == 0);
+			Assert.IsTrue(result.GetType().GenericTypeArguments[0] == typeof(Runtime.Void));
 		}
 
 		[TestMethod]
@@ -176,17 +211,20 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			dynamic result = processor.Evaluate("return [ 2 3 ] = [ 2 3 ]");
+			dynamic result = processor.Evaluate("return [2 3] = [2 3]");
 			Assert.IsTrue(result);
 
-			result = processor.Evaluate("return [ 2 3 ] | [ 2 3 ]");
-			Assert.AreEqual(4, result.Count);
-			Assert.AreEqual(2, result[0]);
-			Assert.AreEqual(3, result[1]);
-			Assert.AreEqual(2, result[2]);
-			Assert.AreEqual(3, result[3]);
+			result = processor.Evaluate("return [] = []");
+			Assert.IsTrue(result);
 
 			// TODO: Remaining list operations
+
+			//result = processor.Evaluate("return [2 3] | [2 3]");
+			//Assert.AreEqual(4, result.Count);
+			//Assert.AreEqual(2, result[0]);
+			//Assert.AreEqual(3, result[1]);
+			//Assert.AreEqual(2, result[2]);
+			//Assert.AreEqual(3, result[3]);
 		}
 
 		[TestMethod]

@@ -11,7 +11,7 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public BooleanType() : base(typeof(bool)) { }
 
-		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -29,13 +29,13 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.InclusiveLess:
 				case Parse.Operator.Greater:
 				case Parse.Operator.Less:
-					return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
 
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
+				default: throw NotSupported(expression);
 			}
 		}
 
-		public override ExpressionContext CompileUnaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext inner, Parse.UnaryExpression expression, Type.BaseType typeHint)
+		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -43,9 +43,9 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.IsNull:
 				case Parse.Operator.Not:
 				case Parse.Operator.BitwiseNot:
-					return base.CompileUnaryExpression(method, compiler, frame, inner, expression, typeHint);
+					return base.DefaultUnaryOperator(method, compiler, inner, expression);
 
-				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
+				default: throw NotSupported(expression);
 			}
 		}
 	}

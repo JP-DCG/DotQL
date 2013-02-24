@@ -20,6 +20,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly ConstructorInfo TimeSpanTicksConstructor = typeof(DateTime).GetConstructor(new[] { typeof(long) });
 		public static readonly MethodInfo TypeGetTypeFromHandle = typeof(System.Type).GetMethod("GetTypeFromHandle");
 		public static readonly MethodInfo IEnumerableMoveNext = typeof(IEnumerator).GetMethod("MoveNext");
+		public static readonly MethodInfo StringCompare = typeof(string).GetMethod("Compare", new System.Type[] { typeof(string), typeof(string) });
+		public static readonly MethodInfo StringConcat = typeof(string).GetMethod("Concat", new System.Type[] { typeof(string), typeof(string) });
 
 		public static bool IsTupleType(System.Type type)
 		{
