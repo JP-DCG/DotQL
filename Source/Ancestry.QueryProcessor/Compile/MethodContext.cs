@@ -21,7 +21,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public LocalBuilder DeclareLocal(Parse.Statement statement, System.Type type, string name)
 		{
 			var local = IL.DeclareLocal(type);
-			local.SetLocalSymInfo(name, statement.Line, statement.LinePos);
+			if (!String.IsNullOrEmpty(name))
+				local.SetLocalSymInfo(name, statement.Line, statement.LinePos);
 			return local;
 		}
 

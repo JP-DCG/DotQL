@@ -17,11 +17,19 @@ namespace Ancestry.QueryProcessor.Compile
 
 		// Scope management
 		private Dictionary<Parse.Statement, Frame> _frames = new Dictionary<Parse.Statement, Frame>();
+		/// <summary> Stack frames by DOM object. </summary>
+		public Dictionary<Parse.Statement, Frame> Frames { get { return _frames; } }
+
+		private Dictionary<object, Func<MethodContext, ExpressionContext?>> _writersBySymbol = new Dictionary<object, Func<MethodContext, ExpressionContext?>>();
+		/// <summary> Emitter necessary to reference the given symbol. </summary>
+		public Dictionary<object, Func<MethodContext, ExpressionContext?>> WritersBySymbol { get { return _writersBySymbol; } }
+
+		private Dictionary<object, List<object>> _references = new Dictionary<object, List<object>>();
+		/// <summary> References to a given symbol. </summary>
+		public Dictionary<object, List<object>> References { get { return _references; } }
+
 		public Frame _importFrame;
 		public Frame _scriptFrame;
-		private Dictionary<Parse.QualifiedIdentifier, object> _references = new Dictionary<Parse.QualifiedIdentifier, object>();
-		private Dictionary<object, Func<MethodContext, ExpressionContext?>> _writersBySymbol = new Dictionary<object, Func<MethodContext, ExpressionContext?>>();
-		public Dictionary<object, Func<MethodContext, ExpressionContext?>> WritersBySymbol { get { return _writersBySymbol; } }
 		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
 		private Dictionary<Parse.ModuleMember, Func<MemberInfo>> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Func<MemberInfo>>();
 		private Dictionary<Parse.ModuleMember, object> _compiledMembers = new Dictionary<Parse.ModuleMember, object>();
@@ -105,10 +113,37 @@ namespace Ancestry.QueryProcessor.Compile
 				method.IL.Emit(OpCodes.Ldnull);
 		}
 
-		private void AddListReferences(Frame frame, IEnumerable<Parse.QualifiedIdentifier> list)
+		public void ResolveListReferences(Frame frame, IEnumerable<Parse.QualifiedIdentifier> list)
 		{
 			foreach (var item in list)
-				_references.Add(item, frame.Resolve<object>(item));
+				ResolveReference<object>(frame, item); 
+		}
+
+		/// <summary> Resolves a given reference and logs the reference. </summary>
+		public T ResolveReference<T>(Frame frame, Parse.QualifiedIdentifier item)
+		{
+			var target = frame.Resolve<T>(item);
+			GetTargetSources(target).Add(item);
+			return target;
+		}
+
+		/// <summary> Resolves a given reference and logs the reference. </summary>
+		public T ResolveReference<T>(Frame frame, Parse.Statement statement, Name name)
+		{
+			var target = frame.Resolve<T>(statement, name);
+			GetTargetSources(target).Add(statement);
+			return target;
+		}
+
+		private List<object> GetTargetSources(object target)
+		{
+			List<object> sources;
+			if (!_references.TryGetValue(target, out sources))
+			{
+				sources = new List<object>();
+				_references.Add(target, sources);
+			}
+			return sources;
 		}
 
 		//private void CompileAssignment(MethodContext method, Frame frame, Parse.ClausedAssignment assignment)
@@ -206,12 +241,11 @@ namespace Ancestry.QueryProcessor.Compile
 		private void CompileUsing(MethodContext method, Frame frame, Frame modulesFrame, Parse.Using use)
 		{
 			var moduleName = Name.FromQualifiedIdentifier(use.Target);
-			var module = modulesFrame.Resolve<Runtime.ModuleTuple>(use, moduleName);
-			_references.Add(use.Target, module);
+			var module = ResolveReference<Runtime.ModuleTuple>(modulesFrame, use, moduleName);
 			frame.Add(use, moduleName, module);
 
 			// Determine the class of the module
-			var moduleType = FindReference<Runtime.ModuleTuple>(use.Target).Class;
+			var moduleType = ResolveReference<Runtime.ModuleTuple>(frame, use.Target).Class;
 
 			// Create a variable to hold the module instance
 			var moduleVar = method.DeclareLocal(use, moduleType, (use.Alias ?? use.Target).ToString());
@@ -283,16 +317,6 @@ namespace Ancestry.QueryProcessor.Compile
 				method.IL.Emit(OpCodes.Stfld, field);
 			}
 			method.IL.Emit(OpCodes.Stloc, moduleVar);
-		}
-
-		private T FindReference<T>(Parse.QualifiedIdentifier id)
-		{
-			object module;
-			if (!_references.TryGetValue(id, out module))
-				throw new CompilerException(id, CompilerException.Codes.IdentifierNotFound, id.ToString());
-			if (!(module is T))
-				throw new CompilerException(id, CompilerException.Codes.IncorrectTypeReferenced, typeof(T), module.GetType());
-			return (T)module;
 		}
 
 		//private DebugInfoExpression GetDebugInfo(Parse.Statement statement)
@@ -457,93 +481,16 @@ namespace Ancestry.QueryProcessor.Compile
 				case "SetSelector": return CompileSetSelector(method, frame, (Parse.SetSelector)expression, typeHint);
 				case "FunctionSelector": return CompileFunctionSelector(method, frame, (Parse.FunctionSelector)expression, typeHint);
 				case "CallExpression": return CompileCallExpression(method, frame, (Parse.CallExpression)expression, typeHint);
-				//case "RestrictExpression": return CompileRestrictExpression(method, frame, (Parse.RestrictExpression)expression, typeHint);
+				case "RestrictExpression": return CompileRestrictExpression(method, frame, (Parse.RestrictExpression)expression, typeHint);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
 		}
 
-		//private ExpressionContext CompileRestrictExpression(MethodContext method, Frame frame, Parse.RestrictExpression restrictExpression, BaseType typeHint)
-		//{
-		//	var local = AddFrame(frame, restrictExpression);
-		//	var expression = MaterializeReference(CompileExpression(frame, restrictExpression.Expression, typeHint));
-		//	if (expression.Type is NaryType)
-		//	{
-		//		var memberType = expression.Type.GenericTypeArguments[0];
-		//		var parameters = new List<ParameterExpression>();
-
-		//		// Add value param
-		//		var valueParam = CreateValueParam(restrictExpression, local, expression, memberType);
-		//		parameters.Add(valueParam);
-
-		//		// Add index param
-		//		var indexParam = CreateIndexParam(restrictExpression, local);
-		//		parameters.Add(indexParam);
-
-		//		// TODO: detect tuple members and push attributes into frame
-
-		//		// Compile condition
-		//		var condition = 
-		//			Expression.Lambda
-		//			(
-		//				CompileExpression(local, restrictExpression.Condition, typeof(bool)), 
-		//				parameters
-		//			);
-
-		//		var where = typeof(System.Linq.Enumerable).GetMethodExt("Where", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, bool>) });
-		//		where = where.MakeGenericMethod(memberType);
-		//		return Expression.Call(where, expression, condition);
-		//	}
-		//	else
-		//	{
-		//		var alreadyOptional = IsOptional(expression.Type);
-		//		var parameters = new List<ParameterExpression>();
-
-		//		// Add value param
-		//		var valueParam = CreateValueParam(restrictExpression, local, expression, expression.Type);
-		//		parameters.Add(valueParam);
-
-		//		var condition = CompileExpression(local, restrictExpression.Condition, typeof(bool));
-		//		return 
-		//			Expression.IfThenElse
-		//			(
-		//				Expression.Block(parameters, condition), 
-		//					alreadyOptional ? (Expression)expression : MakeOptional(expression),
-		//					alreadyOptional ? MakeNullOptional(expression.Type.GenericTypeArguments[0]) : MakeNullOptional(expression.Type)
-		//			);
-		//	} 
-		//}
-
-		//public ParameterExpression CreateIndexParam(Parse.Statement statement, Frame local)
-		//{
-		//	var indexParam = Expression.Parameter(typeof(int), Parse.ReservedWords.Index);
-		//	var indexSymbol = new Parse.Statement();	// Dummy symbol; no syntax element generates index
-		//	local.Add(statement, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
-		//	_writersBySymbol.Add(indexSymbol, indexParam);
-		//	return indexParam;
-		//}
-
-		//public ParameterExpression CreateValueParam(Parse.Statement statement, Frame frame, Expression expression, System.Type type)
-		//{
-		//	var valueParam = Expression.Parameter(type, Parse.ReservedWords.Value);
-		//	_writersBySymbol.Add(expression, valueParam);
-		//	frame.Add(statement, Name.FromComponents(Parse.ReservedWords.Value), expression);
-		//	return valueParam;
-		//}
-
-		//private static Expression MakeOptional(Expression expression)
-		//{
-		//	return Expression.New(typeof(Runtime.Optional<>).MakeGenericType(expression.Type).GetConstructor(new System.Type[] { expression.Type }), expression);
-		//}
-
-		//private static Expression MakeNullOptional(System.Type type)
-		//{
-		//	return Expression.New(typeof(Runtime.Optional<>).MakeGenericType(type).GetConstructor(new System.Type[] { typeof(bool) }), Expression.Constant(false));
-		//}
-
-		//private bool IsOptional(System.Type type)
-		//{
-		//	return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Runtime.Optional<>);
-		//}
+		private ExpressionContext CompileRestrictExpression(MethodContext method, Frame frame, Parse.RestrictExpression restrictExpression, BaseType typeHint)
+		{
+			var left = CompileExpression(method, frame, restrictExpression.Expression, typeHint);
+			return left.Type.CompileRestrictExpression(method, this, frame, left, restrictExpression, typeHint);
+		}
 
 		private ExpressionContext CompileFunctionSelector(MethodContext method, Frame frame, Parse.FunctionSelector functionSelector, BaseType typeHint)
 		{
@@ -780,7 +727,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		//private System.Type CompileNamedType(Frame frame, Parse.NamedType namedType)
 		//{
-		//	var target = frame.Resolve<object>(namedType.Target);
+		//	var target = ResolveReference<object>(frame, namedType.Target);
 		//	_references.Add(namedType.Target, target);
 		//	if (target is System.Type)
 		//		return (System.Type)target;
@@ -814,10 +761,10 @@ namespace Ancestry.QueryProcessor.Compile
 					local.Add(a.Name, a);
 
 				foreach (var k in tupleType.Keys)
-					AddListReferences(local, k.AttributeNames);
+					ResolveListReferences(local, k.AttributeNames);
 
 				foreach (var r in tupleType.References)
-					AddListReferences(local, r.SourceAttributeNames);
+					ResolveListReferences(local, r.SourceAttributeNames);
 			}
 		}
 
@@ -838,15 +785,14 @@ namespace Ancestry.QueryProcessor.Compile
 			// Keys
 			foreach (var r in tupleType.References)
 			{
-				var target = frame.Resolve<Parse.Statement>(r.Target);
-				_references.Add(r.Target, target);
+				var target = ResolveReference<Parse.Statement>(frame, r.Target);
 				if (target is Parse.VarMember)
 				{
 					// Get the tuple type for the table
 					var targetTupleType = CheckTableType(r.Target, ((Parse.VarMember)target).Type);
 
 					// Add references to each target attribute
-					AddListReferences(_frames[targetTupleType], r.TargetAttributeNames);
+					ResolveListReferences(_frames[targetTupleType], r.TargetAttributeNames);
 				}
 				normalized.References.Add
 				(
@@ -1017,7 +963,7 @@ namespace Ancestry.QueryProcessor.Compile
 			// Resolve source reference columns
 			foreach (var k in tupleSelector.Keys)
 			{
-				AddListReferences(local, k.AttributeNames);
+				ResolveListReferences(local, k.AttributeNames);
 
 				tupleType.Keys.Add(Type.TupleKey.FromParseKey(k));
 			}
@@ -1025,10 +971,9 @@ namespace Ancestry.QueryProcessor.Compile
 			// Resolve key reference columns
 			foreach (var r in tupleSelector.References)
 			{
-				AddListReferences(local, r.SourceAttributeNames);
-				var target = _scriptFrame.Resolve<Parse.Statement>(r.Target);
-				_references.Add(r.Target, target);
-				AddListReferences(_frames[target], r.TargetAttributeNames);
+				ResolveListReferences(local, r.SourceAttributeNames);
+				var target = ResolveReference<Parse.Statement>(_scriptFrame, r.Target);
+				ResolveListReferences(_frames[target], r.TargetAttributeNames);
 
 				tupleType.References.Add(Name.FromQualifiedIdentifier(r.Name), Type.TupleReference.FromParseReference(r));
 			}
@@ -1071,8 +1016,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private ExpressionContext CompileIdentifierExpression(MethodContext method, Frame frame, Parse.IdentifierExpression identifierExpression, BaseType typeHint)
 		{
-			var symbol = frame.Resolve<object>(identifierExpression.Target);
-			_references.Add(identifierExpression.Target, symbol);
+			var symbol = ResolveReference<object>(frame, identifierExpression.Target);
 			Func<MethodContext, ExpressionContext?> writer;
 			if (_writersBySymbol.TryGetValue(symbol, out writer))
 			{

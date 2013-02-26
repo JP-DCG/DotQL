@@ -103,6 +103,7 @@
     <Compile Include="Type\ListType.cs" />
     <Compile Include="Type\NaryType.cs" />
     <Compile Include="Type\ModuleAttribute.cs" />
+    <Compile Include="Type\OptionalType.cs" />
     <Compile Include="Type\Reference.cs" />
     <Compile Include="Type\ScalarType.cs" />
     <Compile Include="Type\SetType.cs" />

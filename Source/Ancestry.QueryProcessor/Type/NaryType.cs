@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
@@ -37,6 +38,99 @@ namespace Ancestry.QueryProcessor.Type
 
 				default: throw NotSupported(expression);
 			}
+		}
+
+		public override ExpressionContext CompileRestrictExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		{
+			left = compiler.MaterializeRepository(method, left);
+
+			var memberType = ((NaryType)left.Type).Of;
+			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
+
+			bool indexReferenced;
+			var innerMethod = EmitWhereLambda(method, compiler, frame, expression, memberType, memberNative, out indexReferenced);
+
+			// TODO: Force ordering to left if set and index is referenced
+
+			// Instantiate a delegate pointing to the new method
+			method.IL.Emit(OpCodes.Ldnull);				// instance
+			method.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
+			method.IL.Emit
+			(
+				OpCodes.Newobj,
+				System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), typeof(bool))
+					.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
+			);
+
+			var where = typeof(System.Linq.Enumerable).GetMethodExt("Where", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, bool>) });
+			where = where.MakeGenericMethod(memberNative);
+			
+			method.IL.EmitCall(OpCodes.Call, where, null);
+
+			return new ExpressionContext((NaryType)left.Type, where.ReturnType);
+		}
+
+		private static MethodContext EmitWhereLambda(MethodContext outerMethod, Compiler compiler, Frame frame, Parse.RestrictExpression expression, BaseType memberType, System.Type memberNative, out bool indexReferenced)
+		{
+			var local = compiler.AddFrame(frame, expression);
+
+			// Create a new private method for the condition
+			var typeBuilder = (TypeBuilder)outerMethod.Builder.DeclaringType;
+			var innerMethod =
+				new MethodContext
+				(
+					typeBuilder.DefineMethod
+					(
+						"Where" + expression.GetHashCode(),
+						MethodAttributes.Private | MethodAttributes.Static,
+						typeof(bool),	// return type
+						new System.Type[] { memberNative, typeof(int) }	// param types
+					)
+				);
+
+			// Register value argument
+			var valueSymbol = new Object();
+			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), valueSymbol);
+			compiler.WritersBySymbol.Add(valueSymbol, m => { m.IL.Emit(OpCodes.Ldarg_0); return new ExpressionContext(memberType); });
+
+			// Register index argument
+			var indexSymbol = new Object();
+			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+			compiler.WritersBySymbol.Add(indexSymbol, m => { m.IL.Emit(OpCodes.Ldarg_1); return new ExpressionContext(SystemTypes.Integer); });
+
+			// If the members are tuples, declare locals for each field
+			if (memberType is TupleType)
+			{
+				var tupleType = (TupleType)memberType;
+				foreach (var attribute in tupleType.Attributes)
+				{
+					local.Add(attribute.Key.ToQualifiedIdentifier(), attribute);
+					compiler.WritersBySymbol.Add
+					(
+						attribute,
+						m =>
+						{
+							m.IL.Emit(OpCodes.Ldarg_0);	// value
+							m.IL.Emit(OpCodes.Ldfld, memberNative.GetField(attribute.Key.ToString()));
+							return new ExpressionContext(attribute.Value);
+						}
+					);
+				}
+
+				// TODO: Add references
+			}
+
+			// Compile condition
+			var condition = compiler.MaterializeRepository
+				(
+					innerMethod,
+					compiler.CompileExpression(innerMethod, local, expression.Condition, SystemTypes.Boolean)
+				);
+
+			indexReferenced = compiler.References.ContainsKey(indexSymbol);
+
+			innerMethod.IL.Emit(OpCodes.Ret);
+			return innerMethod;
 		}
 
 		//protected virtual ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)

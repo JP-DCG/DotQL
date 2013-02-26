@@ -76,6 +76,11 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
+		public virtual ExpressionContext CompileRestrictExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		{
+			throw new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Restrict, GetType());
+		}
+
 		protected Exception NotSupported(Parse.BinaryExpression expression)
 		{
 			return new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, expression.Operator, GetType());

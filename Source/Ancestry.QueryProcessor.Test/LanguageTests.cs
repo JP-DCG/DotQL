@@ -329,12 +329,9 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(4, result[0]);
 			Assert.AreEqual(6, result[2]);
 
-			// TODO: change this to (x < 4) when tuple attributes are available in restriction
-			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }?(value.x < 4)");
-			result = Enumerable.ToList(result);
-			Assert.AreEqual(2, result.Count);
-			Assert.AreEqual(2, result[0]);
-			Assert.AreEqual(3, result[1]);
+			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }?(x < 3)");
+			Assert.AreEqual(1, Enumerable.Count(result));
+			Assert.AreEqual(2, Enumerable.First(result).x);
 		}
 
 		[TestMethod]
@@ -342,6 +339,9 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return 5?(value >= 4)");
+			Assert.AreEqual(5, result);
+
+			result = processor.Evaluate("return 5?(value < 4)");
 			Assert.IsNull(result);
 		}
 
@@ -349,11 +349,17 @@ namespace Ancestry.QueryProcessor.Test
 		public void RestrictOnIndex()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return { 10 20 30 40 }?(index >= 2)");
+			dynamic result = processor.Evaluate("return [10 20 30 40]?(index >= 2)");
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(2, result.Count);
 			Assert.AreEqual(30, result[0]);
 			Assert.AreEqual(40, result[1]);
+
+			//// TODO: enable when set sorted
+			//result = processor.Evaluate("return { 0 20 10 }?(index > 1)");
+			//result = Enumerable.ToList(result);
+			//Assert.AreEqual(1, result.Count);
+			//Assert.AreEqual(20, result[0]);
 		}
 
 		[TestMethod]
