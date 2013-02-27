@@ -17,8 +17,8 @@ namespace Ancestry.QueryProcessor.Type
 		{
 			switch (expression.Operator)
 			{
-				//case Parse.Operator.Dereference: 
-				//	return CompileDereference(method, compiler, frame, left, expression, typeHint);
+				case Parse.Operator.Dereference: 
+					return CompileDereference(method, compiler, frame, left, expression, typeHint);
 
 				default: return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
 			}
@@ -133,9 +133,118 @@ namespace Ancestry.QueryProcessor.Type
 			return innerMethod;
 		}
 
-		//protected virtual ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
-		//{
-		//	left = compiler.MaterializeReference(method, left);
+		protected virtual ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		{
+			left = compiler.MaterializeRepository(method, left);
+
+			var memberType = ((NaryType)left.Type).Of;
+			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
+
+			var lambda = EmitSelectLambda(method, compiler, frame, expression, memberType, memberNative);
+
+			// TODO: Force ordering of Left if a set and index is referenced
+
+			// Instantiate a delegate pointing to the new method
+			method.IL.Emit(OpCodes.Ldnull);				// instance
+			method.IL.Emit(OpCodes.Ldftn, lambda.Method.Builder);	// method
+			method.IL.Emit
+			(
+				OpCodes.Newobj,
+				System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), lambda.Method.Builder.ReturnType)
+					.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
+			);
+
+			var select =
+				typeof(Enumerable).GetMethodExt
+				(
+					"Select",
+					new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) }
+				);
+			select = select.MakeGenericMethod(memberNative, lambda.Method.Builder.ReturnType);
+			
+			method.IL.EmitCall(OpCodes.Call, select, null);
+
+			return new ExpressionContext(new ListType { Of = lambda.ReturnType }, select.ReturnType);
+		}
+
+		private struct SelectLambdaInfo
+		{
+			public bool IndexReferenced;
+			public BaseType ReturnType;
+			public MethodContext Method;
+		}
+
+		private static SelectLambdaInfo EmitSelectLambda(MethodContext outerMethod, Compiler compiler, Frame frame, Parse.BinaryExpression expression, BaseType memberType, System.Type memberNative)
+		{
+			// TODO: this largely duplicates EmitWhereLambda; refactor.
+
+			SelectLambdaInfo info = new SelectLambdaInfo();
+
+			var local = compiler.AddFrame(frame, expression);
+
+			// Create a new private method for the condition
+			var typeBuilder = (TypeBuilder)outerMethod.Builder.DeclaringType;
+			info.Method =
+				new MethodContext
+				(
+					typeBuilder.DefineMethod
+					(
+						"Select" + expression.GetHashCode(),
+						MethodAttributes.Private | MethodAttributes.Static,
+						typeof(void),	// temporary return type
+						new System.Type[] { memberNative, typeof(int) }	// param types
+					)
+				);
+
+			// Register value argument
+			var valueSymbol = new Object();
+			local.Add(expression.Right, Name.FromComponents(Parse.ReservedWords.Value), valueSymbol);
+			compiler.WritersBySymbol.Add(valueSymbol, m => { m.IL.Emit(OpCodes.Ldarg_0); return new ExpressionContext(memberType); });
+
+			// Register index argument
+			var indexSymbol = new Object();
+			local.Add(expression.Right, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+			compiler.WritersBySymbol.Add(indexSymbol, m => { m.IL.Emit(OpCodes.Ldarg_1); return new ExpressionContext(SystemTypes.Integer); });
+
+			// If the members are tuples, declare locals for each field
+			if (memberType is TupleType)
+			{
+				var tupleType = (TupleType)memberType;
+				foreach (var attribute in tupleType.Attributes)
+				{
+					local.Add(attribute.Key.ToQualifiedIdentifier(), attribute);
+					compiler.WritersBySymbol.Add
+					(
+						attribute,
+						m =>
+						{
+							m.IL.Emit(OpCodes.Ldarg_0);	// value
+							m.IL.Emit(OpCodes.Ldfld, memberNative.GetField(attribute.Key.ToString()));
+							return new ExpressionContext(attribute.Value);
+						}
+					);
+				}
+
+				// TODO: Add references
+			}
+
+			// Compile selection
+			var selection = compiler.MaterializeRepository
+				(
+					info.Method,
+					compiler.CompileExpression(info.Method, local, expression.Right)
+				);
+			info.ReturnType = selection.Type;
+			var returnNative = selection.NativeType ?? selection.Type.GetNative(compiler.Emitter);
+			info.Method.Builder.SetReturnType(returnNative);
+
+			info.IndexReferenced = compiler.References.ContainsKey(indexSymbol);
+
+			info.Method.IL.Emit(OpCodes.Ret);
+			return info;
+		}
+		
+		//left = compiler.MaterializeReference(method, left);
 
 		//	var local = compiler.AddFrame(frame, expression);
 		//	var memberType = left.Type.GenericTypeArguments[0];

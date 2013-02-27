@@ -815,7 +815,7 @@ namespace Ancestry.QueryProcessor.Parse
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
 		public List<FunctionParameter> Parameters { get { return _parameters; } }
 
-		public ClausedExpression Expression { get; set; }
+		public Expression Expression { get; set; }
 
 		public override string ToString()
 		{

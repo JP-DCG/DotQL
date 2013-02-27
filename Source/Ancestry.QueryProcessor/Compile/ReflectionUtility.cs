@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -22,6 +23,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public static readonly MethodInfo IEnumerableMoveNext = typeof(IEnumerator).GetMethod("MoveNext");
 		public static readonly MethodInfo StringCompare = typeof(string).GetMethod("Compare", new System.Type[] { typeof(string), typeof(string) });
 		public static readonly MethodInfo StringConcat = typeof(string).GetMethod("Concat", new System.Type[] { typeof(string), typeof(string) });
+		public static readonly FieldInfo NameComponents = typeof(Name).GetField("Components");
+		public static readonly MethodInfo RuntimeGetInitializer = typeof(Runtime.Runtime).GetMethod("GetInitializer");	// Generic
 
 		public static bool IsTupleType(System.Type type)
 		{

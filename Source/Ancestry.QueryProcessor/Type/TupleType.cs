@@ -105,20 +105,36 @@ namespace Ancestry.QueryProcessor.Type
 
 		private ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
 		{
-			var local = compiler.AddFrame(frame, expression);
-
 			left = compiler.MaterializeRepository(method, left);
-			var valueVariable = method.DeclareLocal(expression.Right, left.Type.GetNative(compiler.Emitter), "value");
-			method.IL.Emit(OpCodes.Stloc, valueVariable);
-
-			var native = left.Type.GetNative(compiler.Emitter);
-			foreach (var a in ((TupleType)left.Type).Attributes)
+			var local = compiler.AddFrame(frame, expression);
+			method.IL.BeginScope();
+			try
 			{
-				var field = native.GetField(a.Key.ToString(), BindingFlags.Public | BindingFlags.Instance);
-				local.Add(expression, a.Key, field);
-				compiler.WritersBySymbol.Add(field, m => { m.IL.Emit(OpCodes.Ldfld, valueVariable); return new ExpressionContext(a.Value); });
+				var native = left.NativeType ?? left.Type.GetNative(compiler.Emitter);
+				var valueVariable = method.DeclareLocal(expression.Right, native, "value");
+				method.IL.Emit(OpCodes.Stloc, valueVariable);
+
+				foreach (var a in ((TupleType)left.Type).Attributes)
+				{
+					var field = native.GetField(a.Key.ToString(), BindingFlags.Public | BindingFlags.Instance);
+					local.Add(expression, a.Key, field);
+					compiler.WritersBySymbol.Add
+					(
+						field, 
+						m => 
+						{ 
+							m.IL.Emit(OpCodes.Ldloc, valueVariable);
+							m.IL.Emit(OpCodes.Ldfld, field); 
+							return new ExpressionContext(a.Value); 
+						}
+					);
+				}
+				return compiler.CompileExpression(method, local, expression.Right, typeHint);
 			}
-			return compiler.CompileExpression(method, local, expression.Right, typeHint);
+			finally
+			{
+				method.IL.EndScope();
+			}
 		}
 
 		public override System.Type GetNative(Emitter emitter)

@@ -171,7 +171,7 @@ SetSelector :=
 	"{" Items : [ expression ]* "}"
 
 FunctionSelector :=
-	functionParameters "=>" Expression : ClausedExpression
+	functionParameters "=>" Expression : expression
 
 IdentifierExpression := 
 	Target : QualifiedIdentifier

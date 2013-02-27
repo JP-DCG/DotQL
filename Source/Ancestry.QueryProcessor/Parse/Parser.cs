@@ -1317,7 +1317,7 @@ namespace Ancestry.QueryProcessor.Parse
 				"(" expression ")"
 		
 			FunctionSelector :=
-				functionParameters "=>" Expression : ClausedExpression
+				functionParameters "=>" Expression : expression
 		*/
 		public Expression FunctionSelectorOrGroup(Lexer lexer)
 		{
@@ -1331,7 +1331,7 @@ namespace Ancestry.QueryProcessor.Parse
 				var result = new FunctionSelector();
 				result.SetPosition(startToken);
 				lexer.NextToken().CheckSymbol(Keywords.Function);
-				result.Expression = ClausedExpression(lexer);
+				result.Expression = Expression(lexer);
 				return result;
 			}
 
@@ -1361,7 +1361,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 				lexer.NextToken().CheckSymbol(Keywords.Function);
 
-				result.Expression = ClausedExpression(lexer);
+				result.Expression = Expression(lexer);
 				return result;
 			}
 				

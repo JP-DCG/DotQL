@@ -335,6 +335,21 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
+		public void PathRestrictionOfList()
+		{
+			var processor = new Processor();
+			dynamic result = processor.Evaluate("return [2 3 4 5 6]?(value >= 4)");
+			result = Enumerable.ToList(result);	// IEnumerable, must still convert to list
+			Assert.AreEqual(3, result.Count);
+			Assert.AreEqual(4, result[0]);
+			Assert.AreEqual(6, result[2]);
+
+			result = processor.Evaluate("return [{ x:2 } { x:3 } { x:4 }]?(x < 3)");
+			Assert.AreEqual(1, Enumerable.Count(result));
+			Assert.AreEqual(2, Enumerable.First(result).x);
+		}
+
+		[TestMethod]
 		public void PathRestrictionOfScalar()
 		{
 			var processor = new Processor();
@@ -369,7 +384,7 @@ namespace Ancestry.QueryProcessor.Test
 			dynamic result = processor.Evaluate("return { x: 2 }.(x * 2)");
 			Assert.AreEqual(4, result);
 
-			result = processor.Evaluate("return { x: 2 }.{ :x y:x * 2)");
+			result = processor.Evaluate("return { x: 2 }.{ :x y:x * 2 }");
 			Assert.AreEqual(2, result.x);
 			Assert.AreEqual(4, result.y);
 		}
@@ -390,8 +405,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(10, result[0].x);
 			Assert.AreEqual(20, result[2].x);
 
-			// TODO: change this to (x * 5) once tuple attributes are made available
-			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }.(value.x * 5)");
+			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }.(x * 5)");
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0]);
@@ -437,8 +451,30 @@ namespace Ancestry.QueryProcessor.Test
 		public void FunctionSelector()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("let add := (x:Integer y:Integer)=>return x + y return 5->add(10)");
+			dynamic result = processor.Evaluate
+			(
+				@"let add := (x:Integer y:Integer)=>x + y	
+				return 5->add(10)"
+			);
 			Assert.AreEqual(15, result);
+		}
+
+		[TestMethod]
+		public void Variables()
+		{
+			var processor = new Processor();
+			dynamic result = processor.Evaluate("var x := 5 return x");
+			Assert.AreEqual(5, result);
+
+			result = processor.Evaluate("var x : Integer := 5 return x");
+			Assert.AreEqual(5, result);
+
+			result = processor.Evaluate("var x : Integer return x");
+			Assert.AreEqual(0, result);
+
+			// TODO: conversions
+			//result = processor.Evaluate("var x : int := 5.0 return x");
+			//Assert.AreEqual(5, result);
 		}
 
 		[TestMethod]
@@ -447,6 +483,13 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("var x := 5 set x := 10 return x");
 			Assert.AreEqual(10, result);
+
+			result = processor.Evaluate("var x : Integer set x := 10 return x");
+			Assert.AreEqual(10, result);
+
+			// TODO: Conversions
+			//result = processor.Evaluate("var x : Integer set x := 10.0 return x");
+			//Assert.AreEqual(10, result);
 		}
 
 		[TestMethod]

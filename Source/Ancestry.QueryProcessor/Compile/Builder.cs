@@ -9,19 +9,6 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public static class Builder
 	{
-		public static Expression Name(string[] components)
-		{
-			return Expression.MemberInit
-			(
-				Expression.New(typeof(Name)),
-				Expression.Bind
-				(
-					typeof(Name).GetField("Components"),
-					Expression.NewArrayInit(typeof(string), from t in components select Expression.Constant(t))
-				)
-			);
-		}
-
 		public static Expression QualifiedIdentifier(string[] components)
 		{
 			return Expression.MemberInit

@@ -157,6 +157,34 @@ namespace Ancestry.QueryProcessor.Compile
 			return new ExpressionContext(new ScalarType(value.GetType()));
 		}
 
+		public static void EmitName(MethodContext method, Parse.Statement statement, string[] components)
+		{
+			// var nameVar = new Name();
+			var nameVar = method.DeclareLocal(statement, typeof(Name), null);
+			method.IL.Emit(OpCodes.Ldloca, nameVar);
+			method.IL.Emit(OpCodes.Initobj, typeof(Name));
+
+			// <stack> = new string[components.Length];
+			method.IL.Emit(OpCodes.Ldloca, nameVar);
+			method.IL.Emit(OpCodes.Ldc_I4, components.Length);
+			method.IL.Emit(OpCodes.Newarr, typeof(string));
+
+			for (int i = 0; i < components.Length; i++)
+			{
+				// <stack>[i] = components[i]
+				method.IL.Emit(OpCodes.Dup);
+				method.IL.Emit(OpCodes.Ldc_I4, i);
+				method.IL.Emit(OpCodes.Ldstr, components[i]);
+				method.IL.Emit(OpCodes.Stelem_Ref);
+			}
+
+			// nameVar.Components = <stack>
+			method.IL.Emit(OpCodes.Stfld, ReflectionUtility.NameComponents);
+
+			// return nameVar;
+			method.IL.Emit(OpCodes.Ldloc, nameVar);
+		}
+
 		public System.Type EndModule(TypeBuilder module)
 		{
 			var result = module.CreateType();
