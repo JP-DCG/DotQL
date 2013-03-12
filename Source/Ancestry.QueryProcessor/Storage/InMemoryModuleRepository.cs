@@ -24,7 +24,7 @@ namespace Ancestry.QueryProcessor.Storage
 				condition is Parse.BinaryExpression 
 					&& ((Parse.BinaryExpression)condition).Operator == Parse.Operator.Equal 
 					&& ((Parse.BinaryExpression)condition).Left is Parse.IdentifierExpression
-					&& Name.FromQualifiedIdentifier(((Parse.IdentifierExpression)((Parse.BinaryExpression)condition).Left).Target) == Name.FromComponents("Name")
+					&& Name.FromID(((Parse.IdentifierExpression)((Parse.BinaryExpression)condition).Left).Target) == Name.FromComponents("Name")
 					&& ((Parse.BinaryExpression)condition).Right is Parse.LiteralExpression
 			)
 				return new Runtime.Set<Runtime.ModuleTuple>(from m in _repository.Modules where m.Name == (Name)((Parse.LiteralExpression)((Parse.BinaryExpression)condition).Right).Value select m);

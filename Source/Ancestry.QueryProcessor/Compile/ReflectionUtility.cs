@@ -46,6 +46,14 @@ namespace Ancestry.QueryProcessor.Compile
 			return type != null && type.IsGenericType && typeof(Storage.IRepository<>) == type.GetGenericTypeDefinition();
 		}
 
+		public static object GetDefaultValue(System.Type type)
+		{
+			if (type.IsValueType)
+				return Activator.CreateInstance(type);
+			else
+				return null;
+		}
+
 		#region GetMethodExt
 
 		// These GetMethodExt methods are from Ken Beckett's answer on Stack Overflow:

@@ -9,11 +9,11 @@ namespace Ancestry.QueryProcessor.Compile
 {
 	public static class Builder
 	{
-		public static Expression QualifiedIdentifier(string[] components)
+		public static Expression ID(string[] components)
 		{
 			return Expression.MemberInit
 			(
-				Expression.New(typeof(Parse.QualifiedIdentifier)),
+				Expression.New(typeof(Parse.ID)),
 				Expression.Bind
 				(
 					typeof(Name).GetField("Components"),

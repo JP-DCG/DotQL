@@ -11,7 +11,7 @@ namespace Ancestry.QueryProcessor
 		public bool IsRooted;
 		public string[] Components;
 
-		public static Name FromQualifiedIdentifier(Parse.QualifiedIdentifier id)
+		public static Name FromID(Parse.ID id)
 		{
 			return new Name { IsRooted = id.IsRooted, Components = id.Components };
 		}
@@ -21,9 +21,9 @@ namespace Ancestry.QueryProcessor
 			return new Name { Components = components };
 		}
 
-		public Parse.QualifiedIdentifier ToQualifiedIdentifier()
+		public Parse.ID ToID()
 		{
-			return new Parse.QualifiedIdentifier { IsRooted = this.IsRooted, Components = this.Components };
+			return new Parse.ID { IsRooted = this.IsRooted, Components = this.Components };
 		}
 
 		public override bool Equals(object obj)

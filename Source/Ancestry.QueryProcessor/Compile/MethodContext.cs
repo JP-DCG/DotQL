@@ -15,6 +15,11 @@ namespace Ancestry.QueryProcessor.Compile
 			 IL = builder.GetILGenerator();
 		}
 
+		public MethodContext(DynamicMethod method)
+		{
+			IL = method.GetILGenerator();
+		}
+
 		public MethodBuilder Builder { get; private set; }
 		public ILGenerator IL { get; private set; }
 
@@ -43,5 +48,34 @@ namespace Ancestry.QueryProcessor.Compile
 			
 			IL.Emit(OpCodes.Newobj, typeof(Version).GetConstructor(types.ToArray()));
 		}
+
+		public void EmitName(Parse.Statement statement, string[] components)
+		{
+			// var nameVar = new Name();
+			var nameVar = DeclareLocal(statement, typeof(Name), null);
+			IL.Emit(OpCodes.Ldloca, nameVar);
+			IL.Emit(OpCodes.Initobj, typeof(Name));
+
+			// <stack> = new string[components.Length];
+			IL.Emit(OpCodes.Ldloca, nameVar);
+			IL.Emit(OpCodes.Ldc_I4, components.Length);
+			IL.Emit(OpCodes.Newarr, typeof(string));
+
+			for (int i = 0; i < components.Length; i++)
+			{
+				// <stack>[i] = components[i]
+				IL.Emit(OpCodes.Dup);
+				IL.Emit(OpCodes.Ldc_I4, i);
+				IL.Emit(OpCodes.Ldstr, components[i]);
+				IL.Emit(OpCodes.Stelem_Ref);
+			}
+
+			// nameVar.Components = <stack>
+			IL.Emit(OpCodes.Stfld, ReflectionUtility.NameComponents);
+
+			// return nameVar;
+			IL.Emit(OpCodes.Ldloc, nameVar);
+		}
+
 	}
 }

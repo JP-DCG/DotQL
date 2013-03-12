@@ -43,9 +43,12 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(TupleType left, TupleType right)
 		{
 			return Object.ReferenceEquals(left, right)
-				|| 
+				||
 				(
-					left.Attributes.Equivalent(right.Attributes)
+					!Object.ReferenceEquals(right, null)
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType()
+						&& left.Attributes.Equivalent(right.Attributes)
 						&& left.References.Equivalent(right.References)
 						&& left.Keys == right.Keys
 				);
@@ -76,25 +79,26 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		public override ExpressionContext CompileBinaryExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
 		{
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Dereference: 
-					return CompileDereference(method, compiler, frame, left, expression, typeHint);
+					return CompileDereference(compiler, frame, left, expression, typeHint);
 
 				default: 
-					return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+					return base.CompileBinaryExpression(compiler, frame, left, expression, typeHint);
 			}
 		}
 
-		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		protected override void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Equal:
 				case Parse.Operator.NotEqual:
-					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
+					base.EmitBinaryOperator(method, compiler, left, right, expression);
+					break;
 
 				//// TODO: Tuple union
 				//case Parse.Operator.BitwiseOr:
@@ -103,43 +107,119 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		private ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		private ExpressionContext CompileDereference(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
 		{
-			left = compiler.MaterializeRepository(method, left);
 			var local = compiler.AddFrame(frame, expression);
-			method.IL.BeginScope();
-			try
-			{
-				var native = left.NativeType ?? left.Type.GetNative(compiler.Emitter);
-				var valueVariable = method.DeclareLocal(expression.Right, native, "value");
-				method.IL.Emit(OpCodes.Stloc, valueVariable);
+			var native = left.ActualNative(compiler.Emitter);
 
-				foreach (var a in ((TupleType)left.Type).Attributes)
-				{
-					var field = native.GetField(a.Key.ToString(), BindingFlags.Public | BindingFlags.Instance);
-					local.Add(expression, a.Key, field);
-					compiler.WritersBySymbol.Add
+			LocalBuilder valueVariable = null;
+
+			// Create symbol for each tuple member
+			foreach (var a in ((TupleType)left.Type).Attributes)
+			{
+				var field = native.GetField(a.Key.ToString(), BindingFlags.Public | BindingFlags.Instance);
+				local.Add(expression, a.Key, field);
+				compiler.ContextsBySymbol.Add
+				(
+					field, 
+					new ExpressionContext
 					(
-						field, 
+						null,
+						a.Value,
+						Characteristic.Default,
 						m => 
 						{ 
 							m.IL.Emit(OpCodes.Ldloc, valueVariable);
 							m.IL.Emit(OpCodes.Ldfld, field); 
-							return new ExpressionContext(a.Value); 
 						}
-					);
-				}
-				return compiler.CompileExpression(method, local, expression.Right, typeHint);
+					)
+				);
 			}
-			finally
-			{
-				method.IL.EndScope();
-			}
+
+			var right = compiler.CompileExpression(local, expression.Right, typeHint);
+			
+			return
+				new ExpressionContext
+				(
+					expression,
+					right.Type,
+					MergeCharacteristics(left.Characteristics, right.Characteristics),
+					m =>
+					{
+						m.IL.BeginScope();
+						
+						left.EmitGet(m);
+						valueVariable = m.DeclareLocal(expression.Right, native, "value");
+						m.IL.Emit(OpCodes.Stloc, valueVariable);
+						
+						right.EmitGet(m);
+
+						m.IL.EndScope();
+					}
+				);
 		}
 
 		public override System.Type GetNative(Emitter emitter)
 		{
 			return emitter.FindOrCreateNativeFromTupleType(this);
+		}
+
+		public override Parse.Expression BuildDefault()
+		{
+			return
+				new Parse.TupleSelector
+				{
+					Attributes =
+					(
+						from a in Attributes 
+						select new Parse.AttributeSelector { Name = a.Key.ToID(), Value = a.Value.BuildDefault() }
+					).ToList(),
+					Keys = 
+					(
+						from k in Keys
+						select new Parse.TupleKey { AttributeNames = (from n in k.AttributeNames select n.ToID()).ToList() }
+					).ToList(),
+					References =
+					(
+						from r in References
+						select new Parse.TupleReference 
+						{ 
+							Name = r.Key.ToID(), 
+							SourceAttributeNames = (from n in r.Value.SourceAttributeNames select n.ToID()).ToList(),
+							Target = r.Value.Target.ToID(),
+							TargetAttributeNames = (from n in r.Value.TargetAttributeNames select n.ToID()).ToList()
+						}
+					).ToList()
+				};
+		}
+
+		public override Parse.TypeDeclaration BuildDOM()
+		{
+			return
+				new Parse.TupleType
+				{
+					Attributes =
+					(
+						from a in Attributes
+						select new Parse.TupleAttribute { Name = a.Key.ToID(), Type = a.Value.BuildDOM() }
+					).ToList(),
+					Keys =
+					(
+						from k in Keys
+						select new Parse.TupleKey { AttributeNames = (from n in k.AttributeNames select n.ToID()).ToList() }
+					).ToList(),
+					References =
+					(
+						from r in References
+						select new Parse.TupleReference
+						{
+							Name = r.Key.ToID(),
+							SourceAttributeNames = (from n in r.Value.SourceAttributeNames select n.ToID()).ToList(),
+							Target = r.Value.Target.ToID(),
+							TargetAttributeNames = (from n in r.Value.TargetAttributeNames select n.ToID()).ToList()
+						}
+					).ToList()
+				};
 		}
 	}
 }

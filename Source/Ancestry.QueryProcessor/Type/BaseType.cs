@@ -12,10 +12,8 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public abstract System.Type GetNative(Emitter emitter);
 
-		public virtual ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		public virtual ExpressionContext CompileBinaryExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
 		{
-			left = compiler.MaterializeRepository(method, left);
-
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Addition:
@@ -31,17 +29,31 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.Xor:
 				case Parse.Operator.ShiftLeft:
 				case Parse.Operator.ShiftRight:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
-						return DefaultBinaryOperator(method, compiler, left, right, expression);
-					}
+				{
+					var right = compiler.CompileExpression(frame, expression.Right, typeHint);
+					return 
+						new ExpressionContext
+						(
+							expression, 
+							left.Type, 
+							MergeCharacteristics(left.Characteristics, right.Characteristics),
+							m => { EmitBinaryOperator(m, compiler, left, right, expression); }
+						);
+				}
 
 				case Parse.Operator.And:
 				case Parse.Operator.Or:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
-						return DefaultShortCircuit(method, compiler, frame, left, expression, typeHint);
-					}
+				{
+					var right = compiler.CompileExpression(frame, expression.Right, typeHint);
+					return 
+						new ExpressionContext
+						(
+							expression,
+							left.Type,
+							MergeCharacteristics(left.Characteristics, right.Characteristics),
+							m => { EmitShortCircuit(m, compiler, frame, left, right, expression, typeHint); }
+						);
+				}
 
 				case Parse.Operator.Equal:
 				case Parse.Operator.NotEqual:
@@ -49,34 +61,67 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.InclusiveLess:
 				case Parse.Operator.Greater:
 				case Parse.Operator.Less:
-					{
-						var right = compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right));	// (no type hint)
-						return DefaultBinaryOperator(method, compiler, left, right, expression);
-					}
+				{
+					var right = compiler.CompileExpression(frame, expression.Right);	// (no type hint)
+					return 
+						new ExpressionContext
+						(
+							expression,
+							SystemTypes.Boolean,
+							MergeCharacteristics(left.Characteristics, right.Characteristics),
+							m => { EmitBinaryOperator(m, compiler, left, right, expression); }
+						);
+				}
 
 				default: throw NotSupported(expression);
 			}
 		}
 
-		public virtual ExpressionContext CompileUnaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext inner, Parse.UnaryExpression expression, Type.BaseType typeHint)
+		protected Characteristic MergeCharacteristics(Characteristic characteristic1, Characteristic characteristic2)
 		{
-			inner = compiler.MaterializeRepository(method, inner);
+			return (characteristic1 & (Characteristic.NonDeterministic | Characteristic.SideEffectual)) 
+				| (characteristic2 & (Characteristic.NonDeterministic | Characteristic.SideEffectual))
+				|
+				(
+					(characteristic1 & Characteristic.Constant) 
+						& (characteristic2 & Characteristic.Constant)
+				);
+		}
+
+		public virtual ExpressionContext CompileUnaryExpression(Compiler compiler, Frame frame, ExpressionContext inner, Parse.UnaryExpression expression, Type.BaseType typeHint)
+		{
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Exists:
 				case Parse.Operator.IsNull:
+					return
+						new ExpressionContext
+						(
+							expression,
+							SystemTypes.Boolean,
+							inner.Characteristics,
+							m => { EmitUnaryOperator(m, compiler, inner, expression); }
+						);
+
 				case Parse.Operator.Negate:
 				case Parse.Operator.Not:
 				case Parse.Operator.BitwiseNot:
 				case Parse.Operator.Successor:
 				case Parse.Operator.Predicessor:
-					return DefaultUnaryOperator(method, compiler, inner, expression);
+					return 
+						new ExpressionContext
+						(
+							expression,
+							inner.Type,
+							inner.Characteristics,
+							m => { EmitUnaryOperator(m, compiler, inner, expression); }
+						);
 
 				default: throw NotSupported(expression);
 			}
 		}
 
-		public virtual ExpressionContext CompileRestrictExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		public virtual ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
 		{
 			throw new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Restrict, GetType());
 		}
@@ -93,10 +138,12 @@ namespace Ancestry.QueryProcessor.Type
 
 		/// <summary> Overridden to determine what operators a type supports and to change how they are implemented. </summary>
 		/// <remarks> Override this rather than CompileBinaryOperator when nothing special is necessary when compiling the right-hand expression. </remarks>
-		protected virtual ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		protected virtual void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			var leftType = left.Type.GetNative(compiler.Emitter);
 			var rightType = right.Type.GetNative(compiler.Emitter);
+			left.EmitGet(method);
+			right.EmitGet(method);
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Addition:
@@ -150,7 +197,7 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.Equal:
 					if (!CallClassOp(method, "op_Equality", leftType, rightType))
 						method.IL.Emit(OpCodes.Ceq);
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.NotEqual:
 					if (!CallClassOp(method, "op_Inequality", leftType, rightType))
 					{
@@ -158,7 +205,7 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.InclusiveGreater:
 					if (!CallClassOp(method, "op_GreaterThanOrEqual", leftType, rightType))
 					{
@@ -166,7 +213,7 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.InclusiveLess:
 					if (!CallClassOp(method, "op_LessThanOrEqual", leftType, rightType))
 					{
@@ -174,26 +221,28 @@ namespace Ancestry.QueryProcessor.Type
 						method.IL.Emit(OpCodes.Ldc_I4_0);
 						method.IL.Emit(OpCodes.Ceq);
 					}
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.Greater:
 					if (!CallClassOp(method, "op_GreaterThan", leftType, rightType))
 						method.IL.Emit(OpCodes.Cgt);
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.Less:
 					if (!CallClassOp(method, "op_LessThan", leftType, rightType))
 						method.IL.Emit(OpCodes.Clt);
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 
 				default: throw NotSupported(expression);
 			}
-			return left;
 		}
 
 		/// <summary> Overridden to determine what operators a type supports and to change how they are implemented. </summary>
 		/// <remarks> Override this rather than CompileBinaryOperator when nothing special is necessary when compiling the right-hand expression. </remarks>
-		protected virtual ExpressionContext DefaultShortCircuit(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		protected virtual void EmitShortCircuit(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression, Type.BaseType typeHint)
 		{
 			var leftType = left.Type.GetNative(compiler.Emitter);
+			var rightType = right.Type.GetNative(compiler.Emitter);
+			left.EmitGet(method);
+			right.EmitGet(method);
 			switch (expression.Operator)
 			{
 				case Parse.Operator.And:
@@ -202,7 +251,7 @@ namespace Ancestry.QueryProcessor.Type
 						var label = method.IL.DefineLabel();
 						method.IL.Emit(OpCodes.Dup);
 						method.IL.Emit(OpCodes.Brfalse_S, label);
-						compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
+						right.EmitGet(method);
 						method.IL.Emit(OpCodes.And);
 						method.IL.MarkLabel(label);
 					}
@@ -214,7 +263,7 @@ namespace Ancestry.QueryProcessor.Type
 						var label = method.IL.DefineLabel();
 						method.IL.Emit(OpCodes.Dup);
 						method.IL.Emit(OpCodes.Brtrue_S, label);
-						compiler.MaterializeRepository(method, compiler.CompileExpression(method, frame, expression.Right, typeHint));
+						right.EmitGet(method);
 						method.IL.Emit(OpCodes.Or);
 						method.IL.MarkLabel(label);
 					}
@@ -222,24 +271,23 @@ namespace Ancestry.QueryProcessor.Type
 
 				default: throw new NotSupportedException(String.Format("Operator {0} is not supported.", expression.Operator));
 			}
-			return left;
 		}
 
 		/// <summary> Overridden to determine what operators a type supports and to change how they are implemented. </summary>
-		protected virtual ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
+		protected virtual void EmitUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
 			var innerType = inner.Type.GetNative(compiler.Emitter);
-
+			inner.EmitGet(method);
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Exists:
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_1);	// true
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.IsNull:
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_0);	// false 
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.Negate:
 					if (!CallClassOp(method, "op_UnaryNegation", innerType))
 						method.IL.Emit(OpCodes.Neg);
@@ -263,8 +311,6 @@ namespace Ancestry.QueryProcessor.Type
 
 				default: throw NotSupported(expression);
 			}
-
-			return inner;
 		}
 
 		/// <summary> Attempt to invoke an operator overload on the left-hand class if there is one. </summary>
@@ -281,17 +327,24 @@ namespace Ancestry.QueryProcessor.Type
 
 		public override int GetHashCode()
 		{
-			return 0;
+			throw new NotSupportedException();	// Require override
 		}
 
 		public override bool Equals(object obj)
 		{
-			throw new NotSupportedException();
+			return false;	// Require override
 		}
 
 		public static bool operator ==(BaseType left, BaseType right)
 		{
-			return Object.ReferenceEquals(left, right) || (!Object.ReferenceEquals(left, null) && !Object.ReferenceEquals(right, null) && left.Equals(right));
+			return Object.ReferenceEquals(left, right) 
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.Equals(right)
+				);
 		}
 
 		public static bool operator !=(BaseType left, BaseType right)
@@ -302,6 +355,20 @@ namespace Ancestry.QueryProcessor.Type
 		public override string ToString()
 		{
 			return GetType().Name.Replace("Type", "");
+		}
+
+		public abstract Parse.Expression BuildDefault();
+	
+		public abstract Parse.TypeDeclaration BuildDOM();
+
+		public virtual void EmitLiteral(MethodContext method, object value)
+		{
+			throw new NotSupportedException();	
+		}
+
+		public virtual ExpressionContext Convert(ExpressionContext expression, BaseType target)
+		{
+			throw new NotImplementedException(String.Format("Conversion from {0} to {1} is not supported.", expression.Type, target));
 		}
 	}
 }

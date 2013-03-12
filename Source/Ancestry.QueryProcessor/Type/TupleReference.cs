@@ -35,9 +35,12 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(TupleReference left, TupleReference right)
 		{
 			return Object.ReferenceEquals(left, right)
-				|| 
+				||
 				(
-					left.SourceAttributeNames.SequenceEqual(right.SourceAttributeNames)
+					!Object.ReferenceEquals(right, null)
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType()
+						&& left.SourceAttributeNames.SequenceEqual(right.SourceAttributeNames)
 						&& left.Target == right.Target
 						&& left.TargetAttributeNames.SequenceEqual(right.TargetAttributeNames)
 				);
@@ -53,9 +56,9 @@ namespace Ancestry.QueryProcessor.Type
 			return 
 				new TupleReference 
 				{ 
-					SourceAttributeNames = (from san in reference.SourceAttributeNames select Name.FromQualifiedIdentifier(san)).ToArray(),
-					Target = Name.FromQualifiedIdentifier(reference.Target),
-					TargetAttributeNames = (from tan in reference.TargetAttributeNames select Name.FromQualifiedIdentifier(tan)).ToArray()
+					SourceAttributeNames = (from san in reference.SourceAttributeNames select Name.FromID(san)).ToArray(),
+					Target = Name.FromID(reference.Target),
+					TargetAttributeNames = (from tan in reference.TargetAttributeNames select Name.FromID(tan)).ToArray()
 				};
 		}
 	}

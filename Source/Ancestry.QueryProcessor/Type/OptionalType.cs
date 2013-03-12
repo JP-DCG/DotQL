@@ -16,6 +16,22 @@ namespace Ancestry.QueryProcessor.Type
 
 		public BaseType Of { get; private set; }
 
+		// TODO: handle exists and isnull for optional
+		//protected override void EmitUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
+		//{
+		//	switch (expression.Operator)
+		//	{
+		//		case Parse.Operator.Exists:
+		//			if (Of.GetNative(compiler.Emitter).IsValueType)
+		//				...
+		//			break;
+		//		case Parse.Operator.IsNull:
+		//			...
+		//			break;
+		//		default: throw NotSupported(expression);
+		//	}
+		//}
+
 		public override System.Type GetNative(Emitter emitter)
 		{
 			var memberNative = Of.GetNative(emitter);
@@ -41,7 +57,13 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(OptionalType left, OptionalType right)
 		{
 			return Object.ReferenceEquals(left, right)
-				|| (left.Of == right.Of);
+				||
+				(
+					!Object.ReferenceEquals(right, null)
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType()
+						&& left.Of == right.Of
+				);
 		}
 
 		public static bool operator !=(OptionalType left, OptionalType right)
@@ -52,6 +74,16 @@ namespace Ancestry.QueryProcessor.Type
 		public override string ToString()
 		{
 			return Of.ToString() + "?";
+		}
+
+		public override Parse.Expression BuildDefault()
+		{
+			return new Parse.LiteralExpression { Value = null };
+		}
+
+		public override Parse.TypeDeclaration BuildDOM()
+		{
+			return new Parse.OptionalType { Type = Of.BuildDOM() };
 		}
 	}
 }

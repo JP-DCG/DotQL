@@ -22,9 +22,10 @@ namespace Ancestry.QueryProcessor
 			AdHocCall((ao, ct) => { InternalExecute(text, args, ao, ct); }, options);
 		}
 
-		public object Evaluate(string text, IDictionary<string, object> args = null, QueryOptions options = null)
+		public EvaluateResult Evaluate(string text, IDictionary<string, object> args = null, QueryOptions options = null)
 		{
-			object result = null;
+			// TODO: overload that returns the type
+			EvaluateResult result = new EvaluateResult();
 			AdHocCall
 			(
 				(ao, ct) => 
@@ -51,7 +52,7 @@ namespace Ancestry.QueryProcessor
 			throw new NotImplementedException("Not implemented.");
 		}
 
-		public object Evaluate(Guid token, IDictionary<string, object> args = null)
+		public EvaluateResult Evaluate(Guid token, IDictionary<string, object> args = null)
 		{
 			throw new NotImplementedException("Not implemented.");
 		}
@@ -96,7 +97,7 @@ namespace Ancestry.QueryProcessor
 			actualOptions.QueryLimits = limits;
 		}
 
-		private object InternalExecute(string text, IDictionary<string, object> args, QueryOptions actualOptions, CancellationToken cancelToken)
+		private EvaluateResult InternalExecute(string text, IDictionary<string, object> args, QueryOptions actualOptions, CancellationToken cancelToken)
 		{
 			// Create assembly and source file names
 			var assemblyName = "DotQL" + DateTime.Now.Ticks;
@@ -111,7 +112,7 @@ namespace Ancestry.QueryProcessor
 			var script = Parser.ParseFrom(parser.Script, text);
 
 			// Compile
-			var executable = 
+			var result = 
 				Compiler.CreateExecutable
 				(
 					new CompilerOptions
@@ -126,7 +127,7 @@ namespace Ancestry.QueryProcessor
 				);
 
 			// Run
-			return executable(args, Settings.RepositoryFactory, cancelToken);
+			return new EvaluateResult { Result = result.Execute(args, Settings.RepositoryFactory, cancelToken), Type = result.Type };
 		}
 	}
 }

@@ -8,7 +8,7 @@ namespace Ancestry.QueryProcessor
 		/// <summary> Evaluates the given script and returns the result. </summary>
 		/// <param name="args"> Any arguments (var overrides) provided by name. </param>
 		/// <param name="options"> Optional option overrides. </param>
-		object Evaluate(string script, IDictionary<string, object> args = null, QueryOptions options = null);
+		EvaluateResult Evaluate(string script, IDictionary<string, object> args = null, QueryOptions options = null);
 
 		/// <summary> Executes the given script and discards any result. </summary>
 		/// <param name="args"> Any arguments (var overrides) provided by name. </param>
@@ -27,7 +27,7 @@ namespace Ancestry.QueryProcessor
 		/// <summary> Evaluates a previously prepared script by the provided handle and returns the result. </summary>
 		/// <param name="token"> The handle returned by a previous call to Prepare. </param>
 		/// <param name="args"> Any arguments (var overrides) provided by name. </param>
-		object Evaluate(Guid token, IDictionary<string, object> args = null);
+		EvaluateResult Evaluate(Guid token, IDictionary<string, object> args = null);
 
 		/// <summary> Unprepares a prepared script using the provided handle. </summary>
 		void Unprepare(Guid token);

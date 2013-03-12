@@ -30,7 +30,7 @@ Void:
 
 Scalar - intrinsic types:
 
-	return 456										// Integer (32bit), Long (64bit)
+	return 456										// Int32 or Int64
 	return true										// Boolean
 	return "Hello\r\nWorld"							// C-style string (UTF16) ("String")
 	return 'Hello'#13#10'World'						// Pascal-style string ('' escapes, captures whitespace) (UTF16) ("String")
@@ -56,7 +56,7 @@ Declaration
     Customers: 
     {
         { 
-			ID: Integer 
+			ID: Int32 
 			City: String 
 			ref Orders{ ID } Orders{ CustomerID } 
 			key { ID } 
@@ -70,8 +70,8 @@ Tables really are just sets of tuples:
 	Order: 
 		typedef
 		{ 
-			ID: Integer  
-			CustomerID: Integer  
+			ID: Int32  
+			CustomerID: Int32  
 			On: DateTime  
 			ref Customer{ CustomerID } Customers{ ID }  
 			ref Items{ ID } OrderItems{ OrderID } 
@@ -86,9 +86,9 @@ References are not bidirectional; they must be designated from each direction:
 	OrderItems: 
 	{ 
 		{ 
-			OrderID: Integer  
-			PartID: Integer  
-			Quantity: Integer
+			OrderID: Int32  
+			PartID: Int32  
+			Quantity: Int32
 			ref Order{ OrderID } Orders{ ID }  
 			ref Part{ PartID } Parts{ ID }
 			key { OrderID PartID }
@@ -102,7 +102,7 @@ The last of the structures to be used in examples:
 	Parts:
 	{
 		{
-			ID: Integer
+			ID: Int32
 			Name: String
 			IsDiscontinued: Boolean
 			ref OrderItems{ ID } OrderItems{ PartID }
@@ -110,13 +110,13 @@ The last of the structures to be used in examples:
 		}
 	}
 
-Sets may be over any type.  A set of integers:
+Sets may be over any type.  A set of Int32s:
 
-	Things: { Integer }
+	Things: { Int32 }
 
 Identifiers may have a qualified (compound) name:
 
-	Salad\Size: Integer
+	Salad\Size: Int32
 
 ...if Value not ambiguous, may be accessed as:
 	
@@ -354,11 +354,11 @@ Explicit Typing
 
 Empty list type selection:
 
-	return [] of [Integer]
+	return [] of [Int32]
 
 Explicitly designating type of list:
 
-	return [4] of [Long]
+	return [4] of [Int64]
 
 Similar for sets
 
@@ -366,11 +366,11 @@ Similar for sets
 
 Types for nulls:
 
-	return null of Integer
+	return null of Int32
 
 Types for tuples:
 
-	return { ID:135 } of { ID:Long }
+	return { ID:135 } of { ID:Int64 }
 
 Conditions and cases
 --------------------
@@ -421,7 +421,7 @@ Functions
 
 Function declaration:
 
-	let Sign := (x : Integer) =>
+	let Sign := (x : Int32) =>
 		case when x < 0 then -1 when x > 0 then 1 else 0 end
 
 A single FLWOR expression is expected as the body of the function.  The return type is inferred from this expression.
@@ -437,14 +437,14 @@ The expression to the left of the `->` is passed as the first argument to the fu
 
 Alternate declaration of Sign function:
 
-	let Sign := (x:Integer) =>
-		(0 < x)->ToInteger() - (x < 0)->ToInteger()
+	let Sign := (x:Int32) =>
+		(0 < x)->ToInt32() - (x < 0)->ToInt32()
 
-The ToInteger function is part of the standard library; in this case it converts from Boolean to Integers (0 or 1).
+The ToInt32 function is part of the standard library; in this case it converts from Boolean to Int32s (0 or 1).
 
 Recursive function:
 
-	let SequentialSum := (x:Integer) =>
+	let SequentialSum := (x:Int32) =>
 		if x = 0 then 0 else x + (x - 1)->SequentialSum()
 	return 5->SequentialSum()
 
@@ -452,7 +452,7 @@ Result: `15`
 
 Accessing arguments as a tuple:
 
-	let Point := (x:Integer y:Integer) => args
+	let Point := (x:Int32 y:Int32) => args
 	return 5->Point(7)
 
 Result: `{ x:5 y:7 }`
@@ -467,14 +467,14 @@ Result: `{ x:7 y:5 }`  (attribute order never matters)
 
 Function type declaration:
 
-	InventoryFunc: typedef (PartID : Long) => Integer
+	InventoryFunc: typedef (PartID : Int64) => Int32
 
 A function selector may specify a function type name rather than repeat the signature:
 
 	InventoryFunctions: const 
 	{ 
-		{ IDs:1..100 DetermineInventory:(PartID:Long) => return 50 key { IDs } }
-		{ IDs:101..99999 DetermineInventory:(PartID:Long) => return 30 }
+		{ IDs:1..100 DetermineInventory:(PartID:Int64) => return 50 key { IDs } }
+		{ IDs:101..99999 DetermineInventory:(PartID:Int64) => return 30 }
 	}
 
 Polymorphic invocation of functions:
@@ -486,7 +486,7 @@ This uses functions provided in a table to invoke a different inventory function
 
 Complex function example:
 
-	let PreferredName := (PersonID : Long) =>
+	let PreferredName := (PersonID : Int64) =>
 		let orderedn :=
 			for n in Attributes?(value.PersonID = args.PersonID).Name
 			let ap := n.Attribute.Priority
@@ -499,13 +499,13 @@ Nulls
 
 Nulls propagate:
 
-	return 5 * 2 + 3 - (null of Integer)
+	return 5 * 2 + 3 - (null of Int32)
 
 Returns: `null`
 
 Resolving nulls:
 
-	return ([] of [Integer])@0 ?? 5;
+	return ([] of [Int32])@0 ?? 5;
 
 Returns: `5`
 
@@ -537,9 +537,9 @@ Result: `{ Prefix:"" First:"Bob" }`
 
 Explicitly marking required:
 
-	OptionalInterval: typedef interval Integer!?
+	OptionalInterval: typedef interval Int32!?
 
-The `!` symbol indicates requiredness, so this is an interval of required Integers.  The user of a typedef can override the requiredness of the "outer" typedef.
+The `!` symbol indicates requiredness, so this is an interval of required Int32s.  The user of a typedef can override the requiredness of the "outer" typedef.
 
 Enumerations
 ------------
@@ -598,12 +598,12 @@ Type Definitions
 
 Type Definitions provide type description reuse:
 
-	SetOfNumbers: typedef { Integer }
+	SetOfNumbers: typedef { Int32 }
 
 Type Definitions are pure short-hands though; for instance, these represent the same type:
 
-	CustomerTuple1: typedef { Name:String Age:Integer }
-	CustomerTuple2: typedef { Age:Integer Name:String }
+	CustomerTuple1: typedef { Name:String Age:Int32 }
+	CustomerTuple2: typedef { Age:Int32 Name:String }
 
 (order of attributes doesn't matter in a tuple, so these two typedefs are equivalent)
 
@@ -618,7 +618,7 @@ Declaring a module:
 	{
 		Code: enum { Parent Sibling Child Spouse }
 		Modifier: enum { Male Female Elder Younger Legal God Former Practical }
-		Component: typedef { Code:Code Multiplier:Integer?  Modifiers:{ Modifier }? }
+		Component: typedef { Code:Code Multiplier:Int32?  Modifiers:{ Modifier }? }
 		Path: typedef [Component]
 		Normalize: const (Path: Path) =>
 			...
@@ -664,11 +664,11 @@ Modules may contain the following members:
 
 	module MyModule 2.1.0
 	{
-		Current: Integer									// Variables
-		Code: typedef Integer								// Type Definitions
+		Current: Int32									// Variables
+		Code: typedef Int32								// Type Definitions
 		Colors: enum { Red Green }							// Enumerations
 		BestNumber: const 5									// Constants
-		Square: const (x:Integer) => x * x				// Functions (as variables or consts)
+		Square: const (x:Int32) => x * x				// Functions (as variables or consts)
 	}
 
 Scripts
@@ -743,14 +743,14 @@ Scope
 Each script has a local frame, which hides any imported context:
 
 	using Ancestry\FamilyPaths 1.0.0
-	var Code: Integer	// Hides the Code in FamilyPaths
+	var Code: Int32	// Hides the Code in FamilyPaths
 
 Module members can access other module members, and in any order
 
 	module Selfish 1.0.0 
 	{
 		Current: Code
-		Code: typedef Integer
+		Code: typedef Int32
 	}
 
 Usings are global to the script, including within modules
@@ -758,7 +758,7 @@ Usings are global to the script, including within modules
 	using Ancestry\FamilyPaths 1.0.0
 	module PeopleFinder 1.2.0
 	{
-		Connection: typedef { SourceID:Long TargetID:Long Path:Path }
+		Connection: typedef { SourceID:Int64 TargetID:Int64 Path:Path }
 	}
 
 Exceptions
@@ -785,15 +785,15 @@ Nullological Cases
 
 Empty set of attribute carrying tuples:
 
-	return { } of { { ID:Integer } }
+	return { } of { { ID:Int32 } }
 
 Empty lists of normal tuples:
 
-	return [] of [{ ID:Integer }]
+	return [] of [{ ID:Int32 }]
 
 Empty tuple of attribute carrying tuple:
 
-	return { : } of { ID:Integer key { ID } }
+	return { : } of { ID:Int32 key { ID } }
 
 Result: `{ ID:0 }`
 
@@ -827,7 +827,7 @@ Functions may take type arguments:
 
 	let Add := (x:T y:T) => <T>
 		x + y
-	return 5->Add<Integer>(10)
+	return 5->Add<Int32>(10)
 
 Result: `15`
 
@@ -1020,7 +1020,7 @@ Count function on a set:
 
 Result: `3`  
 
-This is a short-hand for `{ 1 2 3 }->Count<Integer>()`
+This is a short-hand for `{ 1 2 3 }->Count<Int32>()`
 
 Count function on a list:
 
@@ -1270,9 +1270,9 @@ Rounding:
 
 Result: `{ 3142 3141.59 3100 }`
 
-Converting double's to integers:
+Converting double's to Int32s:
 
-	return 5.6->ToInteger()
+	return 5.6->ToInt32()
 
 Result: `5`
 
@@ -1300,17 +1300,17 @@ Generating multiple from the same seed:
 
 Result: `{ `random value` `random value` }`
 
-Generating integers:
+Generating Int32s:
 
 	return { : }=>Seed->Random(99)
 
-Result: pseudo-random integer between 0-99
+Result: pseudo-random Int32 between 0-99
 
-Generating in integer range:
+Generating in Int32 range:
 
 	return { : }=>Seed->Random(5..10)
 
-Result: pseudo-random integer between 5-10 inclusive
+Result: pseudo-random Int32 between 5-10 inclusive
 
 Generators
 ----------
@@ -1319,7 +1319,7 @@ Generate an individual ID:
 
 	return "token"->GenerateID()
 
-Result: next ID (Long) for given token
+Result: next ID (Int64) for given token
 
 **Note:** Generator values start at 1 for each unique token
 

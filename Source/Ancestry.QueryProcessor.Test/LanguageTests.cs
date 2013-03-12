@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
 using System.Collections.Generic;
+using Ancestry.QueryProcessor.Type;
 
 namespace Ancestry.QueryProcessor.Test
 {
@@ -15,7 +16,8 @@ namespace Ancestry.QueryProcessor.Test
 
 			processor.Execute("//Nothing but a comment");
 			var result = processor.Evaluate("//Nothing but a comment");
-			Assert.IsNull(result);
+			Assert.IsNull(result.Result);
+			Assert.AreEqual(result.Type, SystemTypes.Void);
 		}
 
 		[TestMethod]
@@ -24,20 +26,20 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return 5");
-			Assert.AreEqual(result, 5);
+			Assert.AreEqual(result.Result, 5);
 			result = processor.Evaluate("return 'Test String'");
-			Assert.AreEqual(result, "Test String");
+			Assert.AreEqual(result.Result, "Test String");
 			result = processor.Evaluate("return '2/3/2013'dt");
-			Assert.AreEqual(result, DateTime.Parse("2/3/2013"));
+			Assert.AreEqual(result.Result, DateTime.Parse("2/3/2013"));
 			result = processor.Evaluate("return '01:02:00'ts");
-			Assert.AreEqual(result, TimeSpan.Parse("01:02:00"));
+			Assert.AreEqual(result.Result, TimeSpan.Parse("01:02:00"));
 			result = processor.Evaluate("return 23.45");
-			Assert.AreEqual(result, 23.45);
+			Assert.AreEqual(result.Result, 23.45);
 			result = processor.Evaluate("return true");
-			Assert.AreEqual(result, true);
+			Assert.AreEqual(result.Result, true);
 			// TODO: remaining literal types
 			//result = processor.Evaluate("return '59A94476-175E-4A83-875B-BD23F71ABDC1'g");
-			//Assert.AreEqual(result, Guid.Parse("59A94476-175E-4A83-875B-BD23F71ABDC1"));
+			//Assert.AreEqual(result.Result, Guid.Parse("59A94476-175E-4A83-875B-BD23F71ABDC1"));
 		}
 
 		[TestMethod]
@@ -47,14 +49,14 @@ namespace Ancestry.QueryProcessor.Test
 
 			// Test basic precedence
 			dynamic result = processor.Evaluate("return 5 - 10 * 3");
-			Assert.AreEqual((5 - 10 * 3), result);
+			Assert.AreEqual((5 - 10 * 3), result.Result);
 
 			result = processor.Evaluate("return 5 * 3 + 1");
-			Assert.AreEqual((5 * 3 + 1), result);
+			Assert.AreEqual((5 * 3 + 1), result.Result);
 
 			// Test remaining operators
 			result = processor.Evaluate("return ~(5**3 / 1 ^ 23 % 2)");
-			Assert.AreEqual((~(Runtime.Runtime.IntPower(5, 3) / 1 ^ 23 % 2)), result);
+			Assert.AreEqual((~(Runtime.Runtime.IntPower(5, 3) / 1 ^ 23 % 2)), result.Result);
 		}
 
 		[TestMethod]
@@ -64,13 +66,13 @@ namespace Ancestry.QueryProcessor.Test
 
 			// Test basic precedence
 			dynamic result = processor.Evaluate("return 'hello ' + 'world'");
-			Assert.AreEqual("hello world", result);
+			Assert.AreEqual("hello world", result.Result);
 
 			result = processor.Evaluate("return 'hello ' <> 'hello' and ('hello' = 'hello') and ('hello' <> 'HELLO')");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			result = processor.Evaluate("return ('zebra' > 'apple') and ('bob' < 'fran') and ('Z' <= 'Z') and ('Z' <= 'Zoe') and ('Z' >= 'Z') and ('Z' >= 'Y')");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 		}
 
 		[TestMethod]
@@ -78,6 +80,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { x:2 y:'hello' z:2.0 }");
+			result = result.Result;
 			Assert.AreEqual(2, result.x);
 			Assert.AreEqual("hello", result.y);
 			Assert.AreEqual(2.0, result.z);
@@ -92,19 +95,19 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return { x:2 y:'hello' key{ x } } = { x:2 y:'other' key{ x } }");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			result = processor.Evaluate("return { x:2 y:'hello' key{ y } } = { x:2 y:'other' key{ y } }");
-			Assert.IsFalse(result);
+			Assert.IsFalse(result.Result);
 
 			result = processor.Evaluate("return { x:2 y:'hello' } = { x:2 y:'other' }");
-			Assert.IsFalse(result);
+			Assert.IsFalse(result.Result);
 
 			result = processor.Evaluate("return { x:2 y:'hello' } = { x:2 y:'hello' }");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			result = processor.Evaluate("return { : } = { : }");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 		}
 
 		[TestMethod]
@@ -114,6 +117,7 @@ namespace Ancestry.QueryProcessor.Test
 
 			//// TODO: Tuple operators
 			//dynamic result = processor.Evaluate("return { x:2 y:'hello' key{ x } } | { z:5 key{ z } }");
+			//result = result.Result;
 			//Assert.AreEqual(2, result.x);
 			//Assert.AreEqual("hello", result.y);
 			//Assert.AreEqual(5, result.z);
@@ -124,6 +128,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("let i := 5 return { :i }");
+			result = result.Result;
 			Assert.AreEqual(5, result.i);
 		}
 
@@ -133,6 +138,7 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return { 2 3 4 }");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(result[0], 2);
@@ -140,9 +146,11 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[2], 4);
 
 			result = processor.Evaluate("return { }");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 0);
 
 			result = processor.Evaluate("return { 'a' 'b' 'c' }");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(result[0], "a");
@@ -150,6 +158,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[2], "c");
 
 			result = processor.Evaluate("return { { x:1 } { x:2 } { x:3 } }");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(result[0].x, 1);
@@ -157,6 +166,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[2].x, 3);
 
 			result = processor.Evaluate("return { { x:1 y:'a' key{ x } } { x:1 y:'b' key{ x } } }");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 1);
 			result = Enumerable.ToList(result);
 			Assert.AreEqual(result[0].x, 1);
@@ -168,19 +178,21 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return { 2 3 } = { 3 2 }");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			result = processor.Evaluate("return { } = { }");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			//// TODO: remaining set operations
 			//result = processor.Evaluate("return { 2 3 } | { 3 4 }");
+			//result = result.Result;
 			//Assert.AreEqual(3, result.Count);
 			//Assert.IsTrue(result.Contains(2));
 			//Assert.IsTrue(result.Contains(3));
 			//Assert.IsTrue(result.Contains(4));
 
 			//result = processor.Evaluate("return { 2 3 } & { 3 4 }");
+			//result = result.Result;
 			//Assert.AreEqual(1, result.Count);
 			//Assert.IsTrue(result.Contains(3));
 		}
@@ -191,17 +203,20 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return [2 3 4]");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			Assert.AreEqual(result[0], 2);
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
 
 			result = processor.Evaluate("return ['blah' 'boo']");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 2);
 			Assert.AreEqual(result[0], "blah");
 			Assert.AreEqual(result[1], "boo");
 
 			result = processor.Evaluate("return []");
+			result = result.Result;
 			Assert.IsTrue(result.Count == 0);
 			Assert.IsTrue(result.GetType().GenericTypeArguments[0] == typeof(Runtime.Void));
 		}
@@ -212,14 +227,15 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return [2 3] = [2 3]");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			result = processor.Evaluate("return [] = []");
-			Assert.IsTrue(result);
+			Assert.IsTrue(result.Result);
 
 			// TODO: Remaining list operations
 
 			//result = processor.Evaluate("return [2 3] | [2 3]");
+			//result = result.Result;
 			//Assert.AreEqual(4, result.Count);
 			//Assert.AreEqual(2, result[0]);
 			//Assert.AreEqual(3, result[1]);
@@ -233,14 +249,15 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			dynamic result = processor.Evaluate("return { 2 3 4 }->ToList()");
-			result = Enumerable.ToList(result);
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);
 			Assert.IsTrue(result.Count == 3);
 			Assert.AreEqual(result[0], 2);
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
 
 			result = processor.Evaluate("return '1955/3/25'dt->AddMonth(2)");
-			Assert.AreEqual(DateTime.Parse("1955/5/25"), result);
+			Assert.AreEqual(DateTime.Parse("1955/5/25"), result.Result);
 		}
 
 		[TestMethod]

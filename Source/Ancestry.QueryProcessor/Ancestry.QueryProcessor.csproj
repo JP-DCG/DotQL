@@ -47,16 +47,18 @@
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Compile\CompilerException.cs" />
     <Compile Include="Compile\CompilerOptions.cs" />
+    <Compile Include="Compile\CompilerResult.cs" />
     <Compile Include="Compile\Emitter.cs" />
     <Compile Include="Compile\EmitterOptions.cs" />
     <Compile Include="Compile\ExpressionContext.cs" />
     <Compile Include="Compile\MethodContext.cs" />
     <Compile Include="Compile\ReflectionUtility.cs" />
     <Compile Include="Compile\UsingComparer.cs" />
+    <Compile Include="EvaluateResult.cs" />
     <Compile Include="Parse\ReservedWords.cs" />
     <Compile Include="Processor.cs" />
     <Compile Include="Runtime\ExecuteHandler.cs" />
-    <Compile Include="Compile\Characteristics.cs" />
+    <Compile Include="Compile\Characteristic.cs" />
     <Compile Include="Compile\Frame.cs" />
     <Compile Include="IProcessor.cs" />
     <Compile Include="Parse\LexerToken.cs" />
@@ -69,6 +71,7 @@
     <Compile Include="Runtime\ListEx.cs" />
     <Compile Include="Runtime\ModuleTuple.cs" />
     <Compile Include="Runtime\Optional.cs" />
+    <Compile Include="Runtime\PreDelegate.cs" />
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\Set.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
@@ -97,6 +100,9 @@
     <Compile Include="Type\BaseIntegerType.cs" />
     <Compile Include="Type\BaseType.cs" />
     <Compile Include="Type\BooleanType.cs" />
+    <Compile Include="Type\CharType.cs" />
+    <Compile Include="Type\DateTimeType.cs" />
+    <Compile Include="Type\DoubleType.cs" />
     <Compile Include="Type\FunctionParameter.cs" />
     <Compile Include="Type\FunctionType.cs" />
     <Compile Include="Type\IComponentType.cs" />
@@ -109,12 +115,14 @@
     <Compile Include="Type\SetType.cs" />
     <Compile Include="Type\StringType.cs" />
     <Compile Include="Type\SystemTypes.cs" />
+    <Compile Include="Type\TimeSpanType.cs" />
     <Compile Include="Type\TupleAttribute.cs" />
     <Compile Include="Type\TupleKey.cs" />
     <Compile Include="Type\TupleKeyAttribute.cs" />
     <Compile Include="Type\TupleReference.cs" />
     <Compile Include="Type\TupleReferenceAttribute.cs" />
     <Compile Include="Type\TupleType.cs" />
+    <Compile Include="Type\VersionType.cs" />
     <Compile Include="Type\VoidType.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>

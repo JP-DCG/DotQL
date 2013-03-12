@@ -24,9 +24,9 @@ namespace Ancestry.QueryProcessor.Compile
 			_baseFrame = baseFrame;
 		}
 
-		public void Add(QualifiedIdentifier id, object symbol)
+		public void Add(ID id, object symbol)
 		{
-			Add(id, Name.FromQualifiedIdentifier(id), symbol);
+			Add(id, Name.FromID(id), symbol);
 		}
 
 		private class Ambiguity : List<object> {}
@@ -80,9 +80,9 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
-		public T Resolve<T>(QualifiedIdentifier id)
+		public T Resolve<T>(ID id)
 		{
-			return Resolve<T>(id, Name.FromQualifiedIdentifier(id));
+			return Resolve<T>(id, Name.FromID(id));
 		}
 
 		/// <summary> Attempts to resolve the given symbol; throws if unable. </summary>

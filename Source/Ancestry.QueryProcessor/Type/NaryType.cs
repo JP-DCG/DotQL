@@ -13,24 +13,25 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public BaseType Of { get; set; }
 
-		public override ExpressionContext CompileBinaryExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, BaseType typeHint)
+		public override ExpressionContext CompileBinaryExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, BaseType typeHint)
 		{
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Dereference: 
-					return CompileDereference(method, compiler, frame, left, expression, typeHint);
+					return CompileDereference(compiler, frame, left, expression, typeHint);
 
-				default: return base.CompileBinaryExpression(method, compiler, frame, left, expression, typeHint);
+				default: return base.CompileBinaryExpression(compiler, frame, left, expression, typeHint);
 			}
 		}
 		
-		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		protected override void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
 				case Parse.Operator.Equal:
 				case Parse.Operator.NotEqual:
-					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
+					base.EmitBinaryOperator(method, compiler, left, right, expression);
+					break;
 
 				//// TODO: nary intersection and union
 				//case Parse.Operator.BitwiseOr:
@@ -40,171 +41,100 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		public override ExpressionContext CompileRestrictExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		public override ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
 		{
-			left = compiler.MaterializeRepository(method, left);
-
 			var memberType = ((NaryType)left.Type).Of;
 			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
 
-			bool indexReferenced;
-			var innerMethod = EmitWhereLambda(method, compiler, frame, expression, memberType, memberNative, out indexReferenced);
-
-			// TODO: Force ordering to left if set and index is referenced
-
-			// Instantiate a delegate pointing to the new method
-			method.IL.Emit(OpCodes.Ldnull);				// instance
-			method.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
-			method.IL.Emit
-			(
-				OpCodes.Newobj,
-				System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), typeof(bool))
-					.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
-			);
-
-			var where = typeof(System.Linq.Enumerable).GetMethodExt("Where", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, bool>) });
-			where = where.MakeGenericMethod(memberNative);
-			
-			method.IL.EmitCall(OpCodes.Call, where, null);
-
-			return new ExpressionContext((NaryType)left.Type, where.ReturnType);
-		}
-
-		private static MethodContext EmitWhereLambda(MethodContext outerMethod, Compiler compiler, Frame frame, Parse.RestrictExpression expression, BaseType memberType, System.Type memberNative, out bool indexReferenced)
-		{
 			var local = compiler.AddFrame(frame, expression);
 
-			// Create a new private method for the condition
-			var typeBuilder = (TypeBuilder)outerMethod.Builder.DeclaringType;
-			var innerMethod =
-				new MethodContext
-				(
-					typeBuilder.DefineMethod
-					(
-						"Where" + expression.GetHashCode(),
-						MethodAttributes.Private | MethodAttributes.Static,
-						typeof(bool),	// return type
-						new System.Type[] { memberNative, typeof(int) }	// param types
-					)
-				);
-
-			// Register value argument
-			var valueSymbol = new Object();
-			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), valueSymbol);
-			compiler.WritersBySymbol.Add(valueSymbol, m => { m.IL.Emit(OpCodes.Ldarg_0); return new ExpressionContext(memberType); });
-
-			// Register index argument
-			var indexSymbol = new Object();
-			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
-			compiler.WritersBySymbol.Add(indexSymbol, m => { m.IL.Emit(OpCodes.Ldarg_1); return new ExpressionContext(SystemTypes.Integer); });
-
-			// If the members are tuples, declare locals for each field
-			if (memberType is TupleType)
-			{
-				var tupleType = (TupleType)memberType;
-				foreach (var attribute in tupleType.Attributes)
-				{
-					local.Add(attribute.Key.ToQualifiedIdentifier(), attribute);
-					compiler.WritersBySymbol.Add
-					(
-						attribute,
-						m =>
-						{
-							m.IL.Emit(OpCodes.Ldarg_0);	// value
-							m.IL.Emit(OpCodes.Ldfld, memberNative.GetField(attribute.Key.ToString()));
-							return new ExpressionContext(attribute.Value);
-						}
-					);
-				}
-
-				// TODO: Add references
-			}
+			// Prepare index and value symbols
+			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Condition, memberType, memberNative, local);
 
 			// Compile condition
-			var condition = compiler.MaterializeRepository
+			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
+
+			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
+
+			return
+				new ExpressionContext
 				(
-					innerMethod,
-					compiler.CompileExpression(innerMethod, local, expression.Condition, SystemTypes.Boolean)
-				);
+					expression,
+					left.Type,
+					MergeCharacteristics(left.Characteristics, condition.Characteristics),
+					m =>
+					{
+						// Create a new private method for the condition
+						var typeBuilder = (TypeBuilder)m.Builder.DeclaringType;
+						var innerMethod =
+							new MethodContext
+							(
+								typeBuilder.DefineMethod
+								(
+									"Where" + expression.GetHashCode(),
+									MethodAttributes.Private | MethodAttributes.Static,
+									typeof(bool),	// return type
+									new System.Type[] { memberNative, typeof(int) }	// param types
+								)
+							);
+						condition.EmitGet(innerMethod);
+						innerMethod.IL.Emit(OpCodes.Ret);
 
-			indexReferenced = compiler.References.ContainsKey(indexSymbol);
+						// TODO: Force ordering to left if Set and index is referenced
 
-			innerMethod.IL.Emit(OpCodes.Ret);
-			return innerMethod;
-		}
+						// Instantiate a delegate pointing to the new method
+						m.IL.Emit(OpCodes.Ldnull);				// instance
+						m.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
+						var funcType =
+							indexReferenced
+								? System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), typeof(bool))
+								: System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(bool));
+						m.IL.Emit
+						(
+							OpCodes.Newobj,
+							funcType.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
+						);
 
-		protected virtual ExpressionContext CompileDereference(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
-		{
-			left = compiler.MaterializeRepository(method, left);
-
-			var memberType = ((NaryType)left.Type).Of;
-			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
-
-			var lambda = EmitSelectLambda(method, compiler, frame, expression, memberType, memberNative);
-
-			// TODO: Force ordering of Left if a set and index is referenced
-
-			// Instantiate a delegate pointing to the new method
-			method.IL.Emit(OpCodes.Ldnull);				// instance
-			method.IL.Emit(OpCodes.Ldftn, lambda.Method.Builder);	// method
-			method.IL.Emit
-			(
-				OpCodes.Newobj,
-				System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), lambda.Method.Builder.ReturnType)
-					.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
-			);
-
-			var select =
-				typeof(Enumerable).GetMethodExt
-				(
-					"Select",
-					new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) }
-				);
-			select = select.MakeGenericMethod(memberNative, lambda.Method.Builder.ReturnType);
+						funcType = indexReferenced ? typeof(Func<ReflectionUtility.T, int, bool>) : typeof(Func<ReflectionUtility.T, bool>);
+						var where = typeof(System.Linq.Enumerable).GetMethodExt("Where", new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), funcType });
+						where = where.MakeGenericMethod(memberNative);
 			
-			method.IL.EmitCall(OpCodes.Call, select, null);
-
-			return new ExpressionContext(new ListType { Of = lambda.ReturnType }, select.ReturnType);
-		}
-
-		private struct SelectLambdaInfo
-		{
-			public bool IndexReferenced;
-			public BaseType ReturnType;
-			public MethodContext Method;
-		}
-
-		private static SelectLambdaInfo EmitSelectLambda(MethodContext outerMethod, Compiler compiler, Frame frame, Parse.BinaryExpression expression, BaseType memberType, System.Type memberNative)
-		{
-			// TODO: this largely duplicates EmitWhereLambda; refactor.
-
-			SelectLambdaInfo info = new SelectLambdaInfo();
-
-			var local = compiler.AddFrame(frame, expression);
-
-			// Create a new private method for the condition
-			var typeBuilder = (TypeBuilder)outerMethod.Builder.DeclaringType;
-			info.Method =
-				new MethodContext
-				(
-					typeBuilder.DefineMethod
-					(
-						"Select" + expression.GetHashCode(),
-						MethodAttributes.Private | MethodAttributes.Static,
-						typeof(void),	// temporary return type
-						new System.Type[] { memberNative, typeof(int) }	// param types
-					)
+						m.IL.EmitCall(OpCodes.Call, where, null);
+					}
 				);
+		}
 
+		private static object PrepareValueIndexContext(Compiler compiler, ExpressionContext left, Parse.Statement statement, BaseType memberType, System.Type memberNative, Frame local)
+		{
 			// Register value argument
 			var valueSymbol = new Object();
-			local.Add(expression.Right, Name.FromComponents(Parse.ReservedWords.Value), valueSymbol);
-			compiler.WritersBySymbol.Add(valueSymbol, m => { m.IL.Emit(OpCodes.Ldarg_0); return new ExpressionContext(memberType); });
+			local.Add(statement, Name.FromComponents(Parse.ReservedWords.Value), valueSymbol);
+			compiler.ContextsBySymbol.Add
+			(
+				valueSymbol,
+				new ExpressionContext
+				(
+					null,
+					left.Type,
+					left.Characteristics,
+					m => { m.IL.Emit(OpCodes.Ldarg_0); }
+				)
+			);
 
 			// Register index argument
 			var indexSymbol = new Object();
-			local.Add(expression.Right, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
-			compiler.WritersBySymbol.Add(indexSymbol, m => { m.IL.Emit(OpCodes.Ldarg_1); return new ExpressionContext(SystemTypes.Integer); });
+			local.Add(statement, Name.FromComponents(Parse.ReservedWords.Index), indexSymbol);
+			compiler.ContextsBySymbol.Add
+			(
+				indexSymbol,
+				new ExpressionContext
+				(
+					null,
+					SystemTypes.Int32,
+					Characteristic.Default,
+					m => { m.IL.Emit(OpCodes.Ldarg_1); }
+				)
+			);
 
 			// If the members are tuples, declare locals for each field
 			if (memberType is TupleType)
@@ -212,68 +142,94 @@ namespace Ancestry.QueryProcessor.Type
 				var tupleType = (TupleType)memberType;
 				foreach (var attribute in tupleType.Attributes)
 				{
-					local.Add(attribute.Key.ToQualifiedIdentifier(), attribute);
-					compiler.WritersBySymbol.Add
+					local.Add(attribute.Key.ToID(), attribute);
+					compiler.ContextsBySymbol.Add
 					(
 						attribute,
-						m =>
-						{
-							m.IL.Emit(OpCodes.Ldarg_0);	// value
-							m.IL.Emit(OpCodes.Ldfld, memberNative.GetField(attribute.Key.ToString()));
-							return new ExpressionContext(attribute.Value);
-						}
+						new ExpressionContext
+						(
+							null,
+							attribute.Value,
+							Characteristic.Default,
+							m =>
+							{
+								m.IL.Emit(OpCodes.Ldarg_0);	// value
+								m.IL.Emit(OpCodes.Ldfld, memberNative.GetField(attribute.Key.ToString()));
+							}
+						)
 					);
 				}
 
 				// TODO: Add references
 			}
+			return indexSymbol;
+		}
+
+		protected virtual ExpressionContext CompileDereference(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+		{
+			var memberType = ((NaryType)left.Type).Of;
+			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
+
+			var local = compiler.AddFrame(frame, expression);
+
+			// Prepare index and value symbols
+			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Right, memberType, memberNative, local);
+
+			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
 
 			// Compile selection
-			var selection = compiler.MaterializeRepository
+			var selection = compiler.CompileExpression(local, expression.Right);
+
+			return
+				new ExpressionContext
 				(
-					info.Method,
-					compiler.CompileExpression(info.Method, local, expression.Right)
+					expression,
+					new ListType(selection.Type),
+					MergeCharacteristics(left.Characteristics, selection.Characteristics),
+					m =>
+					{
+						// Create a new private method for the condition
+						var typeBuilder = (TypeBuilder)m.Builder.DeclaringType;
+						var innerMethod =
+							new MethodContext
+							(
+								typeBuilder.DefineMethod
+								(
+									"Select" + expression.GetHashCode(),
+									MethodAttributes.Private | MethodAttributes.Static,
+									selection.ActualNative(compiler.Emitter),	// temporary return type
+									new System.Type[] { memberNative, typeof(int) }	// param types
+								)
+							);
+						selection.EmitGet(innerMethod);
+						innerMethod.IL.Emit(OpCodes.Ret);
+
+						// TODO: Force ordering of Left if a set and index is referenced
+
+						// Instantiate a delegate pointing to the new method
+						m.IL.Emit(OpCodes.Ldnull);				// instance
+						m.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
+						m.IL.Emit
+						(
+							OpCodes.Newobj,
+							System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), innerMethod.Builder.ReturnType)
+								.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
+						);
+
+						var select =
+							typeof(Enumerable).GetMethodExt
+							(
+								"Select",
+								new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) }
+							);
+						select = select.MakeGenericMethod(memberNative, innerMethod.Builder.ReturnType);
+			
+						m.IL.EmitCall(OpCodes.Call, select, null);
+					}
 				);
-			info.ReturnType = selection.Type;
-			var returnNative = selection.NativeType ?? selection.Type.GetNative(compiler.Emitter);
-			info.Method.Builder.SetReturnType(returnNative);
-
-			info.IndexReferenced = compiler.References.ContainsKey(indexSymbol);
-
-			info.Method.IL.Emit(OpCodes.Ret);
-			return info;
 		}
 		
-		//left = compiler.MaterializeReference(method, left);
-
-		//	var local = compiler.AddFrame(frame, expression);
-		//	var memberType = left.Type.GenericTypeArguments[0];
-		//	var parameters = new List<ParameterExpression>();
-
-		//	var valueParam = compiler.CreateValueParam(expression, local, left, memberType);
-		//	parameters.Add(valueParam);
-
-		//	var indexParam = compiler.CreateIndexParam(expression, local);
-		//	parameters.Add(indexParam);
-
-		//	var right =
-		//		compiler.MaterializeReference
-		//		(
-		//			compiler.CompileExpression(method, local, expression.Right, typeHint)
-		//		);
-
-		//	var selection = Expression.Lambda(right, parameters);
-		//	var select =
-		//		typeof(Enumerable).GetMethodExt
-		//		(
-		//			"Select",
-		//			new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) }
-		//		);
-		//	select = select.MakeGenericMethod(memberType, selection.ReturnType);
-		//	return Expression.Call(select, left, selection);
-		//}
-
-		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
+		protected override void EmitUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -281,11 +237,11 @@ namespace Ancestry.QueryProcessor.Type
 					method.IL.EmitCall(OpCodes.Callvirt, typeof(ICollection<>).MakeGenericType(inner.Type.GetNative(compiler.Emitter)).GetProperty("Count").GetGetMethod(), null);
 					method.IL.Emit(OpCodes.Ldc_I4_0);
 					method.IL.Emit(OpCodes.Cgt);
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				case Parse.Operator.IsNull:
 					method.IL.Emit(OpCodes.Pop);
 					method.IL.Emit(OpCodes.Ldc_I4_0);
-					return new ExpressionContext(SystemTypes.Boolean);
+					break;
 				default: throw NotSupported(expression);
 			}
 		}
@@ -306,7 +262,13 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(NaryType left, NaryType right)
 		{
 			return Object.ReferenceEquals(left, right) 
-				|| (left.GetType() == right.GetType() && left.Of == right.Of);
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.Of == right.Of
+				);
 		}
 
 		public static bool operator !=(NaryType left, NaryType right)

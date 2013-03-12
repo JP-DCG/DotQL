@@ -38,7 +38,13 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator ==(ScalarType left, ScalarType right)
 		{
 			return Object.ReferenceEquals(left, right)
-				|| (left.Native == right.Native);
+				||
+				(
+					!Object.ReferenceEquals(right, null)
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType()
+						&& left.Native == right.Native
+				);
 		}
 
 		public static bool operator !=(ScalarType left, ScalarType right)
@@ -51,60 +57,93 @@ namespace Ancestry.QueryProcessor.Type
 			return Native.Name;
 		}
 
-		public override ExpressionContext CompileRestrictExpression(MethodContext method, Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		public override ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
 		{
-			left = compiler.MaterializeRepository(method, left);
 			var local = compiler.AddFrame(frame, expression);
 			var alreadyOptional = left.Type is OptionalType;
 			var memberNative = left.Type.GetNative(compiler.Emitter);
 			var resultType = alreadyOptional ? left.Type : new OptionalType(left.Type);
 			var resultNative = resultType.GetNative(compiler.Emitter);
 
-			var nullLabel = method.IL.DefineLabel();
-			var endLabel = method.IL.DefineLabel();
+			// Register value symbol
+			LocalBuilder valueLocal = null;
+			var localSymbol = new Object();
+			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), localSymbol);
+			compiler.ContextsBySymbol.Add
+			(
+				localSymbol, 
+				new ExpressionContext
+				(
+					null,
+					left.Type,
+					left.Characteristics,
+					m => { m.IL.Emit(OpCodes.Ldloc, valueLocal); }
+				)
+			);
 
-			// Register value argument
-			var valueLocal = method.DeclareLocal(expression, memberNative, Parse.ReservedWords.Value);
-			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), valueLocal);
-			compiler.WritersBySymbol.Add(valueLocal, m => { m.IL.Emit(OpCodes.Ldloc, valueLocal); return new ExpressionContext(left.Type); });
-			method.IL.Emit(OpCodes.Stloc, valueLocal);
+			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
 
-			var condition = compiler.CompileExpression(method, local, expression.Condition, SystemTypes.Boolean);
+			return
+				new ExpressionContext
+				(
+					expression,
+					resultType,
+					MergeCharacteristics(left.Characteristics, condition.Characteristics),
+					m =>
+					{
+						var nullLabel = m.IL.DefineLabel();
+						var endLabel = m.IL.DefineLabel();
 
-			method.IL.Emit(OpCodes.Brfalse, nullLabel);
+						// Register value argument
+						valueLocal = m.DeclareLocal(expression, memberNative, Parse.ReservedWords.Value);
+						left.EmitGet(m);
+						m.IL.Emit(OpCodes.Stloc, valueLocal);
 
-			// Passed condition
-			if (!alreadyOptional)
-			{
-				var optionalLocal = method.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
-				method.IL.Emit(OpCodes.Ldloca, optionalLocal);
-				method.IL.Emit(OpCodes.Ldloc, valueLocal);
-				method.IL.Emit(OpCodes.Call, resultNative.GetConstructor(new System.Type[] { left.Type.GetNative(compiler.Emitter) }));
-				method.IL.Emit(OpCodes.Ldloc, optionalLocal);
-			}
-			else
-				method.IL.Emit(OpCodes.Ldloc, valueLocal);
-			method.IL.Emit(OpCodes.Br, endLabel);
+						m.IL.Emit(OpCodes.Brfalse, nullLabel);
 
-			// Failed condition
-			method.IL.MarkLabel(nullLabel);
-			if (!alreadyOptional)
-			{
-				var optionalLocal = method.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
-				method.IL.Emit(OpCodes.Ldloca, optionalLocal);
-				method.IL.Emit(OpCodes.Initobj, resultNative);
-				method.IL.Emit(OpCodes.Ldloc, optionalLocal);
-			}
-			else
-			{
-				method.IL.Emit(OpCodes.Ldloca, valueLocal);
-				method.IL.Emit(OpCodes.Initobj, resultNative);
-				method.IL.Emit(OpCodes.Ldloc, valueLocal);
-			}
+						// Passed condition
+						if (!alreadyOptional)
+						{
+							var optionalLocal = m.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
+							m.IL.Emit(OpCodes.Ldloca, optionalLocal);
+							m.IL.Emit(OpCodes.Ldloc, valueLocal);
+							m.IL.Emit(OpCodes.Call, resultNative.GetConstructor(new System.Type[] { left.Type.GetNative(compiler.Emitter) }));
+							m.IL.Emit(OpCodes.Ldloc, optionalLocal);
+						}
+						else
+							m.IL.Emit(OpCodes.Ldloc, valueLocal);
+						m.IL.Emit(OpCodes.Br, endLabel);
 
-			method.IL.MarkLabel(endLabel);
+						// Failed condition
+						m.IL.MarkLabel(nullLabel);
+						if (!alreadyOptional)
+						{
+							var optionalLocal = m.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
+							m.IL.Emit(OpCodes.Ldloca, optionalLocal);
+							m.IL.Emit(OpCodes.Initobj, resultNative);
+							m.IL.Emit(OpCodes.Ldloc, optionalLocal);
+						}
+						else
+						{
+							m.IL.Emit(OpCodes.Ldloca, valueLocal);
+							m.IL.Emit(OpCodes.Initobj, resultNative);
+							m.IL.Emit(OpCodes.Ldloc, valueLocal);
+						}
 
-			return new ExpressionContext(resultType);
+						m.IL.MarkLabel(endLabel);
+					}
+				);
+		}
+
+
+		public override Parse.Expression BuildDefault()
+		{
+			return new Parse.LiteralExpression { Value = ReflectionUtility.GetDefaultValue(Native) };
+		}
+
+		public override Parse.TypeDeclaration BuildDOM()
+		{
+			return new Parse.NamedType { Target = Parse.ID.FromComponents("System", Native.Name) };
 		}
 	}
 }

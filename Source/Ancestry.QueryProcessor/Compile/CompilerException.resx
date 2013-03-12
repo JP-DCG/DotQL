@@ -159,4 +159,10 @@
   <data name="105113" xml:space="preserve">
     <value>Operator '{0}' is not supported for type '{1}'.</value>
   </data>
+  <data name="105114" xml:space="preserve">
+    <value>Cannot assign to this type of target expression.</value>
+  </data>
+  <data name="105115" xml:space="preserve">
+    <value>Constant expression expected.</value>
+  </data>
 </root>

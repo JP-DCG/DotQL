@@ -30,8 +30,14 @@ namespace Ancestry.QueryProcessor.Runtime
 
 		public static bool operator ==(Set<T> left, Set<T> right)
 		{
-			return Object.ReferenceEquals(left, right)
-				|| left.Equivalent(right);
+			return Object.ReferenceEquals(left, right) 
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.Equivalent(right)
+				);
 		}
 
 		public static bool operator !=(Set<T> left, Set<T> right)

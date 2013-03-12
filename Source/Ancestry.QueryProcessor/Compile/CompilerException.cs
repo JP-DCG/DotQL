@@ -49,6 +49,12 @@ namespace Ancestry.QueryProcessor.Compile
 
 			/// <summary>Error code 105113: "Operator '{0}' is not supported for type '{1}'."</summary>
 			OperatorNotSupported = 105113,
+
+			/// <summary>Error code 105114: "Cannot assign to this type of target expression."</summary>
+			CannotAssignToTarget = 105114,
+			
+			/// <summary>Error code 105115: "Constant expression expected."</summary>
+			ConstantExpressionExpected = 105115,
 		}
 
 		// Resource manager for this exception class

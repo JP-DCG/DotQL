@@ -13,28 +13,28 @@ Script :=
 	Expression : [ ClausedExpression ]
 
 UsingClause :=
-	"using" [ Alias: QualifiedIdentifier ":=" ] Target : QualifiedIdentifier Version : Version
+	"using" [ Alias: ID ":=" ] Target : ID Version : Version
 
 ModuleDeclaration :=
-	"module" Name : QualifiedIdentifier Version : Version "{" Members : [ moduleMember ]* "}"
+	"module" Name : ID Version : Version "{" Members : [ moduleMember ]* "}"
 
 moduleMember =
 	TypeMember | EnumMember	| ConstMember | VarMember
 
 TypeMember :=
-	Name : QualifiedIdentifier ":" "typedef" Type : typeDeclaration
+	Name : ID ":" "typedef" Type : typeDeclaration
 
 EnumMember :=
-	Name : QualifiedIdentifier ":" "enum" "{" Values : QualifiedIdentifier* "}"
+	Name : ID ":" "enum" "{" Values : ID* "}"
 
 ConstMember :=
-	Name : QualifiedIdentifier ":" "const" Expression : expression
+	Name : ID ":" "const" Expression : expression
 
 VarMember :=
-	Name : QualifiedIdentifier ":" Type: typeDeclaration
+	Name : ID ":" Type: typeDeclaration
 
 VarDeclaration :=
-	"var" Name : QualifiedIdentifier [ ":" Type : typeDeclaration ] [ ":=" Initializer : expression )
+	"var" Name : ID [ ":" Type : typeDeclaration ] [ ":=" Initializer : expression )
 
 ClausedAssignment :=
 	ForClauses : [ ForClause ]*
@@ -61,14 +61,14 @@ TupleType :=
 	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}"
 
 TupleAttribute :=
-	Name : QualifiedIdentifier ":" Type : typeDeclaration
+	Name : ID ":" Type : typeDeclaration
 
 TupleReference :=
-	"ref" Name : QualifiedIdentifier "{" SourceAttributeNames : QualifiedIdentifier* "}" 
-		Target : QualifiedIdentifier "{" TargetAttributeNames : QualifiedIdentifier* "}"	
+	"ref" Name : ID "{" SourceAttributeNames : ID* "}" 
+		Target : ID "{" TargetAttributeNames : ID* "}"	
 
 TupleKey :=
-	"key" "{" AttributeNames : [ QualifiedIdentifier ]* "}"
+	"key" "{" AttributeNames : [ ID ]* "}"
 
 FunctionType :=
 	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration
@@ -77,13 +77,13 @@ functionParameters =
 	"(" Parameters : [ FunctionParameter ]* ")"
 
 FunctionParameter :=
-	Name : QualifiedIdentifier ":" Type : typeDeclaration
+	Name : ID ":" Type : typeDeclaration
 
 IntervalType :=
 	"interval" Type : typeDeclaration
 
 NamedType :=
-	Target : QualifiedIdentifier
+	Target : ID
 
 TypeOf :=
 	"typeof" Expression : expression 
@@ -165,7 +165,7 @@ TupleSelector :=
 	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
 
 TupleAttributeSelector :=
-	[ Name : QualifiedIdentifier ] ":" Value : expression
+	[ Name : ID ] ":" Value : expression
 
 SetSelector :=
 	"{" Items : [ expression ]* "}"
@@ -174,7 +174,7 @@ FunctionSelector :=
 	functionParameters "=>" Expression : expression
 
 IdentifierExpression := 
-	Target : QualifiedIdentifier
+	Target : ID
 
 IntegerLiteral :=
 	_ (digit* | '0x' { '0'..'9', 'a'..'f', 'A'..'F' }*)+ _
@@ -214,10 +214,10 @@ ClausedExpression :=
 	"return" Expression : expression
 
 ForClause :=
-	"for" Name : QualifiedIdentifier "in" Expression : expression
+	"for" Name : ID "in" Expression : expression
 
 LetClause :=
-	"let" Name : QualifiedIdentifier ":=" Expression : expression
+	"let" Name : ID ":=" Expression : expression
 	
 OrderDimension :=
 	Expression : expression [ Direction : ( "asc" | "desc" ) ]
@@ -228,7 +228,7 @@ Version :=
 pascalString =
 	'''' ( [ '''''' as '''' | {?} &! '''' ]* )+ ''''
 
-QualifiedIdentifier :=
+ID :=
 	_ IsRooted : [ '\' ] Items : identifier^'\' _
 
 identifier =

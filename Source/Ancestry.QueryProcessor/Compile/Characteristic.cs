@@ -5,10 +5,12 @@ using System.Text;
 
 namespace Ancestry.QueryProcessor.Compile
 {
-	public enum Characteristics
+	[Flags]
+	public enum Characteristic
 	{
-		Deterministic,
-		Nullable,
-		SideEffectual
+		Default = 0,
+		Constant = 1,
+		NonDeterministic = 2,
+		SideEffectual = 4
 	}
 }

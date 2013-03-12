@@ -11,11 +11,16 @@ namespace Ancestry.QueryProcessor.Type
 	public class FunctionType : BaseType
 	{
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
-		public List<FunctionParameter> Parameters { get { return _parameters; } }
+		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
+
+		// TODO: Type parameters
+		//private List<FunctionTypeParameter> _parameters = new List<FunctionTypeParameter>();
+		//public List<FunctionTypeParameter> Parameters { get { return _parameters; } }
 
 		public BaseType Type { get; set; }
 
-		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+
+		protected override void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -23,7 +28,7 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
+		protected override void EmitUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -56,13 +61,50 @@ namespace Ancestry.QueryProcessor.Type
 
 		public static bool operator ==(FunctionType left, FunctionType right)
 		{
-			return Object.ReferenceEquals(left, right)
-				|| (left.Parameters.SequenceEqual(right.Parameters) && left.Type == right.Type);
+			return Object.ReferenceEquals(left, right) 
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.Parameters.SequenceEqual(right.Parameters) 
+						&& left.Type == right.Type
+				);
 		}
 
 		public static bool operator !=(FunctionType left, FunctionType right)
 		{
 			return !(left == right);
+		}
+
+		public override Parse.Expression BuildDefault()
+		{
+			return
+				new Parse.FunctionSelector 
+				{ 
+					Expression = Type.BuildDefault(),
+					Parameters =
+					(
+						from p in Parameters 
+						select new Parse.FunctionParameter { Name = p.Name.ToID(), Type = p.Type.BuildDOM() }
+					).ToList()
+				};
+		}
+
+		public override Parse.TypeDeclaration BuildDOM()
+		{
+			return 
+				new Parse.FunctionType 
+				{ 
+					ReturnType = Type.BuildDOM(),
+					Parameters = 
+					(
+						from p in Parameters
+						select new Parse.FunctionParameter { Name = p.Name.ToID(), Type = p.Type.BuildDOM() }
+					).ToList()
+					// TODO: type parameters
+					// TypeParameters =
+				};
 		}
 	}
 }

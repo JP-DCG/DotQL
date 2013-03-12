@@ -6,29 +6,41 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Compile
 {
-	public struct ExpressionContext
+	public class ExpressionContext
 	{
-		public ExpressionContext(Type.BaseType type, System.Type nativeType = null, object member = null)
+		public ExpressionContext(Parse.Expression expression, Type.BaseType type, Characteristic characteristics, Action<MethodContext> emitGet)
 		{
+			Expression = expression;
 			Type = type;
-			NativeType = nativeType;
-			Member = member;
+			Characteristics = characteristics;
+			EmitGet = emitGet;
 		}
 
-		// The DotQL data type
+		public Parse.Expression Expression;
+
+		public Characteristic Characteristics;
+
+		/// <summary> The DotQL data type. </summary>
 		public Type.BaseType Type;
 
-		// The native type; null if the native type is "natural" (same as Type.GetNative)
+		/// <summary> The native type; null if the native type is "natural" (same as Type.GetNative). </summary>
 		public System.Type NativeType;
 
-		// The member information within the parent type
+		/// <summary> The member information within the parent type. </summary>
 		public object Member;
 
-		// TODO: characteristics
+		public Action<MethodContext> EmitGet;
 
+		public Action<MethodContext, Action<MethodContext>> EmitSet;
+						
 		public bool IsRepository()
 		{
 			return ReflectionUtility.IsRepository(NativeType);
+		}
+
+		public System.Type ActualNative(Emitter emitter)
+		{
+			return NativeType ?? Type.GetNative(emitter);
 		}
 	}
 }

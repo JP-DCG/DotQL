@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public BooleanType() : base(typeof(bool)) { }
 
-		protected override ExpressionContext DefaultBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
+		protected override void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -29,13 +30,13 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.InclusiveLess:
 				case Parse.Operator.Greater:
 				case Parse.Operator.Less:
-					return base.DefaultBinaryOperator(method, compiler, left, right, expression);
-
+					base.EmitBinaryOperator(method, compiler, left, right, expression);
+					break;
 				default: throw NotSupported(expression);
 			}
 		}
 
-		protected override ExpressionContext DefaultUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
+		protected override void EmitUnaryOperator(MethodContext method, Compiler compiler, ExpressionContext inner, Parse.UnaryExpression expression)
 		{
 			switch (expression.Operator)
 			{
@@ -43,10 +44,26 @@ namespace Ancestry.QueryProcessor.Type
 				case Parse.Operator.IsNull:
 				case Parse.Operator.Not:
 				case Parse.Operator.BitwiseNot:
-					return base.DefaultUnaryOperator(method, compiler, inner, expression);
+					base.EmitUnaryOperator(method, compiler, inner, expression);
+					break;
 
 				default: throw NotSupported(expression);
 			}
+		}
+
+		public override Parse.Expression BuildDefault()
+		{
+			return new Parse.LiteralExpression { Value = false };
+		}
+
+		public override Parse.TypeDeclaration BuildDOM()
+		{
+			return new Parse.NamedType { Target = Parse.ID.FromComponents("System", "Boolean") };
+		}
+
+		public override void EmitLiteral(MethodContext method, object value)
+		{
+			method.IL.Emit(((bool)value) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
 		}
 	}
 }

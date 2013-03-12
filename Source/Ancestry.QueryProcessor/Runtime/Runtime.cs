@@ -14,7 +14,7 @@ namespace Ancestry.QueryProcessor.Runtime
 			(
 				new Parse.BinaryExpression 
 				{ 
-					Left = new Parse.IdentifierExpression { Target = new Parse.QualifiedIdentifier { Components = new[] { "Name" } } },
+					Left = new Parse.IdentifierExpression { Target = new Parse.ID { Components = new[] { "Name" } } },
 					Operator = Parse.Operator.Equal,
 					Right = new Parse.LiteralExpression { Value = moduleId }
 				},

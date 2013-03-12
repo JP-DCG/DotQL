@@ -4,6 +4,8 @@ using System.Collections.Generic;
 
 namespace Ancestry.QueryProcessor.Parse
 {
+	// TODO: Make all the collections in the DOM settable for better LINQ construction
+
     public class Script : Statement
     {
 		private List<Using> _usings = new List<Using>();
@@ -51,9 +53,9 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class Using : Statement
 	{
-		public QualifiedIdentifier Alias { get; set; }
+		public ID Alias { get; set; }
 		
-		public QualifiedIdentifier Target { get; set; }
+		public ID Target { get; set; }
 
 		public Version Version { get; set; }
 
@@ -71,7 +73,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class ModuleDeclaration : Statement
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public Version Version { get; set; }
 
@@ -94,12 +96,12 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public interface ISymbol
 	{
-		QualifiedIdentifier Name { get; set; }
+		ID Name { get; set; }
 	}
 
 	public abstract class ModuleMember : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public override IEnumerable<Statement> GetChildren()
 		{
@@ -125,8 +127,8 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class EnumMember : ModuleMember
 	{
-		private List<QualifiedIdentifier> _values = new List<QualifiedIdentifier>();
-		public List<QualifiedIdentifier> Values { get { return _values; } }
+		private List<ID> _values = new List<ID>();
+		public List<ID> Values { get { return _values; } }
 
 		public override string ToString()
 		{
@@ -175,7 +177,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class VarDeclaration : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 		
@@ -299,13 +301,13 @@ namespace Ancestry.QueryProcessor.Parse
 	public class TupleType : TypeDeclaration
 	{
 		private List<TupleAttribute> _attributes = new List<TupleAttribute>();
-		public List<TupleAttribute> Attributes { get { return _attributes; } }
+		public List<TupleAttribute> Attributes { get { return _attributes; } set { _attributes = value; } }
 
 		private List<TupleReference> _references = new List<TupleReference>();
-		public List<TupleReference> References { get { return _references; } }
+		public List<TupleReference> References { get { return _references; } set { _references = value; } }
 
 		private List<TupleKey> _keys = new List<TupleKey>();
-		public List<TupleKey> Keys { get { return _keys; } }
+		public List<TupleKey> Keys { get { return _keys; } set { _keys = value; } }
 
 		public override string ToString()
 		{
@@ -337,7 +339,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class TupleAttribute : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 
@@ -355,15 +357,15 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class TupleReference : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
-		private List<QualifiedIdentifier> _sourceAttributeNames = new List<QualifiedIdentifier>();
-		public List<QualifiedIdentifier> SourceAttributeNames { get { return _sourceAttributeNames; } }
+		private List<ID> _sourceAttributeNames = new List<ID>();
+		public List<ID> SourceAttributeNames { get { return _sourceAttributeNames; } set { _sourceAttributeNames = value; } }
 
-		public QualifiedIdentifier Target { get; set; }
+		public ID Target { get; set; }
 
-		private List<QualifiedIdentifier> _targetAttributeNames = new List<QualifiedIdentifier>();
-		public List<QualifiedIdentifier> TargetAttributeNames { get { return _targetAttributeNames; } }
+		private List<ID> _targetAttributeNames = new List<ID>();
+		public List<ID> TargetAttributeNames { get { return _targetAttributeNames; } set { _targetAttributeNames = value; } }
 
 		public override string ToString()
 		{
@@ -384,8 +386,8 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class TupleKey : Statement
 	{
-		private List<QualifiedIdentifier> _attributeNames = new List<QualifiedIdentifier>();
-		public List<QualifiedIdentifier> AttributeNames { get { return _attributeNames; } }
+		private List<ID> _attributeNames = new List<ID>();
+		public List<ID> AttributeNames { get { return _attributeNames; } set { _attributeNames = value; } }
 
 		public override string ToString()
 		{
@@ -402,10 +404,10 @@ namespace Ancestry.QueryProcessor.Parse
 	public class FunctionType : TypeDeclaration
 	{
 		private List<TypeDeclaration> _typeParameters = new List<TypeDeclaration>();
-		public List<TypeDeclaration> TypeParameters { get { return _typeParameters; } }
+		public List<TypeDeclaration> TypeParameters { get { return _typeParameters; } set { _typeParameters = value; } }
 
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
-		public List<FunctionParameter> Parameters { get { return _parameters; } }
+		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
 
 		public TypeDeclaration ReturnType { get; set; }
 
@@ -429,7 +431,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class FunctionParameter : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public TypeDeclaration Type { get; set; }
 
@@ -462,7 +464,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class NamedType : TypeDeclaration
 	{
-		public QualifiedIdentifier Target { get; set; }
+		public ID Target { get; set; }
 
 		public override string ToString()
 		{
@@ -538,7 +540,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class ForClause : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public Expression Expression { get; set; }
 
@@ -556,7 +558,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class LetClause : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public Expression Expression { get; set; }
 
@@ -739,13 +741,13 @@ namespace Ancestry.QueryProcessor.Parse
 	public class TupleSelector : Expression
 	{
 		private List<AttributeSelector> _attributes = new List<AttributeSelector>();
-		public List<AttributeSelector> Attributes { get { return _attributes; } }
+		public List<AttributeSelector> Attributes { get { return _attributes; } set { _attributes = value; } }
 
 		private List<TupleReference> _references = new List<TupleReference>();
-		public List<TupleReference> References { get { return _references; } }
+		public List<TupleReference> References { get { return _references; } set { _references = value; } }
 
 		private List<TupleKey> _keys = new List<TupleKey>();
-		public List<TupleKey> Keys { get { return _keys; } }
+		public List<TupleKey> Keys { get { return _keys; } set { _keys = value; } }
 
 		public override string ToString()
 		{
@@ -777,7 +779,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class AttributeSelector : Statement, ISymbol
 	{
-		public QualifiedIdentifier Name { get; set; }
+		public ID Name { get; set; }
 
 		public Expression Value { get; set; }
 
@@ -813,7 +815,7 @@ namespace Ancestry.QueryProcessor.Parse
 	public class FunctionSelector : Expression
 	{
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
-		public List<FunctionParameter> Parameters { get { return _parameters; } }
+		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
 
 		public Expression Expression { get; set; }
 
@@ -851,7 +853,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class IdentifierExpression : Expression
 	{
-		public QualifiedIdentifier Target { get; set; }
+		public ID Target { get; set; }
 
 		public override string ToString()
 		{
@@ -966,7 +968,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
-	public class QualifiedIdentifier : Statement
+	public class ID : Statement
 	{
 		public bool IsRooted { get; set; }
 
@@ -977,9 +979,9 @@ namespace Ancestry.QueryProcessor.Parse
 			return (IsRooted ? "\\" : "") + String.Join("\\", Components);
 		}
 
-		public static QualifiedIdentifier FromComponents(params string[] components)
+		public static ID FromComponents(params string[] components)
 		{
-			return new QualifiedIdentifier { Components = components };
+			return new ID { Components = components };
 		}
 	}
 }

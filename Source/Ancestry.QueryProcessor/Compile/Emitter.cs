@@ -56,11 +56,19 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public void SaveAssembly()
 		{
-			_module.CreateGlobalFunctions();
-			if (Debugger.IsAttached)
-				_assembly.Save(_assemblyName + ".dll");
+			try
+			{
+				_module.CreateGlobalFunctions();
+				if (Debugger.IsAttached)
+					_assembly.Save(_assemblyName + ".dll");
 
-			//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
+				//var pdbGenerator = _debugOn ? System.Runtime.CompilerServices.DebugInfoGenerator.CreatePdbGenerator() : null;
+			}
+			catch (Exception e)
+			{
+				System.Diagnostics.Debug.WriteLine(e.ToString());
+				// Don't rethrow.  Non-critical.
+			}
 		}
 
 		public TypeBuilder BeginModule(string name)
@@ -78,22 +86,16 @@ namespace Ancestry.QueryProcessor.Compile
 			return module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);
 		}
 
-		public System.Type DeclareEnum(TypeBuilder module, string name, IEnumerable<string> values)
+		public TypeBuilder DeclareEnum(TypeBuilder module, string name)
 		{
 			var enumType = module.DefineNestedType(name, TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
 			enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
-			var i = 0;
-			foreach (var value in values)
-			{
-				FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
-				field.SetConstant(i++);
-			}
-			return enumType.CreateType();
+			return enumType;
 		}
 
 		public FieldBuilder DeclareConst(TypeBuilder module, string name, object value, System.Type type)
 		{
-			if (type.IsValueType || typeof(String).IsAssignableFrom(type))
+			if ((type.IsValueType || typeof(String).IsAssignableFrom(type)) && IsConstable(type))
 			{
 				var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
 				constField.SetConstant(value);
@@ -101,88 +103,38 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 			else
 			{
-				//var readOnlyField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly);
-				// construct value types through constructor
+				var readOnlyField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly);
+				// construct types through constructor
+
+				// TODO: finish - need callback to emit get logic
+				var staticConstructor = module.DefineConstructor(MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard, new System.Type[] { });
+				//staticConstructor
 				throw new NotImplementedException();
 			}
 		}
 
-		public MethodBuilder DeclareMethod(TypeBuilder module, string name, LambdaExpression expression)
+		private bool IsConstable(System.Type type)
 		{
-			var methodBuilder = module.DefineMethod(name, MethodAttributes.Static | MethodAttributes.Public);
-			expression.CompileToMethod(methodBuilder);
-			return methodBuilder;
-		}
-
-		public ExpressionContext EmitLiteral(MethodContext method, object value, BaseType typeHint)
-		{
-			if (value == null)
-			{
-				method.IL.Emit(OpCodes.Ldnull);
-				return new ExpressionContext(typeHint);
-			}
-			switch (value.GetType().ToString())
+			switch (type.ToString())
 			{
 				case "System.Boolean":
-					method.IL.Emit(((bool)value) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-					return new ExpressionContext(SystemTypes.Boolean);
-				case "System.DateTime":
-					method.IL.Emit(OpCodes.Ldc_I8, ((DateTime)value).Ticks);
-					method.IL.Emit(OpCodes.Newobj, ReflectionUtility.DateTimeTicksConstructor);
-					break;
-				case "System.TimeSpan":
-					method.IL.Emit(OpCodes.Ldc_I8, ((TimeSpan)value).Ticks);
-					method.IL.Emit(OpCodes.Newobj, ReflectionUtility.TimeSpanTicksConstructor);
-					break;
-				case "System.Version":
-					method.EmitVersion((Version)value);
-					break;
-				case "System.String":
-					method.IL.Emit(OpCodes.Ldstr, (string)value);
-					return new ExpressionContext(SystemTypes.String);
-				case "System.Int32":
-					method.IL.Emit(OpCodes.Ldc_I4, (int)value);
-					return new ExpressionContext(SystemTypes.Integer);
-				case "System.Int64":
-					method.IL.Emit(OpCodes.Ldc_I8, (long)value);
-					return new ExpressionContext(SystemTypes.Long);
-				case "System.Double":
-					method.IL.Emit(OpCodes.Ldc_R8, (double)value);
-					break;
 				case "System.Char":
-					method.IL.Emit(OpCodes.Ldc_I4, (char)value);
-					break;
-				default: throw new NotSupportedException(String.Format("Literal type {0} not yet supported.", value.GetType().ToString()));
+				case "System.Byte":
+				case "System.SByte":
+				case "System.Int16":
+				case "System.UInt16":
+				case "System.Int32":
+				case "System.UInt32":
+				case "System.Int64":
+				case "System.UInt64":
+				case "System.Single":
+				case "System.Double":
+				case "System.DateTime":
+				case "System.String":
+					return true;
+				default:
+					return false;
 			}
-			return new ExpressionContext(new ScalarType(value.GetType()));
-		}
-
-		public static void EmitName(MethodContext method, Parse.Statement statement, string[] components)
-		{
-			// var nameVar = new Name();
-			var nameVar = method.DeclareLocal(statement, typeof(Name), null);
-			method.IL.Emit(OpCodes.Ldloca, nameVar);
-			method.IL.Emit(OpCodes.Initobj, typeof(Name));
-
-			// <stack> = new string[components.Length];
-			method.IL.Emit(OpCodes.Ldloca, nameVar);
-			method.IL.Emit(OpCodes.Ldc_I4, components.Length);
-			method.IL.Emit(OpCodes.Newarr, typeof(string));
-
-			for (int i = 0; i < components.Length; i++)
-			{
-				// <stack>[i] = components[i]
-				method.IL.Emit(OpCodes.Dup);
-				method.IL.Emit(OpCodes.Ldc_I4, i);
-				method.IL.Emit(OpCodes.Ldstr, components[i]);
-				method.IL.Emit(OpCodes.Stelem_Ref);
-			}
-
-			// nameVar.Components = <stack>
-			method.IL.Emit(OpCodes.Stfld, ReflectionUtility.NameComponents);
-
-			// return nameVar;
-			method.IL.Emit(OpCodes.Ldloc, nameVar);
 		}
 
 		public System.Type EndModule(TypeBuilder module)
@@ -410,9 +362,9 @@ namespace Ancestry.QueryProcessor.Compile
 			if (ReflectionUtility.IsTupleType(native))
 				return TupleTypeFromNative(native);
 			if (ReflectionUtility.IsSet(native))
-				return new SetType { Of = TypeFromNative(native.GenericTypeArguments[0]) };
+				return new SetType(TypeFromNative(native.GenericTypeArguments[0]));
 			if (ReflectionUtility.IsNary(native))
-				return new ListType { Of = TypeFromNative(native.GenericTypeArguments[0]) };
+				return new ListType(TypeFromNative(native.GenericTypeArguments[0]));
 			BaseType scalarType;
 			if (_options.ScalarTypes == null || !_options.ScalarTypes.TryGetValue(native.ToString(), out scalarType))
 				return new ScalarType(native);

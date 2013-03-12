@@ -12,7 +12,7 @@ namespace Ancestry.QueryProcessor
 		public List<Using> DefaultUsings = 
 			new List<Using> 
 			{ 
-				new Using { Target = new QualifiedIdentifier { Components = new string[] { "System" } } } 
+				new Using { Target = new ID { Components = new string[] { "System" } } } 
 			};
 
 		public RequestedSla RequestedSla;

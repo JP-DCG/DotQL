@@ -31,8 +31,14 @@ namespace Ancestry.QueryProcessor.Runtime
 
 		public static bool operator ==(ListEx<T> left, ListEx<T> right)
 		{
-			return Object.ReferenceEquals(left, right)
-				|| left.SequenceEqual(right);
+			return Object.ReferenceEquals(left, right) 
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.SequenceEqual(right)
+				);
 		}
 
 		public static bool operator !=(ListEx<T> left, ListEx<T> right)

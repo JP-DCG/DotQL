@@ -35,7 +35,13 @@ namespace Ancestry.QueryProcessor.Type
 		public static bool operator==(TupleKey left, TupleKey right)
 		{
 			return Object.ReferenceEquals(left, right) 
-				|| left.AttributeNames.SequenceEqual(right.AttributeNames);
+				|| 
+				(
+					!Object.ReferenceEquals(right, null) 
+						&& !Object.ReferenceEquals(left, null)
+						&& left.GetType() == right.GetType() 
+						&& left.AttributeNames.SequenceEqual(right.AttributeNames)
+				);
 		}
 
 		public static bool operator!=(TupleKey left, TupleKey right)
@@ -45,7 +51,7 @@ namespace Ancestry.QueryProcessor.Type
 
 		public static TupleKey FromParseKey(Parse.TupleKey key)
 		{
-			return new TupleKey { AttributeNames = (from an in key.AttributeNames select Name.FromQualifiedIdentifier(an)).ToArray() };
+			return new TupleKey { AttributeNames = (from an in key.AttributeNames select Name.FromID(an)).ToArray() };
 		}
 	}
 }

@@ -35,7 +35,7 @@ namespace Ancestry.QueryProcessor.Service
 			for (int i = 0; i < configuration.DefaultUsings.Count; i++)
 			{
 				var u = configuration.DefaultUsings[i];
-				settings.DefaultOptions.DefaultUsings.Add(new Parse.Using { Target = Name.FromNative(u.Name).ToQualifiedIdentifier(), Version = Version.Parse(u.Version) });
+				settings.DefaultOptions.DefaultUsings.Add(new Parse.Using { Target = Name.FromNative(u.Name).ToID(), Version = Version.Parse(u.Version) });
 			}
 
 			// TODO: load more settings from configuration
