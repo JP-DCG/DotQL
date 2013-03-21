@@ -85,6 +85,16 @@ namespace Ancestry.QueryProcessor.Compile
 			return Runtime.Runtime.GetModulesRepository(_options.Factory).Get(null, null);
 		}
 
+		private static void EmitFactoryArgument(MethodContext method)
+		{
+			method.IL.Emit(OpCodes.Ldarg_1);
+		}
+
+		private static void EmitArgsArgument(MethodContext method)
+		{
+			method.IL.Emit(OpCodes.Ldarg_0);
+		}
+
 		private BaseType CompileScript(MethodContext method, Parse.Script script)
 		{
 			_importFrame = new Frame();
@@ -266,7 +276,7 @@ namespace Ancestry.QueryProcessor.Compile
 			initializer.EmitGet(method);
 			if (type != initializer.Type)
 				Convert(initializer, type).EmitGet(method);
-			method.IL.Emit(OpCodes.Ldarg_0);	// args
+			EmitArgsArgument(method);
 			method.EmitName(declaration.Name, name.Components);	// name
 			method.IL.EmitCall(OpCodes.Call, ReflectionUtility.RuntimeGetInitializer.MakeGenericMethod(nativeType), null);
 			method.IL.Emit(OpCodes.Stloc, variable);
@@ -285,7 +295,7 @@ namespace Ancestry.QueryProcessor.Compile
 			method.IL.Emit(OpCodes.Ldtoken, moduleType);
 			method.IL.EmitCall(OpCodes.Call, ReflectionUtility.TypeGetTypeFromHandle, null);	// Module class
 
-			method.IL.Emit(OpCodes.Ldarg_0);	// factory
+			EmitFactoryArgument(method);	// factory
 			
 			method.IL.EmitCall(OpCodes.Call, typeof(Runtime.Runtime).GetMethod("DeclareModule"), null);
 		}
@@ -293,6 +303,8 @@ namespace Ancestry.QueryProcessor.Compile
 		private System.Type TypeFromModule(Frame frame, Parse.ModuleDeclaration moduleDeclaration)
 		{
 			var local = AddFrame(frame, moduleDeclaration);
+			var members = new List<Action<MethodContext>>();
+			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
 
 			// Gather the module's symbols
 			foreach (var member in moduleDeclaration.Members)
@@ -314,12 +326,7 @@ namespace Ancestry.QueryProcessor.Compile
 				//	&& ((Parse.SetType)varType).Type is Parse.TupleType
 				//)
 				//	EnsureTupleTypeSymbols(frame, (Parse.TupleType)((Parse.SetType)varType).Type);
-			}
 
-			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
-
-			foreach (var member in moduleDeclaration.Members)
-			{
 				switch (member.GetType().Name)
 				{
 					case "VarMember":
@@ -329,7 +336,7 @@ namespace Ancestry.QueryProcessor.Compile
 						var native = compiledType.GetNative(_emitter);
 						if (native.ContainsGenericParameters)
 							throw new NotImplementedException("Generic types are not currently supported for variables.");
-						var field = _emitter.DeclareVariable(module, member.Name.ToString(), native);
+						var field = module.DefineField(member.Name.ToString(), typeof(Storage.IRepository<>).MakeGenericType(native), FieldAttributes.Public);
 						var context = 
 							new ExpressionContext
 							(
@@ -440,6 +447,32 @@ namespace Ancestry.QueryProcessor.Compile
 				_emitter.ImportType(methodInfo.ReturnType);
 				foreach (var parameter in methodInfo.GetParameters())
 					_emitter.ImportType(parameter.ParameterType);
+
+				var functionType = FunctionType.FromMethod(methodInfo, _emitter);
+				var delegateType = 
+					System.Linq.Expressions.Expression.GetFuncType
+					(
+						(from p in methodInfo.GetParameters() select p.ParameterType)
+							.Union(new[] { methodInfo.ReturnType }).ToArray()
+					);
+
+				var context = 
+					new ExpressionContext
+					(
+						new Parse.IdentifierExpression { Target = Name.FromNative(methodInfo.Name).ToID() },
+						functionType,
+						Characteristic.Constant,
+						m =>
+						{
+							if (!methodInfo.IsStatic)
+								m.IL.Emit(OpCodes.Ldloc, moduleVar);	// Instance
+						}
+					)
+					{
+						Member = methodInfo
+					};
+
+				_contextsBySymbol.Add(methodInfo, context);
 			}
 
 			// Discover enums
@@ -520,14 +553,17 @@ namespace Ancestry.QueryProcessor.Compile
 				frame.Add(use, moduleName + Name.FromNative(field.Name), field);
 				_emitter.ImportType(field.FieldType);
 				var type = _emitter.TypeFromNative(field.FieldType);
-				var context =
+				_contextsBySymbol.Add
+				(
+					field,
 					new ExpressionContext
 					(
 						null,
 						type,
 						Characteristic.Constant,
 						null
-					);
+					)
+				);
 			}
 
 			// Build code to construct instance and assign to variable
@@ -537,7 +573,7 @@ namespace Ancestry.QueryProcessor.Compile
 			{
 				// <instance>.<field> = factory.GetRepository(moduleType, Name.FromNative(new string[] { field.Name }))
 				method.IL.Emit(OpCodes.Dup);
-				method.IL.Emit(OpCodes.Ldarg_1);
+				EmitFactoryArgument(method);
 				method.IL.Emit(OpCodes.Ldtoken, moduleType);
 				method.IL.EmitCall(OpCodes.Call, ReflectionUtility.TypeGetTypeFromHandle, null);
 				method.IL.Emit(OpCodes.Ldc_I4_1);
@@ -601,6 +637,8 @@ namespace Ancestry.QueryProcessor.Compile
 							result.EmitGet(m);
 
 							m.IL.EndScope();
+
+							m.IL.Emit(OpCodes.Ldloc, resultVariable);
 						}
 					);
 			}
@@ -629,7 +667,7 @@ namespace Ancestry.QueryProcessor.Compile
 				var enumeratorType = typeof(IEnumerator<>).MakeGenericType(nativeElementType);
 
 				// Add local frame and symbol
-				var local = AddFrame(frame, expression);
+				var local = AddFrame(frame, forClause);
 				local.Add(forClause.Name, forClause);
 				_contextsBySymbol.Add
 				(
@@ -647,15 +685,20 @@ namespace Ancestry.QueryProcessor.Compile
 				var nested = CompileForClause(local, index + 1, expression);
 
 				// Determine the result type
-				var resultType = 
-					nested.Type is NaryType 
+				var resultType =
+					nested.Type is NaryType && index < expression.ForClauses.Count - 1
 						? // force to list if not iterating a set
 						(
 							!(forExpression.Type is SetType) 
 								? (BaseType)new ListType(((NaryType)nested.Type).Of) 
 								: nested.Type
 						)
-						: new SetType(nested.Type);
+						: 
+						(
+							!(forExpression.Type is SetType) 
+								? (BaseType)new ListType(nested.Type) 
+								: new SetType(nested.Type)
+						);
 				
 				ExpressionContext whereResult = null;
 				if (expression.WhereClause != null)
@@ -704,6 +747,8 @@ namespace Ancestry.QueryProcessor.Compile
 								m.IL.Emit(OpCodes.Brfalse, loopStart);
 							}
 
+							nested.EmitGet(m);
+
 							m.IL.Emit(OpCodes.Br, loopStart);
 							m.IL.MarkLabel(loopEnd);
 						}
@@ -740,13 +785,15 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private ExpressionContext CompileClausedReturn(Frame frame, Parse.ClausedExpression expression, BaseType typeHint = null)
 		{
+			var local = frame;
 			var letContexts = new Dictionary<Parse.LetClause, ExpressionContext>();
 			var letVars = new Dictionary<Parse.LetClause, LocalBuilder>();
 
 			// Compile and define a symbol for each let
 			foreach (var let in expression.LetClauses)
 			{
-				var letResult = CompileExpression(frame, let.Expression);
+				local = AddFrame(local, let);
+				var letResult = CompileExpression(local, let.Expression);
 				letContexts.Add(let, letResult);
 
 				_contextsBySymbol.Add
@@ -760,11 +807,11 @@ namespace Ancestry.QueryProcessor.Compile
 						m => { m.IL.Emit(OpCodes.Ldloc, letVars[let]); }
 					)
 				);
-				frame.Add(let.Name, let);
+				local.Add(let.Name, let);
 			}
 
 			// Compile main expression
-			var main = CompileExpression(frame, expression.Expression, typeHint);
+			var main = CompileExpression(local, expression.Expression, typeHint);
 
 			// Add the expression to the body
 			return 
@@ -807,15 +854,8 @@ namespace Ancestry.QueryProcessor.Compile
 				case "SetSelector": return CompileSetSelector(frame, (Parse.SetSelector)expression, typeHint);
 				case "FunctionSelector": return CompileFunctionSelector(frame, (Parse.FunctionSelector)expression, typeHint);
 				case "CallExpression": return CompileCallExpression(frame, (Parse.CallExpression)expression, typeHint);
-				case "RestrictExpression": return CompileRestrictExpression(frame, (Parse.RestrictExpression)expression, typeHint);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
-		}
-
-		private ExpressionContext CompileRestrictExpression(Frame frame, Parse.RestrictExpression restrictExpression, BaseType typeHint)
-		{
-			var left = CompileExpression(frame, restrictExpression.Expression, typeHint);
-			return left.Type.CompileRestrictExpression(this, frame, left, restrictExpression, typeHint);
 		}
 
 		public ExpressionContext CompileFunctionSelector(Frame frame, Parse.FunctionSelector functionSelector, BaseType typeHint)
@@ -831,12 +871,13 @@ namespace Ancestry.QueryProcessor.Compile
 			var type = new FunctionType();
 
 			// Compile each parameter and define the parameter symbols
-			var index = 0;
+			var index = 0;	
 			foreach (var p in functionSelector.Parameters)
 			{
 				local.Add(p.Name, p);
 				var parameter = new FunctionParameter { Name = Name.FromID(p.Name), Type = CompileTypeDeclaration(_importFrame, p.Type) };
 				type.Parameters.Add(parameter);
+				var i = index;	// prevent closure capture of index
 				_contextsBySymbol.Add
 				(
 					p,
@@ -845,15 +886,52 @@ namespace Ancestry.QueryProcessor.Compile
 						functionSelector,
 						parameter.Type,
 						Characteristic.Default,
-						m => { m.IL.Emit(OpCodes.Ldarg, index); }
+						m => { m.IL.Emit(OpCodes.Ldarg, i); }
 					)
 				);
 				++index;
 			}
 
+			// If a return type is specified, define "self"
+			MethodContext innerMethod = null;
+			if (functionSelector.ReturnType != null)
+			{
+				type.Type = CompileTypeDeclaration(frame, functionSelector.ReturnType);
+				var selfSymbol = new Object();
+				local.Add(functionSelector, Name.FromNative(Parse.ReservedWords.Self), selfSymbol);
+				_contextsBySymbol.Add
+				(
+					selfSymbol,
+					new ExpressionContext
+					(
+						null,
+						type,
+						Characteristic.Default,
+						m =>
+						{
+							var delegateType = type.GetNative(_emitter);
+							m.IL.Emit(OpCodes.Ldnull);	// instance
+							m.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
+							m.IL.Emit(OpCodes.Newobj, delegateType.GetConstructor(new[] { typeof(object), typeof(IntPtr) }));
+						}
+					)
+				);
+			}					 
+
 			// Compile the body
 			var expression = CompileExpression(local, functionSelector.Expression, typeHint);
-			type.Type = expression.Type;
+			
+			if (type.Type != null)
+			{
+				// Convert the result if necessary
+				if (type.Type != expression.Type)
+					expression = Convert(expression, type.Type);
+			}
+			else
+			{
+				// Infer the type
+				type.Type = expression.Type;
+			}
 
 			// Determine the native param types
 			var nativeParamTypes = functionSelector.Parameters.Select((p, i) => type.Parameters[i].Type.GetNative(_emitter)).ToArray();
@@ -869,7 +947,7 @@ namespace Ancestry.QueryProcessor.Compile
 					{	
 						// Create a new private method within the same type as the current method
 						var typeBuilder = (TypeBuilder)m.Builder.DeclaringType;
-						var innerMethod = new MethodContext
+						innerMethod = new MethodContext
 						(
 							typeBuilder.DefineMethod("Function" + functionSelector.GetHashCode(), MethodAttributes.Private | MethodAttributes.Static, nativeReturnType, nativeParamTypes)
 						);
@@ -887,66 +965,11 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private ExpressionContext CompileCallExpression(Frame frame, Parse.CallExpression callExpression, BaseType typeHint)
 		{
-			/* 
-			 * Functions are implemented as delegates if referencing a variable, or as methods if referencing a constant.
-			 * The logical type will always be a FunctionType, but the native type with either be a MethodInfo
-			 * or a Delegate.
-			 */
-
-			// Compile expression
-			var expression = CompileExpression(frame, callExpression.Expression);
-			if (!(expression.Type is FunctionType))
-				throw new CompilerException(callExpression.Expression, CompilerException.Codes.CannotInvokeNonFunction);
-
-			// Compile arguments
-			var args = new ExpressionContext[callExpression.Arguments.Count];
-			for (var i = 0; i < callExpression.Arguments.Count; i++)
-				args[i] = CompileExpression(frame, callExpression.Arguments[i]);
-
-			return 
-				new ExpressionContext
-				(
-					callExpression,
-					expression.Type,
-					expression.Characteristics,
-					m =>
-					{
-						if (expression.Member != null)
-						{
-							var methodType = (MethodInfo)(expression.Member);
-
-							// Resolve generic arguments
-							if (methodType.ContainsGenericParameters)
-							{
-								var genericArgs = methodType.GetGenericArguments();
-								var resolved = new System.Type[genericArgs.Length];
-								if (callExpression.TypeArguments.Count > 0)
-								{
-									for (var i = 0; i < resolved.Length; i++)
-										resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(_emitter);
-								}
-								else
-								{
-									var parameters = methodType.GetParameters();
-									for (var i = 0; i < parameters.Length; i++)
-										DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(_emitter));
-									// TODO: Assert that all type parameters are resolved
-								}
-								methodType = methodType.MakeGenericMethod(resolved);
-								// http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
-							}
-							m.IL.EmitCall(OpCodes.Call, methodType, null);
-						}
-						else
-						{
-							var delegateType = expression.Type.GetNative(_emitter);
-							m.IL.EmitCall(OpCodes.Callvirt, delegateType.GetMethod("Invoke"), null);
-						}
-					}
-				);
+			var function = CompileExpression(frame, callExpression.Function);
+			return function.Type.CompileCallExpression(this, frame, function, callExpression, typeHint);
 		}
 
-		private void DetermineTypeParameters(Parse.Statement statement, System.Type[] resolved, System.Type parameterType, System.Type argumentType)
+		public void DetermineTypeParameters(Parse.Statement statement, System.Type[] resolved, System.Type parameterType, System.Type argumentType)
 		{
 			// If the given parameter contains an unresolved generic type parameter, attempt to resolve using actual arguments
 			if (parameterType.ContainsGenericParameters)
@@ -963,7 +986,7 @@ namespace Ancestry.QueryProcessor.Compile
 			}
 		}
 
-		private BaseType CompileTypeDeclaration(Frame frame, Parse.TypeDeclaration typeDeclaration)
+		public BaseType CompileTypeDeclaration(Frame frame, Parse.TypeDeclaration typeDeclaration)
 		{
 			switch (typeDeclaration.GetType().Name)
 			{

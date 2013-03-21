@@ -121,11 +121,6 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		public virtual ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
-		{
-			throw new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Restrict, GetType());
-		}
-
 		protected Exception NotSupported(Parse.BinaryExpression expression)
 		{
 			return new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, expression.Operator, GetType());
@@ -369,6 +364,11 @@ namespace Ancestry.QueryProcessor.Type
 		public virtual ExpressionContext Convert(ExpressionContext expression, BaseType target)
 		{
 			throw new NotImplementedException(String.Format("Conversion from {0} to {1} is not supported.", expression.Type, target));
+		}
+
+		public virtual ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint)
+		{
+			throw new CompilerException(callExpression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Invoke, GetType());
 		}
 	}
 }

@@ -33,18 +33,19 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public void EmitVersion(Version version)
 		{
-			var i = 1;
+			var types = new List<System.Type>() { typeof(int), typeof(int) };
 			IL.Emit(OpCodes.Ldc_I4, version.Major);
-			if (version.Minor >= 0)
-				IL.Emit(OpCodes.Ldc_I4, version.Minor);
+			IL.Emit(OpCodes.Ldc_I4, version.Minor);
 			if (version.Build >= 0)
+			{
 				IL.Emit(OpCodes.Ldc_I4, version.Build);
-			if (version.Revision >= 0)
-				IL.Emit(OpCodes.Ldc_I4, version.Revision);
-
-			var types = new List<System.Type>() { typeof(int) };
-			while (types.Count < i)
 				types.Add(typeof(int));
+			}
+			if (version.Revision >= 0)
+			{
+				IL.Emit(OpCodes.Ldc_I4, version.Revision);
+				types.Add(typeof(int));
+			}
 			
 			IL.Emit(OpCodes.Newobj, typeof(Version).GetConstructor(types.ToArray()));
 		}

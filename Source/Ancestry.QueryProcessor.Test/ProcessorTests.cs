@@ -21,7 +21,7 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			var result = processor.Evaluate(@"//Nothing but a comment");
-			Assert.IsNull(result);
+			Assert.IsNull(result.Result);
 		}
 
 		[TestMethod]
@@ -30,8 +30,8 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 
 			var result = processor.Evaluate("var x := 5 return x", new Dictionary<string, object> { { "x", 10} });
-			Assert.IsTrue(result is int);
-			Assert.AreEqual(10, result);
+			Assert.IsTrue(result.Type is Type.BaseIntegerType);
+			Assert.AreEqual(10, result.Result);
 		}
 	}
 }

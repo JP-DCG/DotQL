@@ -11,6 +11,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public const string Args = "args";
 		public const string Value = "value";
 		public const string Index = "index";
+		public const string Self = "self";
 
 		// Also keywords
 		public const string TypeOf = "typeof";

@@ -76,11 +76,6 @@ namespace Ancestry.QueryProcessor.Compile
 			return _module.DefineType(name, TypeAttributes.Class | TypeAttributes.Public);
 		}
 
-		public FieldBuilder DeclareVariable(TypeBuilder module, string name, System.Type type)
-		{
-			return module.DefineField(name, typeof(Storage.IRepository<>).MakeGenericType(type), FieldAttributes.Public);
-		}
-
 		public FieldBuilder DeclareTypeDef(TypeBuilder module, string name, System.Type type)
 		{
 			return module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);

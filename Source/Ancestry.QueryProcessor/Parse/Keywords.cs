@@ -50,8 +50,8 @@ namespace Ancestry.QueryProcessor.Parse
         public const string BitwiseAnd = "&";
         public const string BitwiseOr = "|";
         public const string BitwiseXor = "^";
-        public const string ShiftLeft = "<<";
-        public const string ShiftRight = ">>";
+        public const string ShiftLeft = "shl";
+        public const string ShiftRight = "shr";
         public const string Equal = "=";
         public const string NotEqual = "<>";
         public const string Less = "<";
@@ -74,7 +74,7 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Extract = "@";
         public const string ExtractSingleton = "@@";
 		public const string Dereference = ".";
-		public const string Embed = ",";
+		public const string Embed = "<<";
 		public const string BeginList = "[";
 		public const string EndList = "]";
 		public const string BeginTupleSet = "{";
@@ -83,10 +83,10 @@ namespace Ancestry.QueryProcessor.Parse
 		public const string IntervalValue = "..";
 		public const string Assignment = ":=";
 		public const string IfNull = "??";
-		public const string Function = "=>";
 		public const string Invoke = "->";
 		public const string AttributeSeparator = ":";
-		public const string Restrict = "?";
+		public const string Separator = ",";
+		public const string TypeArguments = "`";
 		public const string Optional = "?";
 		public const string Required = "!";
 

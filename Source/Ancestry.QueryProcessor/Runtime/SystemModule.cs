@@ -11,8 +11,8 @@ namespace Ancestry.QueryProcessor.Runtime
 	public class SystemModule
 	{
 		public static readonly Boolean Boolean;
-		public static readonly Int32 Integer;
-		public static readonly Int64 Long;
+		public static readonly Int32 Int32;
+		public static readonly Int64 Int64;
 		public static readonly Char Char;
 		public static readonly String String;
 		// TODO: public static readonly Date Date;

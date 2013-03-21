@@ -28,7 +28,7 @@ namespace Ancestry.QueryProcessor.Sql.Test
 		public void TestSelectAll()
 		{
 			dynamic actual = _processor.Evaluate("using Test 1.0.0 return Parts");
-			actual = Enumerable.ToList(actual);
+			actual = Enumerable.ToList(actual.Result);
 			Assert.IsTrue(actual.Count > 0);
 			Assert.IsNotNull(actual[0].ID);
 		}

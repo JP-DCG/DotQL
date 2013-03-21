@@ -3,21 +3,21 @@
     Customers: 
     {
         { 
-			ID: Integer 
-			City: String 
-			ref Orders{ ID } Orders{ CustomerID } 
+			ID: Int32, 
+			City: String,
+			ref Orders{ ID } Orders{ CustomerID },
 			key { ID } 
 		}
-	}
+	},
 
 	Orders: 
 	{ 
 		{ 
-			ID: Integer  
-			CustomerID: Integer  
-			On: DateTime  
-			ref Customer{ CustomerID } Customers{ ID }  
-			ref Items{ ID } OrderItems{ OrderID } 
+			ID: Int32,
+			CustomerID: Int32,
+			On: DateTime,
+			ref Customer{ CustomerID } Customers{ ID },
+			ref Items{ ID } OrderItems{ OrderID },
 			key { ID }
 		}
 	}
@@ -25,11 +25,11 @@
 	OrderItems: 
 	{ 
 		{ 
-			OrderID: Integer  
-			PartID: Integer  
-			Quantity: Integer
-			ref Order{ OrderID } Orders{ ID }  
-			ref Part{ PartID } Parts{ ID }
+			OrderID: Int32,
+			PartID: Int32,
+			Quantity: Int32,
+			ref Order{ OrderID } Orders{ ID },
+			ref Part{ PartID } Parts{ ID },
 			key { OrderID PartID }
 		}
 	}
@@ -37,10 +37,10 @@
 	Parts:
 	{
 		{
-			ID: Integer
-			Name: String
-			IsDiscontinued: Boolean
-			ref OrderItems{ ID } OrderItems{ PartID }
+			ID: Int32,
+			Name: String,
+			IsDiscontinued: Boolean,
+			ref OrderItems{ ID } OrderItems{ PartID },
 			key { ID }
 		}
 	}

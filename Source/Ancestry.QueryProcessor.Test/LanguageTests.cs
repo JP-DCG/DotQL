@@ -79,11 +79,13 @@ namespace Ancestry.QueryProcessor.Test
 		public void TupleSelection()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return { x:2 y:'hello' z:2.0 }");
+			dynamic result = processor.Evaluate("return { x:2 y:'hello' z:2.0, a:1 + 5, b:0x11 }");
 			result = result.Result;
 			Assert.AreEqual(2, result.x);
 			Assert.AreEqual("hello", result.y);
 			Assert.AreEqual(2.0, result.z);
+			Assert.AreEqual(6, result.a);
+			Assert.AreEqual(0x11, result.b);
 
 			result = processor.Evaluate("return { : }");
 			Assert.IsNotNull(result);
@@ -244,11 +246,11 @@ namespace Ancestry.QueryProcessor.Test
 		}
 
 		[TestMethod]
-		public void Calls()
+		public void StaticCalls()
 		{
 			var processor = new Processor();
 
-			dynamic result = processor.Evaluate("return { 2 3 4 }->ToList()");
+			dynamic result = processor.Evaluate("return ToList({ 2 3 4 })");
 			Assert.IsTrue(result.Type is ListType);
 			result = Enumerable.ToList(result.Result);
 			Assert.IsTrue(result.Count == 3);
@@ -256,8 +258,24 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[1], 3);
 			Assert.AreEqual(result[2], 4);
 
-			result = processor.Evaluate("return '1955/3/25'dt->AddMonth(2)");
+			result = processor.Evaluate("return AddMonth('1955/3/25'dt, 2)");
 			Assert.AreEqual(DateTime.Parse("1955/5/25"), result.Result);
+		}
+
+		[TestMethod]
+		public void InstanceCalls()
+		{
+			var processor = new Processor();
+
+			dynamic result = processor.Evaluate(@"module Test 1.0.0 { X: Int32, AddX: (y : Int32) return X + y }");
+			result = processor.Evaluate
+			(
+				@"
+					set X := 5
+					return AddX(2)
+				"
+			);
+			Assert.AreEqual(result.Result, 7);
 		}
 
 		[TestMethod]
@@ -265,7 +283,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("let x := 5 let y := 10 return x + y");
-			Assert.AreEqual(15, result);
+			Assert.AreEqual(15, result.Result);
 		}
 
 		[TestMethod]
@@ -273,25 +291,25 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("for i in { 2 3 4 5 6 7 } return i + 10");
-			Assert.IsTrue(result is ISet<int>);
-			result = Enumerable.ToList(result);
+			Assert.IsTrue(result.Type is SetType);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(6, result.Count);
 			Assert.AreEqual(12, result[0]);
 			Assert.AreEqual(17, result[5]);
 
 			result = processor.Evaluate("for i in [ 2 3 4 ] return -i");
-			Assert.IsTrue(!(result is ISet<int>));
-			Assert.AreEqual(3, result.Count);
-			Assert.AreEqual(-2, result[0]);
-			Assert.AreEqual(-4, result[2]);
+			Assert.IsTrue(result.Type is ListType);
+			Assert.AreEqual(3, result.Result.Count);
+			Assert.AreEqual(-2, result.Result[0]);
+			Assert.AreEqual(-4, result.Result[2]);
 
 			result = processor.Evaluate("for i in { 2 4 } for j in [ 0 1 ] return i + j");
-			Assert.IsTrue(!(result is ISet<int>));
-			Assert.AreEqual(4, result.Count);
-			Assert.AreEqual(2, result[0]);
-			Assert.AreEqual(3, result[1]);
-			Assert.AreEqual(4, result[2]);
-			Assert.AreEqual(5, result[3]);
+			Assert.IsTrue(result.Type is ListType);
+			Assert.AreEqual(4, result.Result.Count);
+			Assert.AreEqual(2, result.Result[0]);
+			Assert.AreEqual(3, result.Result[1]);
+			Assert.AreEqual(4, result.Result[2]);
+			Assert.AreEqual(5, result.Result[3]);
 		}
 
 		[TestMethod]
@@ -299,9 +317,9 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("for i in [ 2 3 4 5 6 7 ] where i % 2 = 0 return i");
-			Assert.AreEqual(3, result.Count);
-			Assert.AreEqual(2, result[0]);
-			Assert.AreEqual(6, result[2]);
+			Assert.AreEqual(3, result.Result.Count);
+			Assert.AreEqual(2, result.Result[0]);
+			Assert.AreEqual(6, result.Result[2]);
 		}
 
 		[TestMethod]
@@ -309,8 +327,16 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			// Note: the for clauses in this test are not part of the same claused expression, one is nested in the return expression
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("for i in { 2 4 6 } \r\n return for j in [ 0 1 ] return i + j");
-			result = Enumerable.ToList(result);
+			dynamic result = 
+				processor.Evaluate
+				(
+					@"
+						for i in { 2 4 6 } 
+						return 
+							for j in [ 0 1 ] return i + j
+					"
+				);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(2, result[0][0]);
 			Assert.AreEqual(3, result[0][1]);
@@ -323,7 +349,10 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("let x := 5 return let x := 10 return x");
-			Assert.AreEqual(10, result);
+			Assert.AreEqual(10, result.Result);
+
+			result = processor.Evaluate("let x := 5 let x := 10 return x");
+			Assert.AreEqual(10, result.Result);
 		}
 
 		[TestMethod]
@@ -331,7 +360,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return System\\Modules");
-			result = Enumerable.ToList(result);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(1, result.Count);
 			Assert.AreEqual("System", result[0].Name.ToString());
 		}
@@ -340,56 +369,59 @@ namespace Ancestry.QueryProcessor.Test
 		public void PathRestrictionOfSet()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return { 2 3 4 5 6 }?(value >= 4)");
-			result = Enumerable.ToList(result);
+			dynamic result = processor.Evaluate("return { 2 3 4 5 6 }(value >= 4)");
+			Assert.IsTrue(result.Type is SetType);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(4, result[0]);
 			Assert.AreEqual(6, result[2]);
 
-			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }?(x < 3)");
-			Assert.AreEqual(1, Enumerable.Count(result));
-			Assert.AreEqual(2, Enumerable.First(result).x);
+			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }(x < 3)");
+			Assert.IsTrue(result.Type is SetType);
+			Assert.AreEqual(1, Enumerable.Count(result.Result));
+			Assert.AreEqual(2, Enumerable.First(result.Result).x);
 		}
 
 		[TestMethod]
 		public void PathRestrictionOfList()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return [2 3 4 5 6]?(value >= 4)");
-			result = Enumerable.ToList(result);	// IEnumerable, must still convert to list
+			dynamic result = processor.Evaluate("return [2 3 4 5 6](value >= 4)");
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);	// IEnumerable, must still convert to list
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(4, result[0]);
 			Assert.AreEqual(6, result[2]);
 
-			result = processor.Evaluate("return [{ x:2 } { x:3 } { x:4 }]?(x < 3)");
-			Assert.AreEqual(1, Enumerable.Count(result));
-			Assert.AreEqual(2, Enumerable.First(result).x);
+			result = processor.Evaluate("return [{ x:2 } { x:3 } { x:4 }](x < 3)");
+			Assert.AreEqual(1, Enumerable.Count(result.Result));
+			Assert.AreEqual(2, Enumerable.First(result.Result).x);
 		}
 
 		[TestMethod]
 		public void PathRestrictionOfScalar()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return 5?(value >= 4)");
-			Assert.AreEqual(5, result);
+			dynamic result = processor.Evaluate("return 5(value >= 4)");
+			Assert.AreEqual(5, result.Result);
 
-			result = processor.Evaluate("return 5?(value < 4)");
-			Assert.IsNull(result);
+			result = processor.Evaluate("return 5(value < 4)");
+			Assert.IsNull(result.Result);
 		}
 
 		[TestMethod]
-		public void RestrictOnIndex()
+		public void PathRestrictOnIndex()
 		{
 			var processor = new Processor();
-			dynamic result = processor.Evaluate("return [10 20 30 40]?(index >= 2)");
-			result = Enumerable.ToList(result);
+			dynamic result = processor.Evaluate("return [10 20 30 40](index >= 2)");
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(2, result.Count);
 			Assert.AreEqual(30, result[0]);
 			Assert.AreEqual(40, result[1]);
 
 			//// TODO: enable when set sorted
-			//result = processor.Evaluate("return { 0 20 10 }?(index > 1)");
-			//result = Enumerable.ToList(result);
+			//result = processor.Evaluate("return { 0 20 10 }(index > 1)");
+			//result = Enumerable.ToList(result.Result);
 			//Assert.AreEqual(1, result.Count);
 			//Assert.AreEqual(20, result[0]);
 		}
@@ -399,34 +431,45 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { x: 2 }.(x * 2)");
-			Assert.AreEqual(4, result);
+			Assert.AreEqual(4, result.Result);
 
 			result = processor.Evaluate("return { x: 2 }.{ :x y:x * 2 }");
-			Assert.AreEqual(2, result.x);
-			Assert.AreEqual(4, result.y);
+			Assert.AreEqual(2, result.Result.x);
+			Assert.AreEqual(4, result.Result.y);
 		}
 
 		[TestMethod]
-		public void SetDereference()
+		public void NaryDereference()
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { 2 3 4 }.(value * 5)");
-			result = Enumerable.ToList(result);
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0]);
 			Assert.AreEqual(20, result[2]);
 
 			result = processor.Evaluate("return { 2 3 4 }.{ x:value * 5 }");
-			result = Enumerable.ToList(result);
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0].x);
 			Assert.AreEqual(20, result[2].x);
 
 			result = processor.Evaluate("return { { x:2 } { x:3 } { x:4 } }.(x * 5)");
-			result = Enumerable.ToList(result);
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0]);
 			Assert.AreEqual(20, result[2]);
+
+			result = processor.Evaluate("return [2 2 3].{ x:value * 5 }");
+			Assert.IsTrue(result.Type is ListType);
+			result = Enumerable.ToList(result.Result);	// convert from enumerable
+			Assert.AreEqual(3, result.Count);
+			Assert.AreEqual(10, result[0].x);
+			Assert.AreEqual(10, result[1].x);
+			Assert.AreEqual(15, result[2].x);
 		}
 
 		[TestMethod]
@@ -434,7 +477,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { { x:2 y:'blah' } { x:3 y:'blah2' } { x:4 y:'blah3' } }.(value.x * 5)");
-			result = Enumerable.ToList(result);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(3, result.Count);
 			Assert.AreEqual(10, result[0]);
 			Assert.AreEqual(20, result[2]);
@@ -445,7 +488,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { 10 20 30 40 }.(value + index)");
-			result = Enumerable.ToList(result);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(4, result.Count);
 			Assert.AreEqual(10, result[0]);
 			Assert.AreEqual(43, result[3]);
@@ -456,7 +499,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("return { 10 20 30 40 }.{ v:value i:index }");
-			result = Enumerable.ToList(result);
+			result = Enumerable.ToList(result.Result);
 			Assert.AreEqual(4, result.Count);
 			Assert.AreEqual(10, result[0].v);
 			Assert.AreEqual(0, result[0].i);
@@ -470,10 +513,10 @@ namespace Ancestry.QueryProcessor.Test
 			var processor = new Processor();
 			dynamic result = processor.Evaluate
 			(
-				@"let add := (x:Integer y:Integer)=>x + y	
-				return 5->add(10)"
+				@"let add := (x:Int32 y:Int32) return x + y	
+				return add(5, 10)"
 			);
-			Assert.AreEqual(15, result);
+			Assert.AreEqual(15, result.Result);
 		}
 
 		[TestMethod]
@@ -481,17 +524,18 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("var x := 5 return x");
-			Assert.AreEqual(5, result);
+			Assert.AreEqual(5, result.Result);
 
-			result = processor.Evaluate("var x : Integer := 5 return x");
-			Assert.AreEqual(5, result);
+			result = processor.Evaluate("var x : Int32 := 5 return x");
+			Assert.AreEqual(5, result.Result);
 
-			result = processor.Evaluate("var x : Integer return x");
-			Assert.AreEqual(0, result);
+			result = processor.Evaluate("var x : Int32 return x");
+			Assert.AreEqual(0, result.Result);
 
 			// TODO: conversions
-			//result = processor.Evaluate("var x : int := 5.0 return x");
-			//Assert.AreEqual(5, result);
+			//result = processor.Evaluate("var x : Int32 := 5.0 return x");
+			//Assert.IsTrue(result.Type is BaseIntegerType);
+			//Assert.AreEqual(5, result.Result);
 		}
 
 		[TestMethod]
@@ -499,14 +543,14 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 			dynamic result = processor.Evaluate("var x := 5 set x := 10 return x");
-			Assert.AreEqual(10, result);
+			Assert.AreEqual(10, result.Result);
 
-			result = processor.Evaluate("var x : Integer set x := 10 return x");
-			Assert.AreEqual(10, result);
+			result = processor.Evaluate("var x : Int32 set x := 10 return x");
+			Assert.AreEqual(10, result.Result);
 
 			// TODO: Conversions
-			//result = processor.Evaluate("var x : Integer set x := 10.0 return x");
-			//Assert.AreEqual(10, result);
+			//result = processor.Evaluate("var x : Int32 set x := 10.0 return x");
+			//Assert.AreEqual(10, result.Result);
 		}
 
 		[TestMethod]
@@ -516,24 +560,34 @@ namespace Ancestry.QueryProcessor.Test
 			processor.Execute("module TestModule 1.0.0 { }");
 
 			dynamic result = processor.Evaluate("return Modules");
-			Assert.AreEqual(2, result.Count);
+			Assert.AreEqual(2, result.Result.Count);
 		}
 
 		[TestMethod]
 		public void ModuleSelfReferencing()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { Forward: Int  Int: typedef Integer Backward: { x: Int } }");
+			processor.Execute
+			(
+				@"
+					module TestModule 1.0.0 
+					{ 
+						Forward: Int,  
+						Int: typedef Int32, 
+						Backward: { x: Int } 
+					}
+				"
+			);
 		}
 
 		[TestMethod]
 		public void SimpleModuleVar()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyVar: Integer }");
+			processor.Execute("module TestModule 1.0.0 { MyVar: Int32 }");
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyVar");
-			Assert.AreEqual(0, result);
+			Assert.AreEqual(0, result.Result);
 		}
 
 		[TestMethod]
@@ -543,72 +597,72 @@ namespace Ancestry.QueryProcessor.Test
 			processor.Execute("module TestModule 1.0.0 { MyConst: const 5 }");
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyConst");
-			Assert.AreEqual(5, result);
+			Assert.AreEqual(5, result.Result);
 		}
 
 		[TestMethod]
 		public void SimpleModuleEnum()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyEnum: enum { Red Green } }");
+			processor.Execute("module TestModule 1.0.0 { MyEnum: enum { Red, Green } }");
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 return Green");
-			Assert.AreEqual("Green", result.ToString());
+			Assert.AreEqual("Green", result.Result.ToString());
 		}
 
 		[TestMethod]
 		public void TupleModuleVar()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyTup: { x:Integer }  MyInt: Integer  MySet: { Integer } }");
+			processor.Execute("module TestModule 1.0.0 { MyTup: { x:Int32 },  MyInt: Int32,  MySet: { Int32 } }");
 
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyTup.x");
-			Assert.AreEqual(0, result);
+			Assert.AreEqual(0, result.Result);
 
 			result = processor.Evaluate("using TestModule 1.0.0 return MyInt + 5");
-			Assert.AreEqual(5, result);
+			Assert.AreEqual(5, result.Result);
 
-			result = processor.Evaluate("using TestModule 1.0.0 set MySet := { -5 5 } return MySet?(value > 0)");
-			Assert.AreEqual(1, Enumerable.Count(result));
+			result = processor.Evaluate("using TestModule 1.0.0 set MySet := { -5, 5 } return MySet(value > 0)");
+			Assert.AreEqual(1, Enumerable.Count(result.Result));
 
 			result = processor.Evaluate
 			(
 				@"using TestModule 1.0.0 
-				let f := (x: Integer y: Integer) => return x + y 
-				return { a:MyInt->f(5) b:5->f(MyInt) }"
+				let f := (x: Int32, y: Int32) return x + y 
+				return { a: f(MyInt, 5), b: f(5, MyInt) }"
 			);
-			Assert.AreEqual(5, result.a);
-			Assert.AreEqual(5, result.b);
+			Assert.AreEqual(5, result.Result.a);
+			Assert.AreEqual(5, result.Result.b);
 		}
 
 		[TestMethod]
 		public void TupleModuleTypedef()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyTypedef: typedef { x:Integer y:String key{ x } } }");
+			processor.Execute("module TestModule 1.0.0 { MyTypedef: typedef { x:Int32, y:String, key{ x } } }");
 
-			dynamic result = processor.Evaluate("using TestModule 1.0.0 var v : MyTypedef return v = { x:0 y:\"\" key{ x } }");
-			Assert.IsTrue(result);
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 var v : MyTypedef return v = { x:0, y:\"\", key{ x } }");
+			Assert.IsTrue(result.Result);
 		}
 
 		[TestMethod]
 		public void SimpleModuleFunctionConst()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyFunc: const (x: Integer) => return x + 1 }");
+			processor.Execute("module TestModule 1.0.0 { MyFunc: const (x: Int32) return x + 1 }");
 
-			dynamic result = processor.Evaluate("using TestModule 1.0.0 return 5->MyFunc()");
-			Assert.AreEqual(6, result);
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 return MyFunc(5)");
+			Assert.AreEqual(6, result.Result);
 		}
 
 		[TestMethod]
 		public void SimpleModuleFunctionVar()
 		{
 			var processor = new Processor();
-			processor.Execute("module TestModule 1.0.0 { MyFunc: (x: Integer) => Integer }");
+			processor.Execute("module TestModule 1.0.0 { MyFunc: (x: Int32) return Int32 }");
 
-			dynamic result = processor.Evaluate("using TestModule 1.0.0 set MyFunc := (x: Integer) => return x + 1 return 5->MyFunc()");
-			Assert.AreEqual(6, result);
+			dynamic result = processor.Evaluate("using TestModule 1.0.0 set MyFunc := (x: Int32) return return x + 1 return MyFunc(5)");
+			Assert.AreEqual(6, result.Result);
 		}
 	}
 }

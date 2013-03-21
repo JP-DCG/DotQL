@@ -44,7 +44,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.IsFalse(moduleDeclaration.Members.Any());
 			Assert.AreEqual(moduleDeclaration.Version, Version.Parse("1.2.3"));
 
-			moduleDeclaration = new Parser().Module(new Lexer("module Something 1.2.0 { a: Integer }"));
+			moduleDeclaration = new Parser().Module(new Lexer("module Something 1.2.0 { a: Int32 }"));
 			Assert.IsNotNull(moduleDeclaration);
 			Assert.AreEqual("Something", moduleDeclaration.Name.ToString());
 			Assert.AreEqual(moduleDeclaration.Version, Version.Parse("1.2.0"));
@@ -54,7 +54,7 @@ namespace Ancestry.QueryProcessor.Test
 
 			moduleDeclaration = new Parser().Module(new Lexer(@" module Something 1.0.0
             {
-                    a: Integer
+                    a: Int32
                     b: const 5
             }"));
 			Assert.IsNotNull(moduleDeclaration);
@@ -69,11 +69,11 @@ namespace Ancestry.QueryProcessor.Test
 		[TestMethod]
 		public void ModuleMember_TypeMember()
 		{
-			ModuleMember moduleMember = new Parser().ModuleMember(new Lexer("a: typedef Integer"));
+			ModuleMember moduleMember = new Parser().ModuleMember(new Lexer("a: typedef Int32"));
 			Assert.IsNotNull(moduleMember);
 			Assert.IsInstanceOfType(moduleMember, typeof(TypeMember));
 			Assert.AreEqual("a", moduleMember.Name.ToString());
-			Assert.AreEqual("Integer", ((TypeMember)moduleMember).Type.ToString());
+			Assert.AreEqual("Int32", ((TypeMember)moduleMember).Type.ToString());
 		}
 
 		[TestMethod]
@@ -99,11 +99,11 @@ namespace Ancestry.QueryProcessor.Test
 		[TestMethod]
 		public void ModuleMember_VarMember()
 		{
-			ModuleMember moduleMember = new Parser().ModuleMember(new Lexer("a: Integer"));
+			ModuleMember moduleMember = new Parser().ModuleMember(new Lexer("a: Int32"));
 			Assert.IsNotNull(moduleMember);
 			Assert.IsInstanceOfType(moduleMember, typeof(VarMember));
 			Assert.AreEqual("a", moduleMember.Name.ToString());
-			Assert.AreEqual("Integer", ((VarMember)moduleMember).Type.ToString());
+			Assert.AreEqual("Int32", ((VarMember)moduleMember).Type.ToString());
 		}
 	}
 }

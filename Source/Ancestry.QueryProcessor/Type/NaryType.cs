@@ -41,18 +41,25 @@ namespace Ancestry.QueryProcessor.Type
 			}
 		}
 
-		public override ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		// Restriction
+		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.CallExpression expression, BaseType typeHint)
 		{
 			var memberType = ((NaryType)left.Type).Of;
 			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
 
 			var local = compiler.AddFrame(frame, expression);
 
+			// Validate that there is only one argument
+			if (expression.Arguments.Count != 1)
+				throw new CompilerException(expression, CompilerException.Codes.CannotInvokeNonFunction, left.Type);
+
 			// Prepare index and value symbols
-			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Condition, memberType, memberNative, local);
+			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Arguments[0], memberType, memberNative, local);
 
 			// Compile condition
-			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
+			var condition = compiler.CompileExpression(local, expression.Arguments[0], SystemTypes.Boolean);
+			if (!(condition.Type is BooleanType))
+				throw new CompilerException(expression.Arguments[0], CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
 
 			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
 
@@ -74,11 +81,13 @@ namespace Ancestry.QueryProcessor.Type
 									"Where" + expression.GetHashCode(),
 									MethodAttributes.Private | MethodAttributes.Static,
 									typeof(bool),	// return type
-									new System.Type[] { memberNative, typeof(int) }	// param types
+									indexReferenced ? new System.Type[] { memberNative, typeof(int) } : new System.Type[] { memberNative }	// param types
 								)
 							);
 						condition.EmitGet(innerMethod);
 						innerMethod.IL.Emit(OpCodes.Ret);
+
+						left.EmitGet(m);
 
 						// TODO: Force ordering to left if Set and index is referenced
 
@@ -115,7 +124,7 @@ namespace Ancestry.QueryProcessor.Type
 				new ExpressionContext
 				(
 					null,
-					left.Type,
+					memberType,
 					left.Characteristics,
 					m => { m.IL.Emit(OpCodes.Ldarg_0); }
 				)
@@ -175,10 +184,10 @@ namespace Ancestry.QueryProcessor.Type
 			// Prepare index and value symbols
 			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Right, memberType, memberNative, local);
 
-			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
-
 			// Compile selection
 			var selection = compiler.CompileExpression(local, expression.Right);
+
+			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
 
 			return
 				new ExpressionContext
@@ -198,29 +207,35 @@ namespace Ancestry.QueryProcessor.Type
 									"Select" + expression.GetHashCode(),
 									MethodAttributes.Private | MethodAttributes.Static,
 									selection.ActualNative(compiler.Emitter),	// temporary return type
-									new System.Type[] { memberNative, typeof(int) }	// param types
+									indexReferenced ? new System.Type[] { memberNative, typeof(int) } : new System.Type[] { memberNative }	// param types
 								)
 							);
 						selection.EmitGet(innerMethod);
 						innerMethod.IL.Emit(OpCodes.Ret);
+
+						left.EmitGet(m);
 
 						// TODO: Force ordering of Left if a set and index is referenced
 
 						// Instantiate a delegate pointing to the new method
 						m.IL.Emit(OpCodes.Ldnull);				// instance
 						m.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
+						var funcType =
+							indexReferenced
+								? System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), innerMethod.Builder.ReturnType)
+								: System.Linq.Expressions.Expression.GetFuncType(memberNative, innerMethod.Builder.ReturnType);
 						m.IL.Emit
 						(
 							OpCodes.Newobj,
-							System.Linq.Expressions.Expression.GetFuncType(memberNative, typeof(int), innerMethod.Builder.ReturnType)
-								.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
+							funcType.GetConstructor(new[] { typeof(object), typeof(IntPtr) })
 						);
 
+						funcType = indexReferenced ? typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) : typeof(Func<ReflectionUtility.T, ReflectionUtility.T>);
 						var select =
 							typeof(Enumerable).GetMethodExt
 							(
 								"Select",
-								new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), typeof(Func<ReflectionUtility.T, int, ReflectionUtility.T>) }
+								new System.Type[] { typeof(IEnumerable<ReflectionUtility.T>), funcType }
 							);
 						select = select.MakeGenericMethod(memberNative, innerMethod.Builder.ReturnType);
 			

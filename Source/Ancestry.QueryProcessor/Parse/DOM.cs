@@ -132,7 +132,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return Name + " : enum { " + String.Join(" ", from v in Values select v.ToString()) + " }";
+			return Name + " : enum { " + String.Join(", ", from v in Values select v.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -369,8 +369,8 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "ref " + Name + "{ " + String.Join(" ", from n in SourceAttributeNames select n.ToString()) 
-				+ " } " + Target + "{ " + String.Join(" ", from n in TargetAttributeNames select n.ToString()) + " }";
+			return "ref " + Name + "{ " + String.Join(", ", from n in SourceAttributeNames select n.ToString()) 
+				+ " } " + Target + "{ " + String.Join(", ", from n in TargetAttributeNames select n.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -391,7 +391,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "key { " + String.Join(" ", from a in AttributeNames select a.ToString()) + " }";
+			return "key { " + String.Join(", ", from a in AttributeNames select a.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -413,10 +413,10 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "(" + String.Join(" ", from p in Parameters select p.ToString()) 
-				+ ") => "
-				+ (TypeParameters.Count > 0 ? "<" + String.Join(" ", from tp in TypeParameters select tp.ToString()) + "> " : "")
-				+ ReturnType.ToString();
+			return "(" + String.Join(", ", from p in Parameters select p.ToString()) 
+				+ ")  "
+				+ (TypeParameters.Count > 0 ? "`" + String.Join(", ", from tp in TypeParameters select tp.ToString()) + "` " : "")
+				+ ": " + ReturnType.ToString();
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -519,7 +519,7 @@ namespace Ancestry.QueryProcessor.Parse
 					(from f in ForClauses select f.ToString())
 						.Union(from l in LetClauses select l.ToString())
 						.Union(WhereClause != null ? new[] { "where" + WhereClause.ToString() } : new string[] {})
-						.Union(OrderDimensions.Count > 0 ? new[] { "order (" + String.Join(" ", from o in OrderDimensions select o.ToString()) + ")" } : new string[] {})
+						.Union(OrderDimensions.Count > 0 ? new[] { "order (" + String.Join(", ", from o in OrderDimensions select o.ToString()) + ")" } : new string[] {})
 						.Union(Expression != null ? new[] { "return " + Expression } : new string[] {})
 				);
 		}
@@ -666,7 +666,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class CallExpression : Expression
 	{
-		public Expression Expression { get; set; }
+		public Expression Function { get; set; }
 
 		private List<TypeDeclaration> _typeArguments = new List<TypeDeclaration>();
 		public List<TypeDeclaration> TypeArguments { get { return _typeArguments; } }
@@ -679,45 +679,22 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return 
-				(
-					Argument != null
-						? Argument.ToString()
-						: (Arguments.Count > 0 ? Arguments[0].ToString() : "{ : }")
-				)
-					+ (Argument != null ? "=>" : "->")
-					+ Expression
-					+ (TypeArguments.Count > 0 ? "<" + String.Join(" ", from ta in TypeArguments select ta.ToString()) + ">" : "")
-					+ (Argument == null ? "(" + String.Join(" ", (from a in Arguments select a.ToString()).Skip(1)) + ")" : "");
+			return
+				Function.ToString()
+					+ (TypeArguments.Count > 0 ? "`" + String.Join(", ", from ta in TypeArguments select ta.ToString()) + "`" : "")
+					+ (Argument != null ? "->" + Argument : "")
+					+ (Arguments != null ? "(" + String.Join(", ", from a in Arguments select a.ToString()) + ")" : "");
 		}
 
 		public override IEnumerable<Statement> GetChildren()
 		{
-			yield return Expression;
+			yield return Function;
 			foreach (var ta in TypeArguments)
 				yield return ta;
 			foreach (var a in Arguments)
 				yield return a;
 			if (Argument != null)
 				yield return Argument;
-		}
-	}
-
-	public class RestrictExpression : Expression
-	{
-		public Expression Expression { get; set; }
-
-		public Expression Condition { get; set; }
-
-		public override string ToString()
-		{
-			return Expression.ToString() + "?(" + Condition + ")";
-		}
-
-		public override IEnumerable<Statement> GetChildren()
-		{
-			yield return Expression;
-			yield return Condition;
 		}
 	}
 
@@ -728,7 +705,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "[" + String.Join(" ", from i in Items select i.ToString()) + "]";
+			return "[" + String.Join(", ", from i in Items select i.ToString()) + "]";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -758,7 +735,7 @@ namespace Ancestry.QueryProcessor.Parse
 						? ":"
 						: String.Join
 						(
-							"  ", 
+							", ", 
 							(from a in Attributes select a.ToString())
 							.Union(from r in References select r.ToString())
 							.Union(from k in Keys select k.ToString())
@@ -802,7 +779,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "{ " + String.Join(" ", from i in Items select i.ToString()) + " }";
+			return "{ " + String.Join(", ", from i in Items select i.ToString()) + " }";
 		}
 
 		public override IEnumerable<Statement> GetChildren()
@@ -817,12 +794,14 @@ namespace Ancestry.QueryProcessor.Parse
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
 		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
 
-		public Expression Expression { get; set; }
+		public ClausedExpression Expression { get; set; }
+
+		public TypeDeclaration ReturnType { get; set; }
 
 		public override string ToString()
 		{
-			return "(" + String.Join(" ", from p in Parameters select p.ToString()) + ")"
-				+ " =>\r\n\t" + Expression;
+			return "(" + String.Join(", ", from p in Parameters select p.ToString()) + ")"
+				+ " " + (ReturnType != null ? ReturnType.ToString() : "") + "\r\n\t" + Expression;
 		}
 
 		public override IEnumerable<Statement> GetChildren()

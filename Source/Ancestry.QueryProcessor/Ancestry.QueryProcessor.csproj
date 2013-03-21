@@ -71,7 +71,6 @@
     <Compile Include="Runtime\ListEx.cs" />
     <Compile Include="Runtime\ModuleTuple.cs" />
     <Compile Include="Runtime\Optional.cs" />
-    <Compile Include="Runtime\PreDelegate.cs" />
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\Set.cs" />
     <Compile Include="Runtime\SystemModule.cs" />

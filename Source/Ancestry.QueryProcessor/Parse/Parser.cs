@@ -89,9 +89,9 @@ namespace Ancestry.QueryProcessor.Parse
 			return @using;
 		}
 
-        /*
-                "module" Name : ID "{" Members : [ ModuleMember ]* "}"
-        */
+		/*
+				"module" Name : ID Version : Version "{" Members : [ moduleMember ]^[","] "}"
+		*/
 		public ModuleDeclaration Module(Lexer lexer)
         {
             lexer.NextToken().DebugCheckSymbol(Keywords.Module);
@@ -108,30 +108,33 @@ namespace Ancestry.QueryProcessor.Parse
             lexer.NextToken().CheckSymbol(Keywords.BeginTupleSet);
 
             while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
+			{
 				moduleDeclaration.Members.Add(ModuleMember(lexer));
+				OptionalSeparator(lexer);
+			}
 
 			lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
 
             return moduleDeclaration;
         }
 
-        /*
-            ModuleMember =
-                    TypeMember | EnumMember   | ConstMember | VarMember
-                          
-            TypeMember :=
-                    Name : ID ":" "typedef" Type : TypeDeclaration
-                          
-            EnumMember :=
-                    Name : ID ":" "enum" "{" Values : ID* "}"
-                          
-            ConstMember :=
-                    Name : ID ":" "const" Expression : Expression
-                          
-            VarMember :=
-                    Name : ID ":" Type: TypeDeclaration
-        */
-        public ModuleMember ModuleMember(Lexer lexer)
+		/*
+				moduleMember =
+					TypeMember | EnumMember	| ConstMember | VarMember
+
+				TypeMember :=
+					Name : ID ":" "typedef" Type : typeDeclaration
+
+				EnumMember :=
+					Name : ID ":" "enum" "{" Values : ID^[","] "}"
+
+				ConstMember :=
+					Name : ID ":" "const" Expression : expression
+
+				VarMember :=
+					Name : ID ":" Type: typeDeclaration
+		*/
+		public ModuleMember ModuleMember(Lexer lexer)
         {
 			ModuleMember moduleMember;
 
@@ -160,6 +163,7 @@ namespace Ancestry.QueryProcessor.Parse
 					while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 					{
 						enumMember.Values.Add(ID(lexer, true));
+						OptionalSeparator(lexer);
 					}
 
 					lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
@@ -327,6 +331,8 @@ namespace Ancestry.QueryProcessor.Parse
 					result.SetPosition(beginToken);
 					result.Attributes.Add(attribute);
 
+					OptionalSeparator(lexer);
+
 					// Add remaining attributes
 					if (!lexer[1, false].IsSymbol(Keywords.EndTupleSet))
 						TupleTypeMembers(lexer, result);
@@ -349,6 +355,12 @@ namespace Ancestry.QueryProcessor.Parse
 			}
 		}
 
+		private static void OptionalSeparator(Lexer lexer)
+		{
+			if (lexer[1].IsSymbol(Keywords.Separator))
+				lexer.NextToken();
+		}
+
 		/*
 				( TupleAttribute | TupleReference | TupleKey )*
 		*/
@@ -365,6 +377,7 @@ namespace Ancestry.QueryProcessor.Parse
 					result.Keys.Add((TupleKey)member);
 				else
 					break;
+				OptionalSeparator(lexer);
 			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 		}
 
@@ -413,10 +426,10 @@ namespace Ancestry.QueryProcessor.Parse
 
 		/*
 			FunctionType :=
-				functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration
+				functionParameters [ "<" TypeParameters : typeDeclaration^[","] ">" ] ":" ReturnType : typeDeclaration
 
 			functionParameters =
-				"(" Parameters : [ FunctionParameter ]* ")"
+				"(" Parameters : [ FunctionParameter ]^[","] ")"
 		*/
 		public FunctionType FunctionType(Lexer lexer)
 		{
@@ -427,18 +440,25 @@ namespace Ancestry.QueryProcessor.Parse
 
 			// Parse parameters
 			while (!lexer[1].IsSymbol(Keywords.EndGroup))
+			{
 				result.Parameters.Add(FunctionParameter(lexer));
+				OptionalSeparator(lexer);
+			}
 			lexer.NextToken().CheckSymbol(Keywords.EndGroup);
 
-			lexer.NextToken().CheckSymbol(Keywords.Function);
-
+			// Parse type parameters
 			if (lexer[1].IsSymbol(Keywords.Less))
 			{
 				lexer.NextToken();
 				while (!lexer[1].IsSymbol(Keywords.Greater))
+				{
 					result.TypeParameters.Add(TypeDeclaration(lexer));
+					OptionalSeparator(lexer);
+				}
 				lexer.NextToken();
 			}
+
+			lexer.NextToken().CheckSymbol(Keywords.AttributeSeparator);
 
 			result.ReturnType = TypeDeclaration(lexer);
 
@@ -802,54 +822,52 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				Argument : expression 
-				(
-					( "->" Expression : expression [ "<" TypeArguments : typeDeclaration* ">" ] "(" Arguments : [ expression ]* ")" )
-						| ( "=>" Expression : expression )
+				Function : expression [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
+				( 
+					( "(" Arguments : expression^[","] ")" ) 
+						| ( "->" Argument : expression )
 				)
 		*/
 		public Expression CallExpression(Lexer lexer)
 		{
 			var expression = UnaryExpression(lexer);
 
-			while (lexer[1, false].IsSymbol(Keywords.Invoke) || lexer[1, false].IsSymbol(Keywords.Function))
+			while (lexer[1, false].IsSymbol(Keywords.BeginGroup) || lexer[1, false].IsSymbol(Keywords.Invoke) || lexer[1, false].IsSymbol(Keywords.TypeArguments))
 			{
-				if (lexer[1, false].IsSymbol(Keywords.Invoke))
+				var result = new CallExpression();
+				result.Function = expression;
+				result.SetPosition(lexer);
+
+				// Type arguments
+				if (lexer[1, false].IsSymbol(Keywords.TypeArguments))
 				{
 					lexer.NextToken();
-
-					var result = new CallExpression();
-					result.SetPosition(lexer);
-					result.Arguments.Add(expression);
-					result.Expression = Expression(lexer);
-
-					if (lexer[1].IsSymbol(Keywords.Less))
+					while (!lexer[1].IsSymbol(Keywords.TypeArguments))
 					{
-						lexer.NextToken();
-						while (!lexer[1].IsSymbol(Keywords.Greater))
-							result.TypeArguments.Add(TypeDeclaration(lexer));
-						lexer.NextToken();
+						result.TypeArguments.Add(TypeDeclaration(lexer));
+						OptionalSeparator(lexer);
 					}
+					lexer.NextToken();
+				}
 
-					lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-
-					while (!lexer[1].IsSymbol(Keywords.EndGroup))
-						result.Arguments.Add(Expression(lexer));
-
-					lexer.NextToken().CheckSymbol(Keywords.EndGroup);
-					expression = result;
+				lexer.NextToken();
+				if (lexer[0].IsSymbol(Keywords.Invoke))
+				{
+					// Tuple argument
+					result.Argument = UnaryExpression(lexer);
 				}
 				else
 				{
-					lexer.NextToken();
-				
-					var result = new CallExpression();
-					result.SetPosition(lexer);
-					result.Argument = expression;
-					result.Expression = UnaryExpression(lexer);
-
-					expression = result;
+					// Arguments
+					lexer[0].CheckSymbol(Keywords.BeginGroup);
+					while (!lexer[1].IsSymbol(Keywords.EndGroup))
+					{
+						result.Arguments.Add(Expression(lexer));
+						OptionalSeparator(lexer);
+					}
+					lexer.NextToken().CheckSymbol(Keywords.EndGroup);
 				}
+				expression = result;
 			}
 			return expression;
 		}
@@ -928,11 +946,11 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				Left : expression Operator : ( "." | "@" | "," ) Right : expression
+				( Left : expression Operator : ( "." | "@" | "<<" ) Right : expression )
 		*/
 		public Expression DereferenceExpression(Lexer lexer)
 		{
-			var expression = RestrictExpression(lexer);
+			var expression = TermExpression(lexer);
 
 			while (lexer[1].Type == TokenType.Symbol)
 			{
@@ -941,36 +959,11 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.Dereference:
 					case Keywords.Extract:
 					case Keywords.Embed:
-						expression = AppendToBinaryExpression(lexer, expression, RestrictExpression);
+						expression = AppendToBinaryExpression(lexer, expression, TermExpression);
 						break;
 					default:
 						return expression;
 				}
-			}
-			return expression;
-		}
-
-		/*
-				Expression : expression "?" "(" Condition : expression ")"
-		*/
-		public Expression RestrictExpression(Lexer lexer)
-		{
-			var expression = TermExpression(lexer);
-
-			while (lexer[1].IsSymbol(Keywords.Restrict))
-			{
-				lexer.NextToken();
-				var restrict = new RestrictExpression();
-				restrict.SetPosition(lexer);
-				restrict.Expression = expression;
-
-				lexer.NextToken().CheckSymbol(Keywords.BeginGroup);
-
-				restrict.Condition = Expression(lexer);
-
-				lexer.NextToken().CheckSymbol(Keywords.EndGroup);
-
-				expression = restrict;
 			}
 			return expression;
 		}
@@ -1043,7 +1036,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-			"[" Items : [ Expression ]* "]"
+			"[" Items : [ expression ]^[","] "]"
 		*/
 		public Expression ListSelector(Lexer lexer)
 		{
@@ -1055,6 +1048,7 @@ namespace Ancestry.QueryProcessor.Parse
 			while (!lexer[1].IsSymbol(Keywords.EndList))
 			{
 				result.Items.Add(Expression(lexer));
+				OptionalSeparator(lexer);
 			}
 			lexer.NextToken().CheckSymbol(Keywords.EndList);
 
@@ -1063,13 +1057,13 @@ namespace Ancestry.QueryProcessor.Parse
 
 		/*
 			TupleSelector :=
-				"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
+				"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )^[","] "}"
 
 			TupleAttributeSelector :=
-				Name : ID ":" Value : Expression
+				[ Name : ID ] ":" Value : expression
 
 			SetSelector :=
-				"{" Items : [ Expression ]* "}"
+				"{" Items : [ expression ]^[","] "}"
 		*/
 		public Expression SetOrTupleSelector(Lexer lexer)
 		{
@@ -1116,6 +1110,8 @@ namespace Ancestry.QueryProcessor.Parse
 						result.SetPosition(beginToken);
 						result.Attributes.Add(attribute);
 
+						OptionalSeparator(lexer);
+
 						// Add remaining attributes
 						TupleSelectorMembers(lexer, result);
 					
@@ -1134,7 +1130,10 @@ namespace Ancestry.QueryProcessor.Parse
 
 					// Add remaining items
 					while (lexer[1].Type != TokenType.EOF && !lexer[1].IsSymbol(Keywords.EndTupleSet))
+					{
 						result.Items.Add(Expression(lexer));
+						OptionalSeparator(lexer);
+					}
 
 					lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
 					return result;
@@ -1143,7 +1142,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				( TupleAttributeSelector | TupleReference | TupleKey )*
+				( TupleAttributeSelector | TupleReference | TupleKey )^[","]
 		*/
 		public void TupleSelectorMembers(Lexer lexer, TupleSelector result)
 		{
@@ -1158,19 +1157,20 @@ namespace Ancestry.QueryProcessor.Parse
 					result.Keys.Add((TupleKey)member);
 				else
 					break;
+				OptionalSeparator(lexer);
 			}
 		}
 
 		/*
-				TupleAttribute :=
-					Name : ID ":" Type : typeDeclaration
+			TupleAttribute :=
+				Name : ID ":" Type : typeDeclaration
 
-				TupleReference :=
-					"ref" Name : ID "(" SourceAttributeNames : ID* ")" 
-						Target : ID "(" TargetAttributeNames : ID* ")"	
+			TupleReference :=
+				"ref" Name : ID "{" SourceAttributeNames : ID^[","] "}" 
+					Target : ID "{" TargetAttributeNames : ID^[","] "}"	
 
-				TupleKey :=
-					"key" "(" AttributeNames : [ ID ]* ")"
+			TupleKey :=
+				"key" "{" AttributeNames : [ ID ]^[","] "}"
 		*/
 		public Statement TupleSelectorMember(Lexer lexer)
 		{
@@ -1205,8 +1205,8 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				"ref" Name : ID "{" SourceAttributeNames : ID* "}" 
-					Target : ID "{" TargetAttributeNames : ID* "}"	
+				"ref" Name : ID "{" SourceAttributeNames : ID^[","] "}" 
+					Target : ID "{" TargetAttributeNames : ID^[","] "}"	
 		*/
 		public TupleReference TupleReference(Lexer lexer)
 		{
@@ -1220,6 +1220,7 @@ namespace Ancestry.QueryProcessor.Parse
 			do
 			{
 				result.SourceAttributeNames.Add(ID(lexer, false));
+				OptionalSeparator(lexer);
 			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 			lexer.NextToken();
 
@@ -1229,6 +1230,7 @@ namespace Ancestry.QueryProcessor.Parse
 			do
 			{
 				result.TargetAttributeNames.Add(ID(lexer, false));
+				OptionalSeparator(lexer);
 			} while (!lexer[1].IsSymbol(Keywords.EndTupleSet));
 			lexer.NextToken();
 
@@ -1236,7 +1238,7 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				"key" "(" AttributeNames : [ ID ]* ")"
+				"key" "{" AttributeNames : [ ID ]^[","] "}"
 		*/
 		public TupleKey TupleKey(Lexer lexer)
 		{
@@ -1249,6 +1251,7 @@ namespace Ancestry.QueryProcessor.Parse
 			while (!lexer[1].IsSymbol(Keywords.EndTupleSet))
 			{
 				result.AttributeNames.Add(ID(lexer, false));
+				OptionalSeparator(lexer);
 			}
 			lexer.NextToken();
 
@@ -1317,7 +1320,7 @@ namespace Ancestry.QueryProcessor.Parse
 				"(" expression ")"
 		
 			FunctionSelector :=
-				functionParameters "=>" Expression : expression
+				functionParameters ":" [ ReturnType : typeDeclaration ] Expression : ClausedExpression
 		*/
 		public Expression FunctionSelectorOrGroup(Lexer lexer)
 		{
@@ -1330,8 +1333,12 @@ namespace Ancestry.QueryProcessor.Parse
 				lexer.NextToken();
 				var result = new FunctionSelector();
 				result.SetPosition(startToken);
-				lexer.NextToken().CheckSymbol(Keywords.Function);
-				result.Expression = Expression(lexer);
+				if (lexer[1, false].IsSymbol(Keywords.AttributeSeparator))
+				{
+					lexer.NextToken();
+					result.ReturnType = TypeDeclaration(lexer);
+				}
+				result.Expression = ClausedExpression(lexer);
 				return result;
 			}
 
@@ -1354,14 +1361,25 @@ namespace Ancestry.QueryProcessor.Parse
 				var result = new FunctionSelector();
 				result.SetPosition(startToken);
 				result.Parameters.Add(param);
+				OptionalSeparator(lexer);
 
+				// Additional parameters
 				while (!lexer[1].IsSymbol(Keywords.EndGroup))
+				{
 					result.Parameters.Add(FunctionParameter(lexer));
+					OptionalSeparator(lexer);
+				}
 				lexer.NextToken().CheckSymbol(Keywords.EndGroup);
 
-				lexer.NextToken().CheckSymbol(Keywords.Function);
+				// Optional return type
+				if (lexer[1, false].IsSymbol(Keywords.AttributeSeparator))
+				{
+					lexer.NextToken();
+					result.ReturnType = TypeDeclaration(lexer);
+				}
 
-				result.Expression = Expression(lexer);
+				// Body
+				result.Expression = ClausedExpression(lexer);
 				return result;
 			}
 				
@@ -1530,11 +1548,11 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-			ForClauses : [ ForClause ]*
-			LetClauses : [ LetClause ]*
-			[ "where" WhereClause : Expression ]
-			[ "order" "(" OrderDimensions : OrderDimension* ")" ]
-			"return" Expression : Expression
+				ForClauses : [ ForClause ]*
+				LetClauses : [ LetClause ]*
+				[ "where" WhereClause : expression ]
+				[ "order" "(" OrderDimensions : OrderDimension^[","] ")" ]
+				"return" Expression : expression
 		*/
 		public ClausedExpression ClausedExpression(Lexer lexer)
 		{
@@ -1598,10 +1616,10 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				"order" "(" OrderDimensions : OrderDimension* ")"
+				"order" "(" OrderDimensions : OrderDimension^[","] ")"
 
 			OrderDimension :=
-				Expression : Expression [ Direction : ( "asc" | "desc" ) ]
+				Expression : expression [ Direction : ( "asc" | "desc" ) ]
 		*/
 		public void OrderClause(Lexer lexer, List<OrderDimension> results)
 		{
@@ -1620,6 +1638,8 @@ namespace Ancestry.QueryProcessor.Parse
 					result.Ascending = asc;
 
 				results.Add(result);
+
+				OptionalSeparator(lexer);
 			}
 		}
 	}

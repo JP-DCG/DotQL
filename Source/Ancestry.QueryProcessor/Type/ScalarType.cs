@@ -57,7 +57,8 @@ namespace Ancestry.QueryProcessor.Type
 			return Native.Name;
 		}
 
-		public override ExpressionContext CompileRestrictExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.RestrictExpression expression, BaseType typeHint)
+		// Restriction
+		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.CallExpression expression, BaseType typeHint)
 		{
 			var local = compiler.AddFrame(frame, expression);
 			var alreadyOptional = left.Type is OptionalType;
@@ -65,10 +66,14 @@ namespace Ancestry.QueryProcessor.Type
 			var resultType = alreadyOptional ? left.Type : new OptionalType(left.Type);
 			var resultNative = resultType.GetNative(compiler.Emitter);
 
+			// Validate that there is only one argument
+			if (expression.Arguments.Count != 1)
+				throw new CompilerException(expression, CompilerException.Codes.CannotInvokeNonFunction, left.Type);
+
 			// Register value symbol
 			LocalBuilder valueLocal = null;
 			var localSymbol = new Object();
-			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), localSymbol);
+			local.Add(expression.Arguments[0], Name.FromComponents(Parse.ReservedWords.Value), localSymbol);
 			compiler.ContextsBySymbol.Add
 			(
 				localSymbol, 
@@ -81,7 +86,9 @@ namespace Ancestry.QueryProcessor.Type
 				)
 			);
 
-			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
+			var condition = compiler.CompileExpression(local, expression.Arguments[0], SystemTypes.Boolean);
+			if (!(condition.Type is BooleanType))
+				throw new CompilerException(expression.Arguments[0], CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
 
 			return
 				new ExpressionContext
@@ -99,10 +106,11 @@ namespace Ancestry.QueryProcessor.Type
 						left.EmitGet(m);
 						m.IL.Emit(OpCodes.Stloc, valueLocal);
 
+						condition.EmitGet(m);
 						m.IL.Emit(OpCodes.Brfalse, nullLabel);
 
 						// Passed condition
-						if (!alreadyOptional)
+						if (!alreadyOptional && memberNative.IsValueType)
 						{
 							var optionalLocal = m.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
 							m.IL.Emit(OpCodes.Ldloca, optionalLocal);
@@ -116,19 +124,21 @@ namespace Ancestry.QueryProcessor.Type
 
 						// Failed condition
 						m.IL.MarkLabel(nullLabel);
-						if (!alreadyOptional)
+						if (!alreadyOptional && memberNative.IsValueType)
 						{
 							var optionalLocal = m.DeclareLocal(expression, resultNative, Parse.ReservedWords.Value);
 							m.IL.Emit(OpCodes.Ldloca, optionalLocal);
 							m.IL.Emit(OpCodes.Initobj, resultNative);
 							m.IL.Emit(OpCodes.Ldloc, optionalLocal);
 						}
-						else
+						else if (alreadyOptional && memberNative.IsValueType)
 						{
 							m.IL.Emit(OpCodes.Ldloca, valueLocal);
 							m.IL.Emit(OpCodes.Initobj, resultNative);
 							m.IL.Emit(OpCodes.Ldloc, valueLocal);
 						}
+						else
+							m.IL.Emit(OpCodes.Ldnull);
 
 						m.IL.MarkLabel(endLabel);
 					}

@@ -16,7 +16,7 @@ UsingClause :=
 	"using" [ Alias: ID ":=" ] Target : ID Version : Version
 
 ModuleDeclaration :=
-	"module" Name : ID Version : Version "{" Members : [ moduleMember ]* "}"
+	"module" Name : ID Version : Version "{" Members : [ moduleMember ]^[","] "}"
 
 moduleMember =
 	TypeMember | EnumMember	| ConstMember | VarMember
@@ -25,7 +25,7 @@ TypeMember :=
 	Name : ID ":" "typedef" Type : typeDeclaration
 
 EnumMember :=
-	Name : ID ":" "enum" "{" Values : ID* "}"
+	Name : ID ":" "enum" "{" Values : ID^[","] "}"
 
 ConstMember :=
 	Name : ID ":" "const" Expression : expression
@@ -58,23 +58,23 @@ SetType :=
 	"{" Type : typeDeclaration "}"
 
 TupleType :=
-	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )* "}"
+	"{" ":" | Members : ( TupleAttribute | TupleReference | TupleKey )^[","] "}"
 
 TupleAttribute :=
 	Name : ID ":" Type : typeDeclaration
 
 TupleReference :=
-	"ref" Name : ID "{" SourceAttributeNames : ID* "}" 
-		Target : ID "{" TargetAttributeNames : ID* "}"	
+	"ref" Name : ID "{" SourceAttributeNames : ID^[","] "}" 
+		Target : ID "{" TargetAttributeNames : ID^[","] "}"	
 
 TupleKey :=
-	"key" "{" AttributeNames : [ ID ]* "}"
+	"key" "{" AttributeNames : [ ID ]^[","] "}"
 
 FunctionType :=
-	functionParameters "=>" [ "<" TypeParameters : typeDeclaration* ">" ] ReturnType : typeDeclaration
+	functionParameters [ "`" TypeParameters : typeDeclaration^[","] "`" ] ":" ReturnType : typeDeclaration
 
 functionParameters =
-	"(" Parameters : [ FunctionParameter ]* ")"
+	"(" Parameters : [ FunctionParameter ]^[","] ")"
 
 FunctionParameter :=
 	Name : ID ":" Type : typeDeclaration
@@ -98,7 +98,7 @@ expression 3 =
 	LogicalAndExpression : ( Left : expression "and" Right : expression )
 
 expression 4 =
-	BitwiseBinaryExpression : ( Left : expression Operator : ( "^" | "&" | "|" | "<<" | ">>" ) Right : expression )
+	BitwiseBinaryExpression : ( Left : expression Operator : ( "^" | "&" | "|" | "shl" | "shr" ) Right : expression )
 
 expression 5 =
 	ComparisonExpression : ( Left : expression Operator : ( "=" | "<>" | "<" | ">" | "<=" | ">=" | "?=" ) Right : expression )
@@ -115,28 +115,29 @@ expression 8 :=
 expression 9 R =
 	ExponentExpression : ( Left : expression "**" Right : expression )
 
-expression 10 =
-	CallExpression : 
-	( 
-		Argument : expression 
-		(
-			( "->" Expression : expression [ "<" TypeArguments : typeDeclaration* ">" ] "(" Arguments : [ expression ]* ")" )
-				| ( "=>" Expression : expression )
-		)
-	)
-
 expression 11 =
 	UnaryExpression : 
 	(
 		( Operator : ( "-" | "~" | "not" | "exists" ) Expression : expression )
-			| ( Expression : expression Operator : ( "@@" | "++" | "--" ) )
+			| ( Expression : expression Operator : ( "++" | "--" ) )
 	)
 
-expression 12 =
-	DereferenceExpression : ( Left : expression Operator : ( "." | "@" | "," ) Right : expression )
+expression 10 =
+	CallExpression : 
+	( 
+		Function : expression [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
+		( 
+			( "(" Arguments : expression^[","] ")" ) 
+				| ( "->" Argument : expression )
+		)
+	)
+		| ExtractExpression :
+		(
+			Expression : expression "[" [ Condition : expression ] "]"
+		)
 
-expression 13 =
-	RestrictExpression : ( Expression : expression "?" "(" Condition : expression ")" )
+expression 12 =
+	DereferenceExpression : ( Left : expression Operator : ( "." | "<<" ) Right : expression )
 
 expression =
 	"(" expression ")"
@@ -159,19 +160,19 @@ expression =
 		| ClausedExpression
 
 ListSelector :=
-	"[" Items : [ expression ]* "]"
+	"[" Items : [ expression ]^[","] "]"
 
 TupleSelector :=
-	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )* "}"
+	"{" ":" | Members : ( TupleAttributeSelector | TupleReference | TupleKey )^[","] "}"
 
 TupleAttributeSelector :=
 	[ Name : ID ] ":" Value : expression
 
 SetSelector :=
-	"{" Items : [ expression ]* "}"
+	"{" Items : [ expression ]^[","] "}"
 
 FunctionSelector :=
-	functionParameters "=>" Expression : expression
+	functionParameters ":" ReturnType : typeDeclaration Expression : ClausedExpression
 
 IdentifierExpression := 
 	Target : ID
@@ -210,7 +211,7 @@ ClausedExpression :=
 	ForClauses : [ ForClause ]*
 	LetClauses : [ LetClause ]*
 	[ "where" WhereClause : expression ]
-	[ "order" "(" OrderDimensions : OrderDimension* ")" ]
+	[ "order" "(" OrderDimensions : OrderDimension^[","] ")" ]
 	"return" Expression : expression
 
 ForClause :=
