@@ -814,61 +814,10 @@ namespace Ancestry.QueryProcessor.Parse
 		*/
 		public Expression ExponentExpression(Lexer lexer)
 		{
-			var expression = CallExpression(lexer);
-
-			while (lexer[1].IsSymbol(Keywords.Power))
-				expression = AppendToBinaryExpression(lexer, expression, CallExpression);
-			return expression;
-		}
-
-		/*
-				Function : expression [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
-				( 
-					( "(" Arguments : expression^[","] ")" ) 
-						| ( "->" Argument : expression )
-				)
-		*/
-		public Expression CallExpression(Lexer lexer)
-		{
 			var expression = UnaryExpression(lexer);
 
-			while (lexer[1, false].IsSymbol(Keywords.BeginGroup) || lexer[1, false].IsSymbol(Keywords.Invoke) || lexer[1, false].IsSymbol(Keywords.TypeArguments))
-			{
-				var result = new CallExpression();
-				result.Function = expression;
-				result.SetPosition(lexer);
-
-				// Type arguments
-				if (lexer[1, false].IsSymbol(Keywords.TypeArguments))
-				{
-					lexer.NextToken();
-					while (!lexer[1].IsSymbol(Keywords.TypeArguments))
-					{
-						result.TypeArguments.Add(TypeDeclaration(lexer));
-						OptionalSeparator(lexer);
-					}
-					lexer.NextToken();
-				}
-
-				lexer.NextToken();
-				if (lexer[0].IsSymbol(Keywords.Invoke))
-				{
-					// Tuple argument
-					result.Argument = UnaryExpression(lexer);
-				}
-				else
-				{
-					// Arguments
-					lexer[0].CheckSymbol(Keywords.BeginGroup);
-					while (!lexer[1].IsSymbol(Keywords.EndGroup))
-					{
-						result.Arguments.Add(Expression(lexer));
-						OptionalSeparator(lexer);
-					}
-					lexer.NextToken().CheckSymbol(Keywords.EndGroup);
-				}
-				expression = result;
-			}
+			while (lexer[1].IsSymbol(Keywords.Power))
+				expression = AppendToBinaryExpression(lexer, expression, UnaryExpression);
 			return expression;
 		}
 
@@ -889,38 +838,38 @@ namespace Ancestry.QueryProcessor.Parse
 					case Keywords.BitwiseNot:
 					case Keywords.Not:
 					case Keywords.Exists:
-					{
-						lexer.NextToken();
-						var result = new UnaryExpression();
-						result.SetPosition(lexer);
-						result.Operator = UnaryKeywordToOperator(lexer[0].Token);
-						result.Expression = UnaryExpression(lexer);
-
-						// If negation against a literal number, invert the value rather than add a negate operator
-						if (result.Operator == Operator.Negate)
 						{
-							var literalExpression = result.Expression as LiteralExpression;
-							if (literalExpression != null && literalExpression.Value != null)
+							lexer.NextToken();
+							var result = new UnaryExpression();
+							result.SetPosition(lexer);
+							result.Operator = UnaryKeywordToOperator(lexer[0].Token);
+							result.Expression = UnaryExpression(lexer);
+
+							// If negation against a literal number, invert the value rather than add a negate operator
+							if (result.Operator == Operator.Negate)
 							{
-								switch (literalExpression.Value.GetType().Name)
+								var literalExpression = result.Expression as LiteralExpression;
+								if (literalExpression != null && literalExpression.Value != null)
 								{
-									case "Double":
-										literalExpression.Value = -(double)literalExpression.Value;
-										return literalExpression;
-									case "Int32":
-										literalExpression.Value = -(int)literalExpression.Value;
-										return literalExpression;
-									case "Int64":
-										literalExpression.Value = -(long)literalExpression.Value;
-										return literalExpression;
+									switch (literalExpression.Value.GetType().Name)
+									{
+										case "Double":
+											literalExpression.Value = -(double)literalExpression.Value;
+											return literalExpression;
+										case "Int32":
+											literalExpression.Value = -(int)literalExpression.Value;
+											return literalExpression;
+										case "Int64":
+											literalExpression.Value = -(long)literalExpression.Value;
+											return literalExpression;
+									}
 								}
 							}
+							return result;
 						}
-						return result;
-					}
 				}
 
-			var expression = DereferenceExpression(lexer);
+			var expression = CallOrExtractExpression(lexer);
 
 			// Postfix operators
 			while (lexer[1, false].Type == TokenType.Symbol)
@@ -946,7 +895,86 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 
 		/*
-				( Left : expression Operator : ( "." | "@" | "<<" ) Right : expression )
+				CallExpression : 
+					( 
+						Function : expression [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
+						( 
+							( "(" Arguments : expression^[","] ")" ) 
+								| ( "->" Argument : expression )
+						)
+					)
+						| ExtractExpression :
+						(
+							Expression : expression "[" [ Condition : expression ] "]"
+						)
+		*/
+		public Expression CallOrExtractExpression(Lexer lexer)
+		{
+			var expression = DereferenceExpression(lexer);
+
+			while 
+			(
+				lexer[1, false].IsSymbol(Keywords.BeginGroup) 
+					|| lexer[1, false].IsSymbol(Keywords.Invoke) 
+					|| lexer[1, false].IsSymbol(Keywords.TypeArguments) 
+					|| lexer[1, false].IsSymbol(Keywords.BeginList)
+			)
+			{
+				if (lexer[1, false].IsSymbol(Keywords.BeginGroup) || lexer[1, false].IsSymbol(Keywords.Invoke) || lexer[1, false].IsSymbol(Keywords.TypeArguments))
+				{
+					var result = new CallExpression();
+					result.Function = expression;
+					result.SetPosition(lexer);
+
+					// Type arguments
+					if (lexer[1, false].IsSymbol(Keywords.TypeArguments))
+					{
+						lexer.NextToken();
+						while (!lexer[1].IsSymbol(Keywords.TypeArguments))
+						{
+							result.TypeArguments.Add(TypeDeclaration(lexer));
+							OptionalSeparator(lexer);
+						}
+						lexer.NextToken();
+					}
+
+					lexer.NextToken();
+					if (lexer[0].IsSymbol(Keywords.Invoke))
+					{
+						// Tuple argument
+						result.Argument = DereferenceExpression(lexer);
+					}
+					else
+					{
+						// Arguments
+						lexer[0].CheckSymbol(Keywords.BeginGroup);
+						while (!lexer[1].IsSymbol(Keywords.EndGroup))
+						{
+							result.Arguments.Add(Expression(lexer));
+							OptionalSeparator(lexer);
+						}
+						lexer.NextToken().CheckSymbol(Keywords.EndGroup);
+					}
+					expression = result;
+				}
+				else
+				{
+					var result = new ExtractExpression();
+					result.SetPosition(lexer);
+					result.Expression = expression;
+					lexer.NextToken();
+
+					if (!lexer[1].IsSymbol(Keywords.EndList))
+						result.Condition = Expression(lexer);
+						 
+					expression = result;
+				}
+			}
+			return expression;
+		}
+
+		/*
+				( Left : expression Operator : ( "." | "<<" ) Right : expression )
 		*/
 		public Expression DereferenceExpression(Lexer lexer)
 		{
@@ -1118,6 +1146,7 @@ namespace Ancestry.QueryProcessor.Parse
 						lexer.NextToken().CheckSymbol(Keywords.EndTupleSet);
 						return result;
 					}
+					OptionalSeparator(lexer);
 				}
 
 				// Treat as a set selector

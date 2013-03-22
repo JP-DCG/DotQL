@@ -139,19 +139,20 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			dynamic result = processor.Evaluate("return { 2 3 4 }");
+			dynamic result = processor.Evaluate("return { -5, 2, 3 4 }");
 			result = result.Result;
-			Assert.IsTrue(result.Count == 3);
+			Assert.IsTrue(result.Count == 4);
 			result = Enumerable.ToList(result);
-			Assert.AreEqual(result[0], 2);
-			Assert.AreEqual(result[1], 3);
-			Assert.AreEqual(result[2], 4);
+			Assert.AreEqual(result[0], -5);
+			Assert.AreEqual(result[1], 2);
+			Assert.AreEqual(result[2], 3);
+			Assert.AreEqual(result[3], 4);
 
 			result = processor.Evaluate("return { }");
 			result = result.Result;
 			Assert.IsTrue(result.Count == 0);
 
-			result = processor.Evaluate("return { 'a' 'b' 'c' }");
+			result = processor.Evaluate("return { 'a', 'b', 'c' }");
 			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
@@ -159,7 +160,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[1], "b");
 			Assert.AreEqual(result[2], "c");
 
-			result = processor.Evaluate("return { { x:1 } { x:2 } { x:3 } }");
+			result = processor.Evaluate("return { { x:1 }, { x:2 }, { x:3 } }");
 			result = result.Result;
 			Assert.IsTrue(result.Count == 3);
 			result = Enumerable.ToList(result);
@@ -167,7 +168,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(result[1].x, 2);
 			Assert.AreEqual(result[2].x, 3);
 
-			result = processor.Evaluate("return { { x:1 y:'a' key{ x } } { x:1 y:'b' key{ x } } }");
+			result = processor.Evaluate("return { { x:1, y:'a', key{ x } }, { x:1, y:'b', key{ x } } }");
 			result = result.Result;
 			Assert.IsTrue(result.Count == 1);
 			result = Enumerable.ToList(result);

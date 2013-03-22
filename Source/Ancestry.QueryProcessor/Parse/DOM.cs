@@ -698,6 +698,24 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
+	public class ExtractExpression : Expression
+	{
+		public Expression Expression { get; set; }
+
+		public Expression Condition { get; set; }
+
+		public override string ToString()
+		{
+			return Expression.ToString() + "[" + (Condition != null ? Condition.ToString() : "") + "]";
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Expression;
+			yield return Condition;
+		}
+	}
+
 	public class ListSelector : Expression
 	{
 		private List<Expression> _items = new List<Expression>();

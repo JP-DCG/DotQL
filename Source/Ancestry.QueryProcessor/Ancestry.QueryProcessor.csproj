@@ -102,6 +102,7 @@
     <Compile Include="Type\CharType.cs" />
     <Compile Include="Type\DateTimeType.cs" />
     <Compile Include="Type\DoubleType.cs" />
+    <Compile Include="Type\EnumType.cs" />
     <Compile Include="Type\FunctionParameter.cs" />
     <Compile Include="Type\FunctionType.cs" />
     <Compile Include="Type\IComponentType.cs" />

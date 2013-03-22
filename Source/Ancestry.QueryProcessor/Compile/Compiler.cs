@@ -33,8 +33,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public Frame _importFrame;
 		public Frame _scriptFrame;
 		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
-		private Dictionary<Parse.ModuleMember, Func<MemberInfo>> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Func<MemberInfo>>();
-		private Dictionary<Parse.ModuleMember, object> _compiledMembers = new Dictionary<Parse.ModuleMember, object>();
+		private Dictionary<Parse.ModuleMember, Action> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Action>();
 
 		// Using private constructor pattern because state spans single static call
 		private Compiler() { }
@@ -325,9 +324,6 @@ namespace Ancestry.QueryProcessor.Compile
 
 				// Populate qualified enumeration members
 				var memberName = Name.FromID(member.Name);
-				if (member is Parse.EnumMember)
-					foreach (var e in ((Parse.EnumMember)member).Values)
-						local.Add(member, memberName + Name.FromID(e), member);
 
 				//// HACK: Pre-discover sets of tuples (tables) because these may be needed by tuple references.  Would be better to separate symbol discovery from compilation for types.
 				//Parse.TypeDeclaration varType;
@@ -343,56 +339,80 @@ namespace Ancestry.QueryProcessor.Compile
 				{
 					case "VarMember":
 					{
-						var varMember = (Parse.VarMember)member;
-						var compiledType = CompileTypeDeclaration(local, varMember.Type);
-						var native = compiledType.GetNative(_emitter);
-						if (native.ContainsGenericParameters)
-							throw new NotImplementedException("Generic types are not currently supported for variables.");
-						var field = module.DefineField(member.Name.ToString(), typeof(Storage.IRepository<>).MakeGenericType(native), FieldAttributes.Public);
-						var context = 
-							new ExpressionContext
-							(
-								new Parse.IdentifierExpression { Target = member.Name },
-								compiledType,
-								Characteristic.Default,
-								m =>
-								{
-									m.IL.Emit(OpCodes.Ldarg_0);	// this
-									m.IL.Emit(OpCodes.Ldfld, field);	// Repository
-									m.IL.Emit(OpCodes.Ldnull);	// Condition
-									m.IL.Emit(OpCodes.Ldnull);	// Order
-									m.IL.EmitCall(OpCodes.Callvirt, field.FieldType.GetMethod("Get"), null);
-								}
-							)
+						_uncompiledMembers.Add
+						(
+							member,
+							() =>
 							{
-								EmitSet = (m, s) =>
-								{
-									m.IL.Emit(OpCodes.Ldarg_0);	// this
-									m.IL.Emit(OpCodes.Ldfld, field);	// Repository
-									m.IL.Emit(OpCodes.Ldnull);	// Condition
-									s(m); // Value
-									m.IL.EmitCall(OpCodes.Callvirt, field.FieldType.GetMethod("Set"), null);
-								}
-							};						
-						_contextsBySymbol.Add(member, context); 
+								_uncompiledMembers.Remove(member);
+								var varMember = (Parse.VarMember)member;
+								var compiledType = CompileTypeDeclaration(local, varMember.Type);
+								var native = compiledType.GetNative(_emitter);
+								var field = module.DefineField(member.Name.ToString(), typeof(Storage.IRepository<>).MakeGenericType(native), FieldAttributes.Public);
+								var context = 
+									new ExpressionContext
+									(
+										new Parse.IdentifierExpression { Target = member.Name },
+										compiledType,
+										Characteristic.Default,
+										m =>
+										{
+											m.IL.Emit(OpCodes.Ldarg_0);	// this
+											m.IL.Emit(OpCodes.Ldfld, field);	// Repository
+											m.IL.Emit(OpCodes.Ldnull);	// Condition
+											m.IL.Emit(OpCodes.Ldnull);	// Order
+											m.IL.EmitCall(OpCodes.Callvirt, field.FieldType.GetMethod("Get"), null);
+										}
+									)
+									{
+										EmitSet = (m, s) =>
+										{
+											m.IL.Emit(OpCodes.Ldarg_0);	// this
+											m.IL.Emit(OpCodes.Ldfld, field);	// Repository
+											m.IL.Emit(OpCodes.Ldnull);	// Condition
+											s(m); // Value
+											m.IL.EmitCall(OpCodes.Callvirt, field.FieldType.GetMethod("Set"), null);
+										}
+									};						
+								_contextsBySymbol.Add(member, context); 
+							}
+						);
 						break;
 					}
 					case "TypeMember":
 					{
-						var typeMember = (Parse.TypeMember)member;
-						var compiledType = CompileTypeDeclaration(local, typeMember.Type);
-						var result = _emitter.DeclareTypeDef(module, member.Name.ToString(), compiledType.GetNative(_emitter));
-						_contextsBySymbol.Add
+						_uncompiledMembers.Add
 						(
-							member, 
-							new ExpressionContext(new Parse.IdentifierExpression { Target = member.Name }, compiledType, Characteristic.Default, null)
+							member,
+							() =>
+							{
+								_uncompiledMembers.Remove(member);
+								var typeMember = (Parse.TypeMember)member;
+								var compiledType = CompileTypeDeclaration(local, typeMember.Type);
+								var result = _emitter.DeclareTypeDef(module, member.Name.ToString(), compiledType.GetNative(_emitter));
+								_contextsBySymbol.Add
+								(
+									member, 
+									new ExpressionContext
+									(
+										new Parse.IdentifierExpression { Target = member.Name }, 
+										compiledType, 
+										Characteristic.Default, 
+										null
+									)
+								);
+							}
 						);
 						break;
 					}
 					case "EnumMember":
 					{
-						// TODO: Enums
+						throw new NotImplementedException();
+						// TODO: Enumerations
 						//var enumMember = (Parse.EnumMember)member;
+						//foreach (var e in enumMember.Values)
+						//	local.Add(member, memberName + Name.FromID(e), member);
+						
 						//var enumType = _emitter.DeclareEnum(module, member.Name.ToString());
 						//var i = 0;
 						//foreach (var value in from v in enumMember.Values select v.ToString())
@@ -403,18 +423,59 @@ namespace Ancestry.QueryProcessor.Compile
 						//return enumType.CreateType();
 						//_contextsBySymbol.Add
 						//(
-						//	member, 
-						//	new ExpressionContext(new Parse.IdentifierExpression { Target = member.Name }, compiledType, Characteristic.Default, null)
+						//	member,
+						//	new ExpressionContext
+						//	(
+						//		null,
+						//		enumMember,
+						//	new Parse.IdentifierExpression { Target = member.Name }, compiledType, Characteristic.Default, null)
 						//);
-						break;
+						//break;
 					}
 					case "ConstMember":
 					{
-						var constExpression = (Parse.ConstMember)member;
-						var expression = CompileExpression(local, constExpression.Expression);
-						var native = expression.NativeType ?? expression.Type.GetNative(_emitter);
-						var expressionResult = CompileTimeEvaluate(constExpression.Expression, expression, native);
-						var field = _emitter.DeclareConst(module, member.Name.ToString(), expressionResult, native);
+						_uncompiledMembers.Add
+						(
+							member,
+							() =>
+							{
+								_uncompiledMembers.Remove(member);
+								var constExpression = (Parse.ConstMember)member;
+								var expression = CompileExpression(local, constExpression.Expression);
+								if (!(expression.Type is FunctionType))
+								{
+									var native = expression.ActualNative(_emitter);
+									var expressionResult = CompileTimeEvaluate(constExpression.Expression, expression, native);
+									var field = _emitter.DeclareConst(module, member.Name.ToString(), expressionResult, native);
+									_contextsBySymbol.Add
+									(
+										member,
+										new ExpressionContext
+										(
+											new Parse.IdentifierExpression { Target = member.Name },
+											expression.Type,
+											Characteristic.Constant,
+											m => 
+											{
+												m.IL.Emit(OpCodes.Ldarg_0);	// this
+												m.IL.Emit(OpCodes.Ldfld, field); 
+											}
+										)
+									);
+								}
+								else
+								{
+									_contextsBySymbol.Add
+									(
+										member, 
+										new ExpressionContext(null, expression.Type, Characteristic.Constant, null)
+										{
+											Member = expression.Member
+										}
+									);
+								}
+							}
+						);
 						break;
 					}
 					default: throw new Exception("Internal Error: Unknown member type " + member.GetType().Name);
@@ -432,7 +493,7 @@ namespace Ancestry.QueryProcessor.Compile
 		{
 			if (expression.Characteristics != Characteristic.Constant)
 				throw new CompilerException(statement, CompilerException.Codes.ConstantExpressionExpected);
-			var dynamicMethod = new DynamicMethod("", native, null);
+			var dynamicMethod = new DynamicMethod("", typeof(object), null);
 			var method = new MethodContext(dynamicMethod);
 			expression.EmitGet(method);
 			if (native.IsValueType)
@@ -1504,33 +1565,23 @@ namespace Ancestry.QueryProcessor.Compile
 				return context;
 
 			// Lazy-compile module member if needed
-			symbol = LazyCompileModuleMember(identifierExpression, symbol);
-
-			if (_contextsBySymbol.TryGetValue(symbol, out context))
-				return context;
+			if (symbol is Parse.ModuleMember)
+				return LazyCompileModuleMember(identifierExpression, (Parse.ModuleMember)symbol);
 
 			throw new CompilerException(identifierExpression, CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
 		}
 
-		private object LazyCompileModuleMember(Parse.Statement statement, object symbol)
+		private ExpressionContext LazyCompileModuleMember(Parse.Statement statement, Parse.ModuleMember member)
 		{
-			if (symbol is Parse.ModuleMember)
-			{
-				var member = (Parse.ModuleMember)symbol;
-				BeginRecursionCheck(statement);
-				try
-				{
-					Func<MemberInfo> compilation;
-					if (_uncompiledMembers.TryGetValue(member, out compilation))
-						compilation();
-					symbol = _compiledMembers[member];
-				}
-				finally
-				{
-					EndRecursionCheck(statement);
-				}
-			}
-			return symbol;
+			Action compilation;
+			if (_uncompiledMembers.TryGetValue(member, out compilation))
+				compilation();
+
+			ExpressionContext context;
+			if (_contextsBySymbol.TryGetValue(member, out context))
+				return context;
+
+			throw new CompilerException(statement, CompilerException.Codes.RecursiveDeclaration);
 		}
 
 		private ExpressionContext CompileBinaryExpression(Frame frame, Parse.BinaryExpression expression, BaseType typeHint)
