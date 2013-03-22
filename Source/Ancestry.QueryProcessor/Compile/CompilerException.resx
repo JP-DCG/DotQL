@@ -165,4 +165,7 @@
   <data name="105115" xml:space="preserve">
     <value>Constant expression expected.</value>
   </data>
+  <data name="105116" xml:space="preserve">
+    <value>Invalid Case Expression: {0}</value>
+  </data>
 </root>

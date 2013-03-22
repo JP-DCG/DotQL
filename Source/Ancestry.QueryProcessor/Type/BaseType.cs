@@ -12,81 +12,70 @@ namespace Ancestry.QueryProcessor.Type
 	{
 		public abstract System.Type GetNative(Emitter emitter);
 
-		public virtual ExpressionContext CompileBinaryExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
-		{
-			switch (expression.Operator)
-			{
-				case Parse.Operator.Addition:
-				case Parse.Operator.Subtract:
-				case Parse.Operator.Multiply:
-				case Parse.Operator.Modulo:
-				case Parse.Operator.Divide:
-				case Parse.Operator.Power:
+        public virtual ExpressionContext CompileBinaryExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.BinaryExpression expression, Type.BaseType typeHint)
+        {
+            switch (expression.Operator)
+            {
+                case Parse.Operator.Addition:
+                case Parse.Operator.Subtract:
+                case Parse.Operator.Multiply:
+                case Parse.Operator.Modulo:
+                case Parse.Operator.Divide:
+                case Parse.Operator.Power:
 
-				case Parse.Operator.BitwiseAnd:
-				case Parse.Operator.BitwiseOr:
-				case Parse.Operator.BitwiseXor:
-				case Parse.Operator.Xor:
-				case Parse.Operator.ShiftLeft:
-				case Parse.Operator.ShiftRight:
-				{
-					var right = compiler.CompileExpression(frame, expression.Right, typeHint);
-					return 
-						new ExpressionContext
-						(
-							expression, 
-							left.Type, 
-							MergeCharacteristics(left.Characteristics, right.Characteristics),
-							m => { EmitBinaryOperator(m, compiler, left, right, expression); }
-						);
-				}
+                case Parse.Operator.BitwiseAnd:
+                case Parse.Operator.BitwiseOr:
+                case Parse.Operator.BitwiseXor:
+                case Parse.Operator.Xor:
+                case Parse.Operator.ShiftLeft:
+                case Parse.Operator.ShiftRight:
+                    {
+                        var right = compiler.CompileExpression(frame, expression.Right, typeHint);
+                        return
+                            new ExpressionContext
+                            (
+                                expression,
+                                left.Type,
+                                Compiler.MergeCharacteristics(left.Characteristics, right.Characteristics),
+                                m => { EmitBinaryOperator(m, compiler, left, right, expression); }
+                            );
+                    }
 
-				case Parse.Operator.And:
-				case Parse.Operator.Or:
-				{
-					var right = compiler.CompileExpression(frame, expression.Right, typeHint);
-					return 
-						new ExpressionContext
-						(
-							expression,
-							left.Type,
-							MergeCharacteristics(left.Characteristics, right.Characteristics),
-							m => { EmitShortCircuit(m, compiler, frame, left, right, expression, typeHint); }
-						);
-				}
+                case Parse.Operator.And:
+                case Parse.Operator.Or:
+                    {
+                        var right = compiler.CompileExpression(frame, expression.Right, typeHint);
+                        return
+                            new ExpressionContext
+                            (
+                                expression,
+                                left.Type,
+                                Compiler.MergeCharacteristics(left.Characteristics, right.Characteristics),
+                                m => { EmitShortCircuit(m, compiler, frame, left, right, expression, typeHint); }
+                            );
+                    }
 
-				case Parse.Operator.Equal:
-				case Parse.Operator.NotEqual:
-				case Parse.Operator.InclusiveGreater:
-				case Parse.Operator.InclusiveLess:
-				case Parse.Operator.Greater:
-				case Parse.Operator.Less:
-				{
-					var right = compiler.CompileExpression(frame, expression.Right);	// (no type hint)
-					return 
-						new ExpressionContext
-						(
-							expression,
-							SystemTypes.Boolean,
-							MergeCharacteristics(left.Characteristics, right.Characteristics),
-							m => { EmitBinaryOperator(m, compiler, left, right, expression); }
-						);
-				}
+                case Parse.Operator.Equal:
+                case Parse.Operator.NotEqual:
+                case Parse.Operator.InclusiveGreater:
+                case Parse.Operator.InclusiveLess:
+                case Parse.Operator.Greater:
+                case Parse.Operator.Less:
+                    {
+                        var right = compiler.CompileExpression(frame, expression.Right);	// (no type hint)
+                        return
+                            new ExpressionContext
+                            (
+                                expression,
+                                SystemTypes.Boolean,
+                                Compiler.MergeCharacteristics(left.Characteristics, right.Characteristics),
+                                m => { EmitBinaryOperator(m, compiler, left, right, expression); }
+                            );
+                    }
 
-				default: throw NotSupported(expression);
-			}
-		}
-
-		protected Characteristic MergeCharacteristics(Characteristic characteristic1, Characteristic characteristic2)
-		{
-			return (characteristic1 & (Characteristic.NonDeterministic | Characteristic.SideEffectual)) 
-				| (characteristic2 & (Characteristic.NonDeterministic | Characteristic.SideEffectual))
-				|
-				(
-					(characteristic1 & Characteristic.Constant) 
-						& (characteristic2 & Characteristic.Constant)
-				);
-		}
+                default: throw NotSupported(expression);
+            }
+        }		
 
 		public virtual ExpressionContext CompileUnaryExpression(Compiler compiler, Frame frame, ExpressionContext inner, Parse.UnaryExpression expression, Type.BaseType typeHint)
 		{

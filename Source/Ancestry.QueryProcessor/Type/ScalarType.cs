@@ -95,7 +95,7 @@ namespace Ancestry.QueryProcessor.Type
 				(
 					expression,
 					resultType,
-					MergeCharacteristics(left.Characteristics, condition.Characteristics),
+					Compiler.MergeCharacteristics(left.Characteristics, condition.Characteristics),
 					m =>
 					{
 						var nullLabel = m.IL.DefineLabel();

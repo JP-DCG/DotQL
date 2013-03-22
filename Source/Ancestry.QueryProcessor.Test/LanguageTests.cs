@@ -665,5 +665,107 @@ namespace Ancestry.QueryProcessor.Test
 			dynamic result = processor.Evaluate("using TestModule 1.0.0 set MyFunc := (x: Int32) return return x + 1 return MyFunc(5)");
 			Assert.AreEqual(6, result.Result);
 		}
+
+        [TestMethod]
+        public void IfExpression()
+        {
+            var processor = new Processor();
+            dynamic result = processor.Evaluate("return if true then 1 else 0");
+            Assert.AreEqual(1, result.Result);
+
+            result = processor.Evaluate("return if false then 1 else 0");
+            Assert.AreEqual(0, result.Result);
+
+            result = processor.Evaluate("return if 5 > 3 then 1 else 0");
+            Assert.AreEqual(1, result.Result);
+
+            result = processor.Evaluate("return if 5 < 3 then 1 else 5 + 6");
+            Assert.AreEqual(11, result.Result);
+
+
+            //Test datatype conversions
+            //result = processor.Evaluate("return if true then 1.1 else 0");
+            //Assert.AreEqual(1, result.Result);
+        }
+
+        [TestMethod]
+        public void CaseExpression()
+        {
+
+            //"Switch" case
+            var processor = new Processor();
+            dynamic result = processor.Evaluate
+            (
+                @"return
+                    case 0
+                        when 0 then 'zero'
+			            when 1 then 'one'
+			            else 'two'
+		            end"
+            );
+            Assert.AreEqual("zero", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return
+                    case 1
+                        when 0 then 'zero'
+			            when 1 then 'one'
+			            else 'two'
+		            end"
+            );
+            Assert.AreEqual("one", result.Result);
+
+            result = processor.Evaluate
+           (
+              @"return
+                    case 2
+                        when 0 then 'zero'
+			            when 1 then 'one'
+			            else 'two'
+		            end"
+           );
+            Assert.AreEqual("two", result.Result);
+
+
+            //Stacked if case
+            result = processor.Evaluate
+            (
+                @"return
+                    case 
+                        when 1 > 0 then 'first'
+			            when 1 < 0  then 'second'
+			            else 'neither'
+		            end"
+            );
+            Assert.AreEqual("first", result.Result);
+
+            result = processor.Evaluate
+           (
+               @"return
+                    case 
+                        when 1 < 0 then 'first'
+			            when 1 > 0  then 'second'
+			            else 'neither'
+		            end"
+           );
+            Assert.AreEqual("second", result.Result);
+
+            result = processor.Evaluate
+            (
+            @"return
+                    case 
+                        when 1 < 0 then 'first'
+			            when 1 = 0  then 'second'
+			            else 'neither'
+		            end"
+            );
+            Assert.AreEqual("neither", result.Result);
+            
+
+            //TODO: Case strict
+
+
+        }
 	}
 }
