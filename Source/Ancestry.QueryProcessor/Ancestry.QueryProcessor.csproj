@@ -127,15 +127,21 @@
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="BaseException.resx" />
+    <EmbeddedResource Include="BaseException.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="Compile\CompilerException.resx">
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Parse\LanguageException.resx">
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="Parse\LexerException.resx" />
-    <EmbeddedResource Include="Parse\ParserException.resx" />
+    <EmbeddedResource Include="Parse\LexerException.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Parse\ParserException.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="Parse\SyntaxException.resx" />
   </ItemGroup>
   <ItemGroup>

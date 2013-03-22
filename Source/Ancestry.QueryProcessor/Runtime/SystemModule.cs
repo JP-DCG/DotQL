@@ -39,10 +39,10 @@ namespace Ancestry.QueryProcessor.Runtime
 			return new Set<T>(listValue);
 		}
 
-		public static DateTime AddMonth(DateTime start, int months)
-		{
-			return start.AddMonths(months);
-		}
+        public static DateTime AddMonth(DateTime start, int months)
+        {
+            return start.AddMonths(months);
+        }
 
         public static DateTime AddDay(DateTime start, double days)
         {
@@ -105,10 +105,22 @@ namespace Ancestry.QueryProcessor.Runtime
             return Math.Exp(value);
         }
 
-        //public static long Factorial(int value)
-        //{
+        public static long Factorial(int value)
+        {
+            var ex = 0.0;
+            var x = (double)value;
+            x = x + x + 1;
+            if (x > 1)
+            {
+                   x = (Math.Log(2.0 * Math.PI) + Math.Log(x / 2.0) * x - x
+                   - (1.0 - 7.0 / (30.0 * x * x)) / (6.0 * x)) / 2.0;
+                x = x / Math.Log(10);
+                ex = Math.Floor(x);
+                x = Math.Pow(10, x - ex);
+            }
 
-        //}
+            return (long)Math.Truncate(x * Math.Pow(10, ex));
+        }
 
         public static double Frac(double value)
         {
@@ -194,6 +206,9 @@ namespace Ancestry.QueryProcessor.Runtime
         {
             return Math.Truncate(value);
         }
+
+
+        //String
 
 	}
 }
