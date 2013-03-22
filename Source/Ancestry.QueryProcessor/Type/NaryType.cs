@@ -68,7 +68,7 @@ namespace Ancestry.QueryProcessor.Type
 				(
 					expression,
 					left.Type,
-					MergeCharacteristics(left.Characteristics, condition.Characteristics),
+					Compiler.MergeCharacteristics(left.Characteristics, condition.Characteristics),
 					m =>
 					{
 						// Create a new private method for the condition
@@ -194,7 +194,7 @@ namespace Ancestry.QueryProcessor.Type
 				(
 					expression,
 					new ListType(selection.Type),
-					MergeCharacteristics(left.Characteristics, selection.Characteristics),
+					Compiler.MergeCharacteristics(left.Characteristics, selection.Characteristics),
 					m =>
 					{
 						// Create a new private method for the condition

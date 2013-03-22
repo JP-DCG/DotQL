@@ -39,6 +39,18 @@ namespace Ancestry.QueryProcessor.Compile
 		// Using private constructor pattern because state spans single static call
 		private Compiler() { }
 
+        public static Characteristic MergeCharacteristics(Characteristic characteristic1, Characteristic characteristic2)
+        {
+            return (characteristic1 & (Characteristic.NonDeterministic | Characteristic.SideEffectual))
+                | (characteristic2 & (Characteristic.NonDeterministic | Characteristic.SideEffectual))
+                |
+                (
+                    (characteristic1 & Characteristic.Constant)
+                        & (characteristic2 & Characteristic.Constant)
+                );
+        }
+
+
 		public static CompilerResult CreateExecutable(CompilerOptions options, Parse.Script script)
 		{
 			return new Compiler().InternalCreateExecutable(options, script);
@@ -853,10 +865,217 @@ namespace Ancestry.QueryProcessor.Compile
 				case "ListSelector": return CompileListSelector(frame, (Parse.ListSelector)expression, typeHint);
 				case "SetSelector": return CompileSetSelector(frame, (Parse.SetSelector)expression, typeHint);
 				case "FunctionSelector": return CompileFunctionSelector(frame, (Parse.FunctionSelector)expression, typeHint);
-				case "CallExpression": return CompileCallExpression(frame, (Parse.CallExpression)expression, typeHint);
+                case "CallExpression": return CompileCallExpression(frame, (Parse.CallExpression)expression, typeHint);
+                case "IfExpression": return CompileIfExpression(frame, (Parse.IfExpression)expression, typeHint);
+                case "CaseExpression": return CompileCaseExpression(frame, (Parse.CaseExpression)expression, typeHint);
 				default : throw new NotSupportedException(String.Format("Expression type {0} is not supported", expression.GetType().Name));
 			}
 		}
+
+        public ExpressionContext CompileCaseExpression(Frame frame, Parse.CaseExpression expression, BaseType typeHint)
+        {
+            //TODO: Strict case expressions
+            if (expression.IsStrict)
+                throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "Strict case expressions not yet supported");
+
+            //TODO: Some of this should be enforced in the parser.
+            if (expression.IsStrict && expression.TestExpression == null)
+                throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "Strict case requires a test expression");
+            if (expression.IsStrict && expression.ElseExpression != null)
+                throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "Strict case can not have a default value");
+            if (!expression.IsStrict && expression.ElseExpression == null)
+                throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "Default expression required in non-strict cases");
+            if (expression.Items.Count == 0 && expression.ElseExpression == null)
+                throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "Case must have at least one when expression or an else expression");
+
+            //selective case (switch)
+            //case X, when Y then, when Z then  
+            if (expression.TestExpression != null)
+            {
+                //Prep to store the result of the test expression as a local variable.
+                var local = AddFrame(frame, expression);
+                LocalBuilder testLocal = null;
+
+                var test = CompileExpression(frame, expression.TestExpression, typeHint);
+                Characteristic characteristic = test.Characteristics;
+
+                local.Add(expression.TestExpression, Name.FromComponents("@test"), expression.TestExpression);
+                _contextsBySymbol.Add
+                    (
+                        expression.TestExpression,
+                        new ExpressionContext
+                        (
+                            null,
+                            test.Type,
+                            test.Characteristics,
+                            m => { m.IL.Emit(OpCodes.Ldloc, testLocal); }
+                        )
+                    );
+
+                ExpressionContext def = null;
+                BaseType returnType = null;
+                if (expression.ElseExpression != null)
+                {                    
+                    def = CompileExpression(frame, expression.ElseExpression, null);
+                    returnType = def.Type;
+                    characteristic = Compiler.MergeCharacteristics(characteristic, def.Characteristics);
+                }
+
+                List<Tuple<ExpressionContext, ExpressionContext>> caseItemExpressions = new List<Tuple<ExpressionContext, ExpressionContext>>();
+
+                foreach (var caseItem in expression.Items)
+                {
+                    //Pull the result of the test expression and compare it with the current expression.
+                    var whenEx = CompileBinaryExpression(local, new Parse.BinaryExpression() { Left = new Parse.IdentifierExpression() { Target = Parse.ID.FromComponents("@test") }, Right = caseItem.WhenExpression, Operator = Parse.Operator.Equal }, null);
+
+                    var thenEx = CompileExpression(frame, caseItem.ThenExpression, returnType);
+
+                    //In case it hasn't been set by the else (default) case, will be set by the first item in the list.
+                    returnType = returnType ?? thenEx.Type;
+
+                    if (thenEx.Type != returnType)
+                        thenEx = Convert(thenEx, returnType);
+
+                    characteristic = Compiler.MergeCharacteristics(characteristic, whenEx.Characteristics);
+                    characteristic = Compiler.MergeCharacteristics(characteristic, thenEx.Characteristics);
+
+                    caseItemExpressions.Add(new Tuple<ExpressionContext, ExpressionContext>(whenEx, thenEx));
+                }
+
+                return
+                    new ExpressionContext
+                        (
+                            expression,
+                            returnType,
+                            characteristic,
+                            m =>
+                            {
+                                var lblEnd = m.IL.DefineLabel();
+                                testLocal = m.DeclareLocal(test.Expression, test.ActualNative(_emitter), "@test");
+                                test.EmitGet(m);
+                                m.IL.Emit(OpCodes.Stloc, testLocal);
+                                foreach (var caseItem in caseItemExpressions)
+                                {
+                                    var lblNext = m.IL.DefineLabel();
+                                    caseItem.Item1.EmitGet(m);
+                                    m.IL.Emit(OpCodes.Brfalse, lblNext);
+                                    caseItem.Item2.EmitGet(m);
+                                    m.IL.Emit(OpCodes.Br, lblEnd);
+                                    m.IL.MarkLabel(lblNext);
+                                }
+
+                                if (def != null)
+                                {
+                                    def.EmitGet(m);
+                                }
+                                else
+                                {
+                                    m.IL.Emit(OpCodes.Ldstr, "Internal Error: Unhandled case condition");
+                                    m.IL.Emit(OpCodes.Newobj, typeof(Exception).GetConstructor(new[] { typeof(string) }));
+                                    m.IL.Emit(OpCodes.Throw);
+                                }
+
+                                m.IL.MarkLabel(lblEnd);
+                            }
+                        );
+            }
+
+            //conditional case (stacked if expression)
+            //case when X = Y then, when Y = Z then, else
+            else
+            {
+                ExpressionContext def = CompileExpression(frame, expression.ElseExpression, typeHint);
+                BaseType returnType = def.Type;
+                Characteristic characteristic = def.Characteristics;
+
+                List<Tuple<ExpressionContext, ExpressionContext>> caseItemExpressions = new List<Tuple<ExpressionContext, ExpressionContext>>();
+
+                foreach (var caseItem in expression.Items)
+                {
+                    var whenEx = CompileExpression(frame, caseItem.WhenExpression, SystemTypes.Boolean);
+                    if (whenEx.Type != SystemTypes.Boolean)
+                        throw new CompilerException(expression, CompilerException.Codes.InvalidCase, "When statements in the conditional case must evaluate to a Boolean");
+
+                    //Convert then expressions to either the default type, or if no default is present, the type of the first item in the case items.
+                    var thenEx = CompileExpression(frame, caseItem.ThenExpression, returnType);
+                    if (thenEx.Type != returnType)
+                        thenEx = Convert(thenEx, returnType);
+
+                    characteristic = Compiler.MergeCharacteristics(characteristic, whenEx.Characteristics);
+                    characteristic = Compiler.MergeCharacteristics(characteristic, thenEx.Characteristics);
+
+                    caseItemExpressions.Add(new Tuple<ExpressionContext, ExpressionContext>(whenEx, thenEx));
+                }
+
+                return
+                    new ExpressionContext
+                        (
+                            expression,
+                            returnType,
+                            characteristic,
+                            m =>
+                            {
+                                var lblEnd = m.IL.DefineLabel();
+                                foreach (var caseItem in caseItemExpressions)
+                                {
+                                    var lblNext = m.IL.DefineLabel();
+                                    caseItem.Item1.EmitGet(m);
+                                    m.IL.Emit(OpCodes.Brfalse, lblNext);
+                                    caseItem.Item2.EmitGet(m);
+                                    m.IL.Emit(OpCodes.Br, lblEnd);
+                                    m.IL.MarkLabel(lblNext);
+                                }
+
+                                def.EmitGet(m);
+                                m.IL.MarkLabel(lblEnd);
+                            }
+                        );
+            }
+        }
+
+        public ExpressionContext CompileIfExpression(Frame frame, Parse.IfExpression expression, BaseType typeHint)
+        {
+            var testExpression = CompileExpression(frame, expression.TestExpression, SystemTypes.Boolean);
+            if (!(testExpression.Type is BooleanType))
+				throw new CompilerException(expression.TestExpression, CompilerException.Codes.IncorrectType, testExpression.Type, "Boolean");
+
+            var thenExpression = CompileExpression(frame, expression.ThenExpression, typeHint);
+            typeHint = typeHint ?? thenExpression.Type;
+
+            var elseExpression = CompileExpression(frame, expression.ElseExpression, typeHint);
+
+            if (thenExpression.Type != elseExpression.Type)
+            {
+                if (thenExpression.Type == SystemTypes.Void)
+                    elseExpression = Convert(elseExpression, thenExpression.Type);
+                else
+                    thenExpression = Convert(thenExpression, elseExpression.Type);
+            }
+
+            Characteristic expressionCharacteristic = MergeCharacteristics(testExpression.Characteristics, thenExpression.Characteristics);
+            expressionCharacteristic = MergeCharacteristics(expressionCharacteristic, elseExpression.Characteristics);
+            
+            return
+                new ExpressionContext
+                    (
+                        expression,
+                        thenExpression.Type,
+                        expressionCharacteristic,
+                        m =>
+                        {
+                            var endLabel = m.IL.DefineLabel();
+                            var elseLabel = m.IL.DefineLabel();
+
+                            testExpression.EmitGet(m);
+                            m.IL.Emit(OpCodes.Brfalse, elseLabel);
+                            thenExpression.EmitGet(m);
+                            m.IL.Emit(OpCodes.Br, endLabel);
+                            m.IL.MarkLabel(elseLabel);
+                            elseExpression.EmitGet(m);
+                            m.IL.MarkLabel(endLabel);                     
+                        }
+                    );
+        }
 
 		public ExpressionContext CompileFunctionSelector(Frame frame, Parse.FunctionSelector functionSelector, BaseType typeHint)
 		{

@@ -43,5 +43,157 @@ namespace Ancestry.QueryProcessor.Runtime
 		{
 			return start.AddMonths(months);
 		}
+
+        public static DateTime AddDay(DateTime start, double days)
+        {
+            return start.AddDays(days);
+        }
+
+        //Numeric - TODO: overloading for various data types.
+        public static double Abs(double value)
+        {
+            return Math.Abs(value);
+        }
+
+        public static double Acos(double value)
+        {
+            return Math.Acos(value);
+        }
+
+        public static double Asin(double value)
+        {
+            return Math.Asin(value);
+        }
+
+        public static double Atan(double value)
+        {
+            return Math.Atan(value);
+        }
+
+        public static double Atan2(double x, double y)
+        {
+            return Math.Atan2(x, y);
+        }
+
+        public static long BigMul(int x, int y)
+        {
+            return Math.BigMul(x, y);
+        }
+
+        public static double Ceiling(double value)
+        {
+            return Math.Ceiling(value);
+        }
+
+        public static double Cos(double value)
+        {
+            return Math.Cos(value);
+        }
+
+        public static double Cosh(double value)
+        {
+            return Math.Cosh(value);
+        }
+
+        //public static double DivRem(double value)
+        //{
+        //    return Math.DivRem(value);
+        //}
+
+        public static double Exp(double value)
+        {
+            return Math.Exp(value);
+        }
+
+        //public static long Factorial(int value)
+        //{
+
+        //}
+
+        public static double Frac(double value)
+        {
+            return value - Math.Truncate(value);
+        }
+
+        public static double Floor(double value)
+        {
+            return Math.Floor(value);
+        }
+
+        public static double IEEERemainder(double x, double y)
+        {
+            return Math.IEEERemainder(x, y);
+        }
+
+        public static double Ln(double value)
+        {
+            return Math.Log(value);
+        }
+
+        public static double Log(double value, double newBase)
+        {
+            return Math.Log(value, newBase);
+        }
+
+        public static double Log10(double value)
+        {
+            return Math.Log10(value);
+        }
+
+        public static double Max(double x, double y)
+        {
+            return Math.Max(x, y);
+        }
+
+        public static double Min(double x, double y)
+        {
+            return Math.Min(x, y);
+        }
+
+        public static double Pow(double x, double y)
+        {
+            return Math.Pow(x, y);
+        }
+
+        public static double Round(double value, int decimals)
+        {
+            return Math.Round(value, decimals);
+        }
+
+        public static int Sign(double value)
+        {
+            return Math.Sign(value);
+        }
+
+        public static double Sin(double value)
+        {
+            return Math.Sin(value);
+        }
+
+        public static double Sinh(double value)
+        {
+            return Math.Sinh(value);
+        }
+
+        public static double Sqrt(double value)
+        {
+            return Math.Sqrt(value);
+        }
+
+        public static double Tan(double value)
+        {
+            return Math.Tan(value);
+        }
+
+        public static double Tanh(double value)
+        {
+            return Math.Tanh(value);
+        }
+
+        public static double Truncate(double value)
+        {
+            return Math.Truncate(value);
+        }
+
 	}
 }

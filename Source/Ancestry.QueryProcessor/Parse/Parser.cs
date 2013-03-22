@@ -1419,6 +1419,7 @@ namespace Ancestry.QueryProcessor.Parse
 				item.WhenExpression = Expression(lexer);
 				lexer.NextToken().CheckSymbol(Keywords.Then);
 				item.ThenExpression = Expression(lexer);
+                result.Items.Add(item);
 			} while (lexer[1].IsSymbol(Keywords.When));
 
 			// Else

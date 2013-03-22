@@ -143,7 +143,7 @@ namespace Ancestry.QueryProcessor.Type
 				(
 					expression,
 					right.Type,
-					MergeCharacteristics(left.Characteristics, right.Characteristics),
+					Compiler.MergeCharacteristics(left.Characteristics, right.Characteristics),
 					m =>
 					{
 						m.IL.BeginScope();

@@ -874,7 +874,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "case" + (TestExpression != null ? " " + TestExpression : "")
+			return "case" + (IsStrict ? " strict" : "") + (TestExpression != null ? " " + TestExpression : "")
 				+ String.Concat(from i in Items select "\r\n\t" + i.ToString())
 				+ "\r\n\t" + ElseExpression
 				+ "\r\nend";
