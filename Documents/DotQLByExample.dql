@@ -315,35 +315,35 @@ Item Extraction
 
 List member extraction:
 
-	return [2, 4, 6, 8]@0
+	return [2, 4, 6, 8][0]
 
 returns: `2`
 
 Singleton member extraction from list:
 
-	return [2]@@	
+	return [2][]	
 
 Result: `2`
 
-**Note:** Singleton extraction is not the same as @0, @0 for an set having more than 1 entry returns null, whereas singleton extraction throws an exception in this case.
+**Note:** Singleton extraction is not the same as `[0]`, `[0]` for an set having more than 1 entry returns null, whereas singleton extraction throws an exception in this case.
 
 Single member extraction from set:
 
-	return { 2 }@@
+	return { 2 }[]
 
 Result: `2`
 
 Empty list or set extraction:
 
-	return []@@
-	return { }@@
+	return [][]
+	return { }[]
 
 result `null`
 
 Invalid single member extraction:
 
-	return [2, 4]@@
-	return { 2, 4 }@@
+	return [2, 4][]
+	return { 2, 4 }[]
 
 **Runtime exception!**, Cannot extract single member from a set or list with more than one item.
 
@@ -406,7 +406,7 @@ Result: `"Goodbye"`
 
 Strict cases:
 
-	Colors: enum { Green Red Blue }
+	Colors: enum { Green, Red, Blue }
 	...
 	return 
 		case strict x // Error: this case statement must handle all colors
@@ -484,7 +484,7 @@ A function selector may specify a function type name rather than repeat the sign
 Polymorphic invocation of functions:
 
 	for PartID in Parts.ID 
-	return { :PartID, Quantity : InventoryCities(PartID in IDs)@@.DetermineInventory(PartID) }
+	return { :PartID, Quantity : InventoryCities(PartID in IDs)[].DetermineInventory(PartID) }
 
 This uses functions provided in a table to invoke a different inventory function depending on the ID of the part.
 
@@ -496,7 +496,7 @@ Complex function example:
 			let ap := n.Attribute.Priority
 			order (ap.Priority ?? 0 desc, n.ID)
 			return n
-		return orderedn@0
+		return orderedn[0]
 
 Nulls
 -----
@@ -513,7 +513,7 @@ Resolving nulls:
 
 Returns: `5`
 
-Out of range item extraction produces a null., The `??` (if null) operator resolves the null., The parentheses are not necessary in this case, but makes it clear that the `@0` item extraction is on the empty list, not the type.
+Out of range item extraction produces a null., The `??` (if null) operator resolves the null., The parentheses are not necessary in this case, but makes it clear that the `[0]` item extraction is on the empty list, not the type.
 
 Determining null:
 
@@ -780,7 +780,7 @@ Throwing exceptions:
 
 Example of throwing for a null:
 
-	return Setting@@ ?? !!{	Message:"The settings are not setup." }
+	return Setting[] ?? !!{	Message:"The settings are not setup." }
 
 Result: The singleton row from the table Setting; an exception will be thrown if there isn't one
 

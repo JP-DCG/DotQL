@@ -33,7 +33,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public static bool IsSet(System.Type type)
 		{
-			return type.IsGenericType && typeof(ISet<>).IsAssignableFrom(type.GetGenericTypeDefinition());
+			return type.IsGenericType && typeof(ISet<>).MakeGenericType(type.GenericTypeArguments[0]).IsAssignableFrom(type);
 		}
 
 		public static bool IsNary(System.Type type)
