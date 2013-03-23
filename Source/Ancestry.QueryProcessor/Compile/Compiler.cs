@@ -209,9 +209,10 @@ namespace Ancestry.QueryProcessor.Compile
 							m =>
 							{
 								// Emit the source and convert if necessary
-								source.EmitGet(method);
 								if (source.Type != target.Type)
 									Convert(source, target.Type).EmitGet(m);
+								else
+									source.EmitGet(method);
 							}
 						);
 					}
@@ -284,9 +285,11 @@ namespace Ancestry.QueryProcessor.Compile
 			_contextsBySymbol.Add(declaration, context);
 
 			// Initialize variable, defaulting to passed in arguments if they are provided
-			initializer.EmitGet(method);
 			if (type != initializer.Type)
 				Convert(initializer, type).EmitGet(method);
+			else
+				initializer.EmitGet(method);
+
 			EmitArgsArgument(method);
 			method.EmitName(declaration.Name, name.Components);	// name
 			method.IL.EmitCall(OpCodes.Call, ReflectionUtility.RuntimeGetInitializer.MakeGenericMethod(nativeType), null);
@@ -1298,6 +1301,9 @@ namespace Ancestry.QueryProcessor.Compile
 						(
 							typeBuilder.DefineMethod("Function" + functionSelector.GetHashCode(), MethodAttributes.Private | MethodAttributes.Static, nativeReturnType, nativeParamTypes)
 						);
+						var num = 1;
+						foreach (var p in functionSelector.Parameters)
+							innerMethod.Builder.DefineParameter(num++, ParameterAttributes.None, p.Name.ToString());
 						emitMethod(innerMethod);
 
 						// Instantiate a delegate pointing to the new method
@@ -1519,10 +1525,11 @@ namespace Ancestry.QueryProcessor.Compile
 							foreach (var item in expressions)
 							{
 								m.IL.Emit(OpCodes.Dup);	// collection
-								item.EmitGet(m);
 								// Convert the element if needed
 								if (item.Type != elementType)
 									Convert(item, elementType).EmitGet(m);
+								else
+									item.EmitGet(m);
 								m.IL.Emit(OpCodes.Call, addMethod);
 								if (addMethod.ReturnType != typeof(void))
 									m.IL.Emit(OpCodes.Pop);	// ignore any add result

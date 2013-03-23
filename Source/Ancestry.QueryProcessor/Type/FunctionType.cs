@@ -71,8 +71,8 @@ namespace Ancestry.QueryProcessor.Type
 					{
 						if (methodType != null)		// Invoke as method
 						{
-
-							function.EmitGet(m);	// Instance
+							if (function.EmitGet != null)
+								function.EmitGet(m);	// Instance
 							foreach (var arg in args)
 								arg.EmitGet(m);
 							m.IL.EmitCall(OpCodes.Call, methodType, null);
