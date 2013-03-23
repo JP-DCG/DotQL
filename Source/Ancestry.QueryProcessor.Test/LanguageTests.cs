@@ -936,7 +936,60 @@ namespace Ancestry.QueryProcessor.Test
         [TestMethod]
         public void StringFunctions()
         {
+            var processor = new Processor();
+            dynamic result = processor.Evaluate
+            (
+                @"return Uppercase(""dOg"")"
+            );
+            Assert.AreEqual("DOG", result.Result);
 
+            result = processor.Evaluate
+            (
+                @"return Lowercase(""CaT"")"
+            );
+            Assert.AreEqual("cat", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Concat(""-"", [""bubba"", ""joe""])"
+            );
+            Assert.AreEqual("bubba-joe", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Split(""bubba-joe"", {""-""})"
+            );
+            CollectionAssert.AreEqual(new []{"bubba","joe"}, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Length(""hello"")"
+            );
+            Assert.AreEqual(5, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Slice(""hello"", 2, 3)"
+            );
+            Assert.AreEqual("llo", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Normalize("" DotQL   is        super great! "")"
+            );
+            Assert.AreEqual("DotQL is super great!", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Explode(""chars"")"
+            );
+            CollectionAssert.AreEqual(new[] { 'c', 'h', 'a', 'r', 's' }, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Implode(['c','h','a','r','s'])"
+            );
+            Assert.AreEqual("chars", result.Result);
         }
     }
 }
