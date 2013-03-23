@@ -43,7 +43,12 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public static bool IsRepository(System.Type type)
 		{
-			return type != null && type.IsGenericType && typeof(Storage.IRepository<>) == type.GetGenericTypeDefinition();
+			return type != null && type.IsGenericType && typeof(Storage.IRepository<>).MakeGenericType(type.GenericTypeArguments[0]).IsAssignableFrom(type);
+		}
+
+		public static bool IsFunction(System.Type type)
+		{
+			return typeof(Delegate).IsAssignableFrom(type);
 		}
 
 		public static object GetDefaultValue(System.Type type)

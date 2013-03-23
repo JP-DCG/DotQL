@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -32,6 +33,8 @@ namespace Ancestry.QueryProcessor.Compile
 		public Action<MethodContext> EmitGet;
 
 		public Action<MethodContext, Action<MethodContext>> EmitSet;
+
+		public Action<MethodContext> EmitMethod;
 						
 		public bool IsRepository()
 		{
@@ -41,6 +44,24 @@ namespace Ancestry.QueryProcessor.Compile
 		public System.Type ActualNative(Emitter emitter)
 		{
 			return NativeType ?? Type.GetNative(emitter);
+		}
+
+		public ExpressionContext Clone()
+		{
+			return
+				new ExpressionContext
+				(
+					Expression,
+					Type,
+					Characteristics,
+					EmitGet
+				)
+				{
+					EmitMethod = EmitMethod,
+					EmitSet = EmitSet,
+					Member = Member,
+					NativeType = NativeType
+				};
 		}
 	}
 }
