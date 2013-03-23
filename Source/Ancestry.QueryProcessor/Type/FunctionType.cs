@@ -71,8 +71,8 @@ namespace Ancestry.QueryProcessor.Type
 					{
 						if (methodType != null)		// Invoke as method
 						{
-
-							function.EmitGet(m);	// Instance
+							if (function.EmitGet != null)
+								function.EmitGet(m);	// Instance
 							foreach (var arg in args)
 								arg.EmitGet(m);
 							m.IL.EmitCall(OpCodes.Call, methodType, null);
@@ -108,9 +108,7 @@ namespace Ancestry.QueryProcessor.Type
 
 		public override System.Type GetNative(Compile.Emitter emitter)
 		{
-			var types = (from p in Parameters select p.Type.GetNative(emitter)).ToList();
-			types.Add(Type.GetNative(emitter));
-			return System.Linq.Expressions.Expression.GetDelegateType(types.ToArray());
+			return emitter.FindOrCreateNativeFromFunctionType(this);
 		}
 
 		public static FunctionType FromMethod(MethodInfo method, Emitter emitter)
@@ -189,6 +187,31 @@ namespace Ancestry.QueryProcessor.Type
 					// TODO: type parameters
 					// TypeParameters =
 				};
+		}
+
+		public override ExpressionContext Convert(ExpressionContext expression, BaseType target)
+		{
+			// Allow a function type to be converted if the argument types and the return type are the same
+
+			var source = (FunctionType)expression.Type;
+			FunctionType targetFunction;
+			// Validate that the target is a function and has the same number of parameters and the same return type
+			if 
+			(
+				!(target is FunctionType) 
+					|| source.Parameters.Count != (targetFunction = (FunctionType)target).Parameters.Count 
+					|| source.Type != targetFunction.Type
+			)
+				return base.Convert(expression, target);
+			
+			// Validate the parameter types
+			for (var i = 0; i < source.Parameters.Count; i++)
+				if (source.Parameters[i].Type != targetFunction.Parameters[i].Type)
+					return base.Convert(expression, target);
+
+			var result = expression.Clone();
+			result.Type = target;
+			return result;
 		}
 	}
 }

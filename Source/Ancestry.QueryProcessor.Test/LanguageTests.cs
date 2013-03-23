@@ -656,15 +656,23 @@ namespace Ancestry.QueryProcessor.Test
             Assert.AreEqual(6, result.Result);
         }
 
-        [TestMethod]
-        public void SimpleModuleFunctionVar()
-        {
-            var processor = new Processor();
-            processor.Execute("module TestModule 1.0.0 { MyFunc: (x: Int32) return Int32 }");
+		[TestMethod]
+		public void SimpleModuleFunctionVar()
+		{
+			var processor = new Processor();
+			processor.Execute("module TestModule 1.0.0 { MyFunc: (x: Int32) : Int32 }");
 
-            dynamic result = processor.Evaluate("using TestModule 1.0.0 set MyFunc := (x: Int32) return return x + 1 return MyFunc(5)");
-            Assert.AreEqual(6, result.Result);
-        }
+			dynamic result = 
+				processor.Evaluate
+				(
+					@"
+						using TestModule 1.0.0 
+						set MyFunc := (x: Int32) return x + 1 
+						return MyFunc(5)
+					"
+				);
+			Assert.AreEqual(6, result.Result);
+		}
 
         [TestMethod]
         public void IfExpression()

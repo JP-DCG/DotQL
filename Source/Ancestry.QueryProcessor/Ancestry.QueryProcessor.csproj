@@ -43,7 +43,6 @@
   <ItemGroup>
     <Compile Include="BaseException.cs" />
     <Compile Include="AncestryException.cs" />
-    <Compile Include="Compile\Builder.cs" />
     <Compile Include="Compile\Compiler.cs" />
     <Compile Include="Compile\CompilerException.cs" />
     <Compile Include="Compile\CompilerOptions.cs" />

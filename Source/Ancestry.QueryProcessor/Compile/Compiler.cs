@@ -209,9 +209,10 @@ namespace Ancestry.QueryProcessor.Compile
 							m =>
 							{
 								// Emit the source and convert if necessary
-								source.EmitGet(method);
 								if (source.Type != target.Type)
 									Convert(source, target.Type).EmitGet(m);
+								else
+									source.EmitGet(method);
 							}
 						);
 					}
@@ -284,9 +285,11 @@ namespace Ancestry.QueryProcessor.Compile
 			_contextsBySymbol.Add(declaration, context);
 
 			// Initialize variable, defaulting to passed in arguments if they are provided
-			initializer.EmitGet(method);
 			if (type != initializer.Type)
 				Convert(initializer, type).EmitGet(method);
+			else
+				initializer.EmitGet(method);
+
 			EmitArgsArgument(method);
 			method.EmitName(declaration.Name, name.Components);	// name
 			method.IL.EmitCall(OpCodes.Call, ReflectionUtility.RuntimeGetInitializer.MakeGenericMethod(nativeType), null);
@@ -314,7 +317,6 @@ namespace Ancestry.QueryProcessor.Compile
 		private System.Type TypeFromModule(Frame frame, Parse.ModuleDeclaration moduleDeclaration)
 		{
 			var local = AddFrame(frame, moduleDeclaration);
-			var members = new List<Action<MethodContext>>();
 			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
 
 			// Gather the module's symbols
@@ -389,7 +391,7 @@ namespace Ancestry.QueryProcessor.Compile
 								_uncompiledMembers.Remove(member);
 								var typeMember = (Parse.TypeMember)member;
 								var compiledType = CompileTypeDeclaration(local, typeMember.Type);
-								var result = _emitter.DeclareTypeDef(module, member.Name.ToString(), compiledType.GetNative(_emitter));
+								var result = DeclareTypeDef(module, member.Name.ToString(), compiledType.GetNative(_emitter));
 								_contextsBySymbol.Add
 								(
 									member, 
@@ -413,7 +415,7 @@ namespace Ancestry.QueryProcessor.Compile
 						//foreach (var e in enumMember.Values)
 						//	local.Add(member, memberName + Name.FromID(e), member);
 						
-						//var enumType = _emitter.DeclareEnum(module, member.Name.ToString());
+						//var enumType = DeclareEnum(module, member.Name.ToString());
 						//var i = 0;
 						//foreach (var value in from v in enumMember.Values select v.ToString())
 						//{
@@ -446,7 +448,7 @@ namespace Ancestry.QueryProcessor.Compile
 								{
 									var native = expression.ActualNative(_emitter);
 									var expressionResult = CompileTimeEvaluate(constExpression.Expression, expression, native);
-									var field = _emitter.DeclareConst(module, member.Name.ToString(), expressionResult, native);
+									var field = DeclareConst(module, member.Name.ToString(), expressionResult, native);
 									_contextsBySymbol.Add
 									(
 										member,
@@ -465,12 +467,27 @@ namespace Ancestry.QueryProcessor.Compile
 								}
 								else
 								{
+									var functionType = (FunctionType)expression.Type;
+
+									// Create a public method for the function function
+									var parameterTypes = functionType.Parameters.Select(i => i.Type.GetNative(_emitter)).ToArray();
+									var method = new MethodContext
+									(
+										module.DefineMethod(member.Name.ToString(), MethodAttributes.Public | MethodAttributes.Static, functionType.Type.GetNative(_emitter), parameterTypes)
+									);
+									var num = 1;
+									foreach (var p in functionType.Parameters)
+										method.Builder.DefineParameter(num++, ParameterAttributes.None, p.Name.ToString());
+
+									// Emit the function body
+									expression.EmitMethod(method);
+									
 									_contextsBySymbol.Add
 									(
 										member, 
 										new ExpressionContext(null, expression.Type, Characteristic.Constant, null)
 										{
-											Member = expression.Member
+											Member = method.Builder
 										}
 									);
 								}
@@ -487,6 +504,62 @@ namespace Ancestry.QueryProcessor.Compile
 				_uncompiledMembers.First().Value();
 
 			return _emitter.EndModule(module);
+		}
+
+		public FieldBuilder DeclareTypeDef(TypeBuilder module, string name, System.Type type)
+		{
+			return module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static);
+		}
+
+		public TypeBuilder DeclareEnum(TypeBuilder module, string name)
+		{
+			var enumType = module.DefineNestedType(name, TypeAttributes.NestedPublic | TypeAttributes.Sealed, typeof(Enum));
+			enumType.DefineField("value__", typeof(int), FieldAttributes.Private | FieldAttributes.SpecialName);
+			return enumType;
+		}
+
+		public FieldBuilder DeclareConst(TypeBuilder module, string name, object value, System.Type type)
+		{
+			if ((type.IsValueType || typeof(String).IsAssignableFrom(type)) && IsConstable(type))
+			{
+				var constField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
+				constField.SetConstant(value);
+				return constField;
+			}
+			else
+			{
+				var readOnlyField = module.DefineField(name, type, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly);
+				// construct types through constructor
+
+				// TODO: finish - need callback to emit get logic
+				var staticConstructor = module.DefineConstructor(MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard, new System.Type[] { });
+				//staticConstructor
+				throw new NotImplementedException();
+			}
+		}
+
+		private bool IsConstable(System.Type type)
+		{
+			switch (type.ToString())
+			{
+				case "System.Boolean":
+				case "System.Char":
+				case "System.Byte":
+				case "System.SByte":
+				case "System.Int16":
+				case "System.UInt16":
+				case "System.Int32":
+				case "System.UInt32":
+				case "System.Int64":
+				case "System.UInt64":
+				case "System.Single":
+				case "System.Double":
+				case "System.DateTime":
+				case "System.String":
+					return true;
+				default:
+					return false;
+			}
 		}
 
 		private static object CompileTimeEvaluate(Parse.Statement statement, ExpressionContext expression, System.Type native)
@@ -522,12 +595,6 @@ namespace Ancestry.QueryProcessor.Compile
 					_emitter.ImportType(parameter.ParameterType);
 
 				var functionType = FunctionType.FromMethod(methodInfo, _emitter);
-				var delegateType = 
-					System.Linq.Expressions.Expression.GetFuncType
-					(
-						(from p in methodInfo.GetParameters() select p.ParameterType)
-							.Union(new[] { methodInfo.ReturnType }).ToArray()
-					);
 
 				var context = 
 					new ExpressionContext
@@ -535,11 +602,7 @@ namespace Ancestry.QueryProcessor.Compile
 						new Parse.IdentifierExpression { Target = Name.FromNative(methodInfo.Name).ToID() },
 						functionType,
 						Characteristic.Constant,
-						m =>
-						{
-							if (!methodInfo.IsStatic)
-								m.IL.Emit(OpCodes.Ldloc, moduleVar);	// Instance
-						}
+						null
 					)
 					{
 						Member = methodInfo
@@ -1217,6 +1280,13 @@ namespace Ancestry.QueryProcessor.Compile
 			var nativeParamTypes = functionSelector.Parameters.Select((p, i) => type.Parameters[i].Type.GetNative(_emitter)).ToArray();
 			var nativeReturnType = expression.NativeType ?? expression.Type.GetNative(_emitter);
 
+			Action<MethodContext> emitMethod = 
+				m =>
+				{
+					expression.EmitGet(m);
+					m.IL.Emit(OpCodes.Ret);
+				};
+
 			return
 				new ExpressionContext
 				(
@@ -1231,8 +1301,10 @@ namespace Ancestry.QueryProcessor.Compile
 						(
 							typeBuilder.DefineMethod("Function" + functionSelector.GetHashCode(), MethodAttributes.Private | MethodAttributes.Static, nativeReturnType, nativeParamTypes)
 						);
-						expression.EmitGet(innerMethod);
-						innerMethod.IL.Emit(OpCodes.Ret);
+						var num = 1;
+						foreach (var p in functionSelector.Parameters)
+							innerMethod.Builder.DefineParameter(num++, ParameterAttributes.None, p.Name.ToString());
+						emitMethod(innerMethod);
 
 						// Instantiate a delegate pointing to the new method
 						var delegateType = type.GetNative(_emitter);
@@ -1240,7 +1312,8 @@ namespace Ancestry.QueryProcessor.Compile
 						m.IL.Emit(OpCodes.Ldftn, innerMethod.Builder);	// method
 						m.IL.Emit(OpCodes.Newobj, delegateType.GetConstructor(new[] { typeof(object), typeof(IntPtr) }));
 					}
-				);
+				)
+				{ EmitMethod = emitMethod };
 		}
 
 		private ExpressionContext CompileCallExpression(Frame frame, Parse.CallExpression callExpression, BaseType typeHint)
@@ -1452,10 +1525,11 @@ namespace Ancestry.QueryProcessor.Compile
 							foreach (var item in expressions)
 							{
 								m.IL.Emit(OpCodes.Dup);	// collection
-								item.EmitGet(m);
 								// Convert the element if needed
 								if (item.Type != elementType)
 									Convert(item, elementType).EmitGet(m);
+								else
+									item.EmitGet(m);
 								m.IL.Emit(OpCodes.Call, addMethod);
 								if (addMethod.ReturnType != typeof(void))
 									m.IL.Emit(OpCodes.Pop);	// ignore any add result
