@@ -168,4 +168,7 @@
   <data name="105116" xml:space="preserve">
     <value>Invalid Case Expression: {0}</value>
   </data>
+  <data name="105117" xml:space="preserve">
+    <value>No functions match this signature: {0}</value>
+  </data>
 </root>

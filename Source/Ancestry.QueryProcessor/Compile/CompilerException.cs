@@ -57,7 +57,10 @@ namespace Ancestry.QueryProcessor.Compile
             ConstantExpressionExpected = 105115,
 
             /// <summary>Error code 105116: "Invalid Case expression."</summary>
-            InvalidCase = 105116
+            InvalidCase = 105116,
+
+            /// <summary>Error code 105176: "No matching function signatures."</summary>
+            SignatureMismatch = 105117
         }
 
 		// Resource manager for this exception class

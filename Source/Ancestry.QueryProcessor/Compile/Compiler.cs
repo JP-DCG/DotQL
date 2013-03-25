@@ -173,6 +173,63 @@ namespace Ancestry.QueryProcessor.Compile
 			return _contextsBySymbol[symbol];
 		}
 
+        public ExpressionContext ResolveAndCompileFunction(Frame frame, Parse.CallExpression callExpression, BaseType typeHint, MethodInfo[] methods)
+        {
+            var potential = methods.Where(m => m.GetParameters().Count() == callExpression.Arguments.Count).ToList();
+            if (potential.Count == 0)
+                throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.ToString());
+
+            MethodInfo function = null;
+            var args = new ExpressionContext[callExpression.Arguments.Count];
+
+            if (callExpression.Arguments.Count == 0)
+                function = potential[0];
+            else
+            {                
+                for (var i = 0; i < callExpression.Arguments.Count; i++)
+                    args[i] = CompileExpression(frame, callExpression.Arguments[i]);
+
+                for (int f = 0; f < potential.Count; ++f)
+                {
+                    var parameters = potential[f].GetParameters();
+                    bool match = true;
+                    for (int p = 0; p < parameters.Count(); p++)
+                    {
+                        if (Emitter.TypeFromNative(parameters[p].ParameterType) != args[p].Type)
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (match)
+                    {
+                        function = potential[f];
+                        break;
+                    }
+                }
+            }
+
+            if (function == null)
+                throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.ToString());
+
+            var functionType = FunctionType.FromMethod(function, Emitter);
+
+             var context = new ExpressionContext
+                    (
+                        new Parse.IdentifierExpression { Target = Name.FromNative(function.Name).ToID() },
+                        functionType,
+                        Characteristic.Constant,
+                        null
+                    )
+                    {
+                        Member = function
+                    };
+
+
+             return functionType.CompileCallExpression(this, frame, context, callExpression, typeHint, args);
+        }
+
 		private List<object> GetTargetSources(object target)
 		{
 			List<object> sources;
@@ -601,23 +658,6 @@ namespace Ancestry.QueryProcessor.Compile
                 }
 
 				frame.Add(use, moduleName + Name.FromNative(methodGroup[0].Name), methodGroup);
-				
-
-				var functionGroupType = FunctionGroupType.FromMethodGroup(methodGroup, _emitter);
-
-				var context = 
-					new ExpressionContext
-					(
-						new Parse.IdentifierExpression { Target = Name.FromNative(methodGroup[0].Name).ToID() },
-                        functionGroupType,
-						Characteristic.Constant,
-						null
-					)
-					{
-						Member = methodGroup
-					};
-
-				_contextsBySymbol.Add(methodGroup, context);
 			}
 
 			// Discover enums
@@ -1328,7 +1368,14 @@ namespace Ancestry.QueryProcessor.Compile
 		private ExpressionContext CompileCallExpression(Frame frame, Parse.CallExpression callExpression, BaseType typeHint)
 		{
 			var function = CompileExpression(frame, callExpression.Function);
-			return function.Type.CompileCallExpression(this, frame, function, callExpression, typeHint);
+            if (function.Member is MethodInfo[])
+            {
+                return ResolveAndCompileFunction(frame, callExpression, typeHint, (MethodInfo[])function.Member);
+            }
+            else
+            {
+                return function.Type.CompileCallExpression(this, frame, function, callExpression, typeHint);
+            }
 		}
 
 		public void DetermineTypeParameters(Parse.Statement statement, System.Type[] resolved, System.Type parameterType, System.Type argumentType)
@@ -1646,6 +1693,19 @@ namespace Ancestry.QueryProcessor.Compile
 			ExpressionContext context;
 			if (_contextsBySymbol.TryGetValue(symbol, out context))
 				return context;
+
+            //If we get a function group
+            if (symbol is MethodInfo[])
+                return new ExpressionContext
+                (
+                    identifierExpression,
+                    SystemTypes.Void,
+                    Characteristic.Default,
+                    null
+                )
+                {
+                    Member = symbol
+                };
 
 			// Lazy-compile module member if needed
 			if (symbol is Parse.ModuleMember)

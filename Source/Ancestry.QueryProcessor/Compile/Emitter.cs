@@ -120,13 +120,6 @@ namespace Ancestry.QueryProcessor.Compile
 			return builder.CreateType();
 		}
 
-        public System.Type FindOrCreateNativeFromFunctionGroupType(FunctionGroupType functionGroupType)
-        {
-            //TODO: Figure this out.
-            return typeof(MethodInfo[]);
-        }
-
-
 		public System.Type FindOrCreateNativeFromTupleType(TupleType tupleType)
 		{
 			System.Type nativeType;
