@@ -21,9 +21,9 @@ namespace Ancestry.QueryProcessor.Sql
 			_fields = tupleType.GetFields(BindingFlags.Public | BindingFlags.Instance).ToArray();
 			_tableName = tableName;
 			_collectionType = 
-				typeof(ISet<>).IsAssignableFrom(typeof(T).GetGenericTypeDefinition())
-					? typeof(HashSet<>).MakeGenericType(tupleType)
-					: typeof(List<>).MakeGenericType(tupleType);
+				typeof(ISet<>).MakeGenericType(tupleType).IsAssignableFrom(typeof(T))
+					? typeof(Runtime.Set<>).MakeGenericType(tupleType)
+					: typeof(Runtime.ListEx<>).MakeGenericType(tupleType);
 			_addRowDelegate = CompileAddRowDelegate();
 		}
 

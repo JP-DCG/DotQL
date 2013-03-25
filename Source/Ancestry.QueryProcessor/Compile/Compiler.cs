@@ -34,6 +34,7 @@ namespace Ancestry.QueryProcessor.Compile
 		public Frame _scriptFrame;
 		private HashSet<Parse.Statement> _recursions = new HashSet<Parse.Statement>();
 		private Dictionary<Parse.ModuleMember, Action> _uncompiledMembers = new Dictionary<Parse.ModuleMember, Action>();
+		private Dictionary<Parse.ID, Parse.EnumMember> _enumMembers = new Dictionary<Parse.ID,Parse.EnumMember>();
 
 		// Using private constructor pattern because state spans single static call
 		private Compiler() { }
@@ -319,6 +320,19 @@ namespace Ancestry.QueryProcessor.Compile
 			var local = AddFrame(frame, moduleDeclaration);
 			var module = _emitter.BeginModule(moduleDeclaration.Name.ToString());
 
+			// HACK: Pre-discover sets of tuples (tables) because these may be needed by tuple references.  Would be better to separate symbol discovery from compilation for types.
+			foreach (var member in moduleDeclaration.Members)
+			{
+				Parse.TypeDeclaration varType;
+				if
+				(
+					member is Parse.VarMember
+					&& (varType = ((Parse.VarMember)member).Type) is Parse.SetType
+					&& ((Parse.SetType)varType).Type is Parse.TupleType
+				)
+					EnsureTupleTypeSymbols(frame, (Parse.TupleType)((Parse.SetType)varType).Type);
+			}
+
 			// Gather the module's symbols
 			foreach (var member in moduleDeclaration.Members)
 			{
@@ -326,16 +340,6 @@ namespace Ancestry.QueryProcessor.Compile
 
 				// Populate qualified enumeration members
 				var memberName = Name.FromID(member.Name);
-
-				//// HACK: Pre-discover sets of tuples (tables) because these may be needed by tuple references.  Would be better to separate symbol discovery from compilation for types.
-				//Parse.TypeDeclaration varType;
-				//if
-				//(
-				//	member is Parse.VarMember
-				//	&& (varType = ((Parse.VarMember)member).Type) is Parse.SetType
-				//	&& ((Parse.SetType)varType).Type is Parse.TupleType
-				//)
-				//	EnsureTupleTypeSymbols(frame, (Parse.TupleType)((Parse.SetType)varType).Type);
 
 				switch (member.GetType().Name)
 				{
@@ -409,30 +413,60 @@ namespace Ancestry.QueryProcessor.Compile
 					}
 					case "EnumMember":
 					{
-						throw new NotImplementedException();
-						// TODO: Enumerations
-						//var enumMember = (Parse.EnumMember)member;
-						//foreach (var e in enumMember.Values)
-						//	local.Add(member, memberName + Name.FromID(e), member);
-						
-						//var enumType = DeclareEnum(module, member.Name.ToString());
-						//var i = 0;
-						//foreach (var value in from v in enumMember.Values select v.ToString())
-						//{
-						//	FieldBuilder field = enumType.DefineField(value.ToString(), enumType, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
-						//	field.SetConstant(i++);
-						//}
-						//return enumType.CreateType();
-						//_contextsBySymbol.Add
-						//(
-						//	member,
-						//	new ExpressionContext
-						//	(
-						//		null,
-						//		enumMember,
-						//	new Parse.IdentifierExpression { Target = member.Name }, compiledType, Characteristic.Default, null)
-						//);
-						//break;
+						var enumMember = (Parse.EnumMember)member;
+
+						// Push symbols for each member before compilation
+						foreach (var value in enumMember.Values)
+						{
+							var valueName = memberName + Name.FromID(value);
+							local.Add(value, valueName, value);
+							_enumMembers.Add(value, enumMember);
+						}
+
+						_uncompiledMembers.Add
+						(
+							member,
+							() =>
+							{
+								_uncompiledMembers.Remove(member);
+								var enumBuilder = DeclareEnum(module, member.Name.ToString());
+								var i = 0;
+								var type = new EnumType(memberName);
+								foreach (var value in enumMember.Values)
+								{
+									FieldBuilder field = enumBuilder.DefineField(Name.FromID(value).ToString(), enumBuilder, FieldAttributes.Public | FieldAttributes.Literal | FieldAttributes.Static);
+									field.SetConstant(i);
+									_contextsBySymbol.Add
+									(
+										value,
+										new ExpressionContext
+										(
+											null,
+											type,
+											Characteristic.Constant,
+											m => { m.IL.Emit(OpCodes.Ldc_I4, i); }
+										)
+									);
+									++i;
+								}
+								type.Native = enumBuilder;
+								enumBuilder.CreateType();
+
+								// Advertise the enumeration itself as a type symbol
+								_contextsBySymbol.Add
+								(
+									member,
+									new ExpressionContext
+									(
+										null,
+										type,
+										Characteristic.Constant,
+										null
+									)
+								);
+							}
+						);
+						break;
 					}
 					case "ConstMember":
 					{
@@ -447,23 +481,30 @@ namespace Ancestry.QueryProcessor.Compile
 								if (!(expression.Type is FunctionType))
 								{
 									var native = expression.ActualNative(_emitter);
-									var expressionResult = CompileTimeEvaluate(constExpression.Expression, expression, native);
-									var field = DeclareConst(module, member.Name.ToString(), expressionResult, native);
-									_contextsBySymbol.Add
-									(
-										member,
-										new ExpressionContext
+									if (native is TypeBuilder)
+									{
+										// TODO: handle not yet built enumerations, need to get the value directly rather than emit the constant
+									}
+									else
+									{
+										var expressionResult = CompileTimeEvaluate(constExpression.Expression, expression, native);
+										var field = DeclareConst(module, member.Name.ToString(), expressionResult, native);
+										_contextsBySymbol.Add
 										(
-											new Parse.IdentifierExpression { Target = member.Name },
-											expression.Type,
-											Characteristic.Constant,
-											m => 
-											{
-												m.IL.Emit(OpCodes.Ldarg_0);	// this
-												m.IL.Emit(OpCodes.Ldfld, field); 
-											}
-										)
-									);
+											member,
+											new ExpressionContext
+											(
+												new Parse.IdentifierExpression { Target = member.Name },
+												expression.Type,
+												Characteristic.Constant,
+												m => 
+												{
+													m.IL.Emit(OpCodes.Ldarg_0);	// this
+													m.IL.Emit(OpCodes.Ldfld, field); 
+												}
+											)
+										);
+									}
 								}
 								else
 								{
@@ -615,9 +656,41 @@ namespace Ancestry.QueryProcessor.Compile
 			foreach (var type in module.Class.GetNestedTypes(BindingFlags.Public))
 			{
 				var enumName = moduleName + Name.FromNative(type.Name);
+				var enumType = new EnumType(enumName) { Native = type };
+
+				// Push the enum symbol as a type
 				frame.Add(use, enumName, type);
+				_contextsBySymbol.Add
+				(
+					type,
+					new ExpressionContext
+					(
+						new Parse.IdentifierExpression { Target = enumName.ToID() },
+						enumType,
+						Characteristic.Constant,
+						null
+					)
+				); 
+				
+				var i = 0;
 				foreach (var enumItem in type.GetFields(BindingFlags.Public | BindingFlags.Static))
-					frame.Add(use, enumName + Name.FromNative(enumItem.Name), enumItem);
+				{
+					var itemName = enumName + Name.FromNative(enumItem.Name);
+					frame.Add(use, itemName, enumItem);
+					var num = i;	// Capture within loop
+					_contextsBySymbol.Add
+					(
+						enumItem,
+						new ExpressionContext
+						(
+							new Parse.IdentifierExpression { Target = itemName.ToID() },
+							enumType,
+							Characteristic.Constant,
+							m => { m.IL.Emit(OpCodes.Ldc_I4, num); }
+						)
+					);
+					++i;
+				}
 			}
 
 			// Discover consts
@@ -1355,12 +1428,10 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private BaseType CompileNamedType(Frame frame, Parse.NamedType namedType)
 		{
-			var target = ResolveReference<object>(frame, namedType.Target);
-			ExpressionContext result;
-			if (_contextsBySymbol.TryGetValue(target, out result) && result.EmitGet == null)
-				return result.Type;
-			else
-				throw new CompilerException(namedType, CompilerException.Codes.IncorrectTypeReferenced, "typedef", target.GetType());
+			var context = CompileReference(frame, namedType.Target);
+			if (context.EmitGet != null)
+				throw new CompilerException(namedType, CompilerException.Codes.IncorrectTypeReferenced, "typedef", context.Type);
+			return context.Type;
 		}
 
 		private void EndRecursionCheck(Parse.Statement statement)
@@ -1376,17 +1447,7 @@ namespace Ancestry.QueryProcessor.Compile
 
 		public BaseType CompileTupleType(Frame frame, Parse.TupleType tupleType)
 		{
-			// Create symbols
-			var local = AddFrame(frame, tupleType);
-
-			foreach (var a in tupleType.Attributes)
-				local.Add(a.Name, a);
-
-			foreach (var k in tupleType.Keys)
-				ResolveListReferences(local, k.AttributeNames);
-
-			foreach (var r in tupleType.References)
-				ResolveListReferences(local, r.SourceAttributeNames);
+			EnsureTupleTypeSymbols(frame, tupleType);
 
 			var normalized = new Type.TupleType();
 
@@ -1550,6 +1611,23 @@ namespace Ancestry.QueryProcessor.Compile
 			return expression.Type.Convert(expression, target);
 		}
 
+		private void EnsureTupleTypeSymbols(Frame frame, Parse.TupleType tupleType)
+		{
+			if (!_frames.ContainsKey(tupleType))
+			{
+				var local = AddFrame(frame, tupleType);
+
+				foreach (var a in tupleType.Attributes)
+					local.Add(a.Name, a);
+
+				foreach (var k in tupleType.Keys)
+					ResolveListReferences(local, k.AttributeNames);
+
+				foreach (var r in tupleType.References)
+					ResolveListReferences(local, r.SourceAttributeNames);
+			}
+		}
+
 		private ExpressionContext CompileTupleSelector(Frame frame, Parse.TupleSelector tupleSelector, BaseType typeHint)
 		{
 			var tupleType = new Type.TupleType();
@@ -1633,29 +1711,48 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private ExpressionContext CompileIdentifierExpression(Frame frame, Parse.IdentifierExpression identifierExpression, BaseType typeHint)
 		{
-			var symbol = ResolveReference<object>(frame, identifierExpression.Target);
+			return CompileReference(frame, identifierExpression.Target);
+		}
+
+		private ExpressionContext CompileReference(Frame frame, Parse.ID target)
+		{
+			var symbol = ResolveReference<object>(frame, target);
+
+			// If this is an enum member, ensure that the enclosing enum is compiled
+			Parse.EnumMember enumMember;
+			if (symbol is Parse.ID && _enumMembers.TryGetValue((Parse.ID)symbol, out enumMember))
+				LazyCompileModuleMember(enumMember);
+
 			ExpressionContext context;
 			if (_contextsBySymbol.TryGetValue(symbol, out context))
 				return context;
 
 			// Lazy-compile module member if needed
 			if (symbol is Parse.ModuleMember)
-				return LazyCompileModuleMember(identifierExpression, (Parse.ModuleMember)symbol);
+			{
+				var member = (Parse.ModuleMember)symbol;
+				return ResolveMember(target, member);
+			}
 
-			throw new CompilerException(identifierExpression, CompilerException.Codes.IdentifierNotFound, identifierExpression.Target);
+			throw new CompilerException(target, CompilerException.Codes.IdentifierNotFound, target);
 		}
 
-		private ExpressionContext LazyCompileModuleMember(Parse.Statement statement, Parse.ModuleMember member)
+		private ExpressionContext ResolveMember(Parse.Statement statement, Parse.ModuleMember member)
 		{
-			Action compilation;
-			if (_uncompiledMembers.TryGetValue(member, out compilation))
-				compilation();
+			LazyCompileModuleMember(member);
 
 			ExpressionContext context;
 			if (_contextsBySymbol.TryGetValue(member, out context))
 				return context;
 
 			throw new CompilerException(statement, CompilerException.Codes.RecursiveDeclaration);
+		}
+
+		private void LazyCompileModuleMember(Parse.ModuleMember member)
+		{
+			Action compilation;
+			if (_uncompiledMembers.TryGetValue(member, out compilation))
+				compilation();
 		}
 
 		private ExpressionContext CompileBinaryExpression(Frame frame, Parse.BinaryExpression expression, BaseType typeHint)

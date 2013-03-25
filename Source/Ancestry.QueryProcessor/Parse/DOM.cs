@@ -318,7 +318,7 @@ namespace Ancestry.QueryProcessor.Parse
 						? ":"
 						: String.Join
 						(
-							"  ", 
+							",  ", 
 							(from a in Attributes select a.ToString())
 							.Union(from r in References select r.ToString())
 							.Union(from k in Keys select k.ToString())

@@ -567,15 +567,26 @@ namespace Ancestry.QueryProcessor.Test
 		[TestMethod]
 		public void ModuleSelfReferencing()
 		{
+			// TODO: FIX const values - cannot compile builders into a dynamic method
 			var processor = new Processor();
 			processor.Execute
 			(
 				@"
 					module TestModule 1.0.0 
 					{ 
-						Forward: Int,  
-						Int: typedef Int32, 
-						Backward: { x: Int } 
+						ForwardTypedef: Int,
+						ForwardEnum: Color,
+						//ForwardEnumValue: const Red,	
+						//ForwardConst: const Five,  
+
+						Int: typedef Int32,
+						Color: enum { Red Green },
+						Five: const 5, 
+						
+						BackwardTypedef: { x: Int },
+						BackwardEnum: Color,
+						//BackwardEnumValue: const Green,
+						//BackwardConst: const Five
 					}
 				"
 			);

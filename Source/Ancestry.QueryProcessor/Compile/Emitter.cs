@@ -25,15 +25,23 @@ namespace Ancestry.QueryProcessor.Compile
 		private EmitterOptions _options;
 
 		private Dictionary<TupleType, System.Type> _tupleToNative;
+		private Dictionary<FunctionType, System.Type> _functionToDelegate;
 
 		public Emitter(EmitterOptions options)
 		{
 			_options = options;
+			
 			//// TODO: setup separate app domain with appropriate cache path, shadow copying etc.
 			//var domainName = "plan" + DateTime.Now.Ticks.ToString();
 			//var domain = AppDomain.CreateDomain(domainName);
+
 			_assemblyName = new AssemblyName(_options.AssemblyName);
-			_assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.RunAndSave);// TODO: temp for debugging .RunAndCollect);
+			_assembly = 
+				AppDomain.CurrentDomain.DefineDynamicAssembly
+				(
+					_assemblyName, 
+					_options.DebugOn ? AssemblyBuilderAccess.RunAndSave : AssemblyBuilderAccess.RunAndCollect
+				);
 			if (_options.DebugOn)
 				_assembly.SetCustomAttribute
 				(
@@ -50,6 +58,7 @@ namespace Ancestry.QueryProcessor.Compile
 						}
 					)
 				);
+			
 			_module = _assembly.DefineDynamicModule(_assemblyName.Name, _assemblyName.Name + ".dll", _options.DebugOn);
 			if (_options.DebugOn)
 				_symbolWriter = _module.DefineDocument(_options.SourceFileName, Guid.Empty, Guid.Empty, Guid.Empty);
