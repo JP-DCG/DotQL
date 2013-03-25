@@ -587,28 +587,37 @@ namespace Ancestry.QueryProcessor.Compile
 			var moduleVar = method.DeclareLocal(use, moduleType, (use.Alias ?? use.Target).ToString());
 
 			// Discover methods
-			foreach (var methodInfo in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+			foreach (var methodInfos in module.Class.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly).GroupBy(m => m.Name))
 			{
-				frame.Add(use, moduleName + Name.FromNative(methodInfo.Name), methodInfo);
-				_emitter.ImportType(methodInfo.ReturnType);
-				foreach (var parameter in methodInfo.GetParameters())
-					_emitter.ImportType(parameter.ParameterType);
 
-				var functionType = FunctionType.FromMethod(methodInfo, _emitter);
+                MethodInfo[] methodGroup = methodInfos.ToArray();
+
+                //Import all types.
+                foreach (var methodInfo in methodGroup)
+                {
+                    _emitter.ImportType(methodInfo.ReturnType);
+                    foreach (var parameter in methodInfo.GetParameters())
+                        _emitter.ImportType(parameter.ParameterType);
+                }
+
+				frame.Add(use, moduleName + Name.FromNative(methodGroup[0].Name), methodGroup);
+				
+
+				var functionGroupType = FunctionGroupType.FromMethodGroup(methodGroup, _emitter);
 
 				var context = 
 					new ExpressionContext
 					(
-						new Parse.IdentifierExpression { Target = Name.FromNative(methodInfo.Name).ToID() },
-						functionType,
+						new Parse.IdentifierExpression { Target = Name.FromNative(methodGroup[0].Name).ToID() },
+                        functionGroupType,
 						Characteristic.Constant,
 						null
 					)
 					{
-						Member = methodInfo
+						Member = methodGroup
 					};
 
-				_contextsBySymbol.Add(methodInfo, context);
+				_contextsBySymbol.Add(methodGroup, context);
 			}
 
 			// Discover enums

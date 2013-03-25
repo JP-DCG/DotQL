@@ -39,6 +39,17 @@ namespace Ancestry.QueryProcessor.Runtime
             return new Set<T>(listValue);
         }
 
+        //ToString overloads
+        public static string ToString(char value)
+        {
+            return value.ToString();
+        }
+
+        public static string ToString(int value)
+        {
+            return value.ToString();
+        }
+
         public static DateTime AddMonth(DateTime start, int months)
         {
             return start.AddMonths(months);
@@ -247,11 +258,6 @@ namespace Ancestry.QueryProcessor.Runtime
         {
             //TODO: Figure out why getting entry point not found with this code:
             return new string(chars.ToArray());
-        }
-
-        public static string ToString(char ch)
-        {
-            return ch.ToString();
         }
     }
 }
