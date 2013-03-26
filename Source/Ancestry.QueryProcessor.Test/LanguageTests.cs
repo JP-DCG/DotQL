@@ -328,7 +328,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			// Note: the for clauses in this test are not part of the same claused expression, one is nested in the return expression
 			var processor = new Processor();
-			dynamic result = 
+            dynamic result =
 				processor.Evaluate
 				(
 					@"
@@ -711,7 +711,7 @@ namespace Ancestry.QueryProcessor.Test
         public void CaseExpression()
         {
 
-            //"Switch" case
+            //Selective case
             var processor = new Processor();
             dynamic result = processor.Evaluate
             (
@@ -747,7 +747,7 @@ namespace Ancestry.QueryProcessor.Test
             Assert.AreEqual("two", result.Result);
 
 
-            //Stacked if case
+            //Conditional case
             result = processor.Evaluate
             (
                 @"return
@@ -780,11 +780,235 @@ namespace Ancestry.QueryProcessor.Test
 		            end"
             );
             Assert.AreEqual("neither", result.Result);
-            
+
 
             //TODO: Case strict
-
-
         }
+
+        [TestMethod]
+        public void NumericFunctions()
+        {
+            var processor = new Processor();
+            dynamic result = processor.Evaluate
+            (
+                @"return Abs(-1.1)"
+            );
+            Assert.AreEqual(1.1, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Acos(1.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Asin(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Atan(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Atan2(0.0,0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return BigMul(2000000000,2000)"
+            );
+            Assert.AreEqual(4000000000000, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Ceiling(1.1)"
+            );
+            Assert.AreEqual(2, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Cos(0)"
+            );
+            Assert.AreEqual(1, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Cosh(0)"
+            );
+            Assert.AreEqual(1, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Exp(0.0)"
+            );
+            Assert.AreEqual(1.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Factorial(10)"
+            );
+            Assert.AreEqual(3628800, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Frac(1.12)"
+            );
+            Assert.AreEqual(0.12, result.Result, .000001);
+
+            result = processor.Evaluate
+            (
+                @"return Floor(-1.1)"
+            );
+            Assert.AreEqual(-2.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return IEEERemainder(1.0,2.0)"
+            );
+            Assert.AreEqual(1.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Log(8.0, 2.0)"
+            );
+            Assert.AreEqual(3.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Log10(1.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Max(1.0,2.0)"
+            );
+            Assert.AreEqual(2.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Min(1.0,2.0)"
+            );
+            Assert.AreEqual(1.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Pow(2.0,2.0)"
+            );
+            Assert.AreEqual(4.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Round(1.1,0)"
+            );
+            Assert.AreEqual(1.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Sign(-2.0)"
+            );
+            Assert.AreEqual(-1, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Sin(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Sinh(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Sqrt(4.0)"
+            );
+            Assert.AreEqual(2.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Tan(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Tanh(0.0)"
+            );
+            Assert.AreEqual(0.0, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Truncate(1.1)"
+            );
+            Assert.AreEqual(1.0, result.Result);
+        }
+
+        [TestMethod]
+        public void StringFunctions()
+        {
+            var processor = new Processor();
+            dynamic result = processor.Evaluate
+            (
+                @"return Uppercase(""dOg"")"
+            );
+            Assert.AreEqual("DOG", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Lowercase(""CaT"")"
+            );
+            Assert.AreEqual("cat", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Concat(""-"", [""bubba"", ""joe""])"
+            );
+            Assert.AreEqual("bubba-joe", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Split(""bubba-joe"", {""-""})"
+            );
+            CollectionAssert.AreEqual(new []{"bubba","joe"}, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Length(""hello"")"
+            );
+            Assert.AreEqual(5, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Slice(""hello"", 2, 3)"
+            );
+            Assert.AreEqual("llo", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Normalize("" DotQL   is        super great! "")"
+            );
+            Assert.AreEqual("DotQL is super great!", result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Explode(""chars"")"
+            );
+            CollectionAssert.AreEqual(new[] { 'c', 'h', 'a', 'r', 's' }, result.Result);
+
+            result = processor.Evaluate
+            (
+                @"return Implode(['c','h','a','r','s'])"
+            );
+            Assert.AreEqual("chars", result.Result);
 	}
+    }
 }

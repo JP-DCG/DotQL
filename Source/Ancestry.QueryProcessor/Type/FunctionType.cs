@@ -21,6 +21,64 @@ namespace Ancestry.QueryProcessor.Type
 
 		public BaseType Type { get; set; }
 
+        public ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint, ExpressionContext[] args)
+        {
+            MethodInfo methodType = null;
+            if (function.Member != null)
+            {
+                methodType = (MethodInfo)(function.Member);
+
+                // Resolve generic arguments
+                if (methodType.ContainsGenericParameters)
+                {
+                    var genericArgs = methodType.GetGenericArguments();
+                    var resolved = new System.Type[genericArgs.Length];
+                    if (callExpression.TypeArguments.Count > 0)
+                    {
+                        for (var i = 0; i < resolved.Length; i++)
+                            resolved[i] = compiler.CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(compiler.Emitter);
+                    }
+                    else
+                    {
+                        var parameters = methodType.GetParameters();
+                        for (var i = 0; i < parameters.Length; i++)
+                            compiler.DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(compiler.Emitter));
+                        // TODO: Assert that all type parameters are resolved
+                    }
+                    methodType = methodType.MakeGenericMethod(resolved);
+                    // http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
+                }
+            }
+
+            return
+                new ExpressionContext
+                (
+                    callExpression,
+                    ((FunctionType)function.Type).Type,
+                    function.Characteristics,
+                    m =>
+                    {
+                        if (methodType != null)		// Invoke as method
+                        {
+                            if (function.EmitGet != null)
+                                function.EmitGet(m);	// Instance
+                            foreach (var arg in args)
+                                arg.EmitGet(m);
+                            m.IL.EmitCall(OpCodes.Call, methodType, null);
+                        }
+                        else	// Invoke as delegate
+                        {
+
+                            function.EmitGet(m);
+                            foreach (var arg in args)
+                                arg.EmitGet(m);
+                            var delegateType = function.Type.GetNative(compiler.Emitter);
+                            m.IL.EmitCall(OpCodes.Callvirt, delegateType.GetMethod("Invoke"), null);
+                        }
+                    }
+                );
+        }
+
 		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint)
 		{
 			/* 
@@ -34,60 +92,7 @@ namespace Ancestry.QueryProcessor.Type
 			for (var i = 0; i < callExpression.Arguments.Count; i++)
 				args[i] = compiler.CompileExpression(frame, callExpression.Arguments[i]);
 
-			MethodInfo methodType = null;
-			if (function.Member != null)
-			{
-				methodType = (MethodInfo)(function.Member);
-
-				// Resolve generic arguments
-				if (methodType.ContainsGenericParameters)
-				{
-					var genericArgs = methodType.GetGenericArguments();
-					var resolved = new System.Type[genericArgs.Length];
-					if (callExpression.TypeArguments.Count > 0)
-					{
-						for (var i = 0; i < resolved.Length; i++)
-							resolved[i] = compiler.CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(compiler.Emitter);
-					}
-					else
-					{
-						var parameters = methodType.GetParameters();
-						for (var i = 0; i < parameters.Length; i++)
-							compiler.DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(compiler.Emitter));
-						// TODO: Assert that all type parameters are resolved
-					}
-					methodType = methodType.MakeGenericMethod(resolved);
-					// http://msdn.microsoft.com/en-us/library/system.reflection.methodinfo.makegenericmethod.aspx
-				}
-			}
-
-			return
-				new ExpressionContext
-				(
-					callExpression,
-					((FunctionType)function.Type).Type,
-					function.Characteristics,
-					m =>
-					{
-						if (methodType != null)		// Invoke as method
-						{
-							if (function.EmitGet != null)
-								function.EmitGet(m);	// Instance
-							foreach (var arg in args)
-								arg.EmitGet(m);
-							m.IL.EmitCall(OpCodes.Call, methodType, null);
-						}
-						else	// Invoke as delegate
-						{
-
-							function.EmitGet(m);
-							foreach (var arg in args)
-								arg.EmitGet(m);
-							var delegateType = function.Type.GetNative(compiler.Emitter);
-							m.IL.EmitCall(OpCodes.Callvirt, delegateType.GetMethod("Invoke"), null);
-						}
-					}
-				);
+            return CompileCallExpression(compiler, frame, function, callExpression, typeHint, args);			
 		}
 
 		protected override void EmitBinaryOperator(MethodContext method, Compiler compiler, ExpressionContext left, ExpressionContext right, Parse.BinaryExpression expression)

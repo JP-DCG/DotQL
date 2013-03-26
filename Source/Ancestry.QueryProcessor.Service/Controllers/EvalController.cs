@@ -10,7 +10,7 @@ namespace Ancestry.QueryProcessor.Service.Controllers
 		{
 			var service = new Processor(QueryConfig.Settings);
 			var result = service.Evaluate(e, a == null ? null : JsonInterop.JsonArgsToNative(JObject.Parse(a)));
-			return Json(result, JsonRequestBehavior.AllowGet);
+			return Json(result.Result, JsonRequestBehavior.AllowGet);
 		}
 	}
 }

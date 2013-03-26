@@ -8,41 +8,52 @@ using System.Threading.Tasks;
 
 namespace Ancestry.QueryProcessor.Runtime
 {
-	public class SystemModule
-	{
-		public static readonly Boolean Boolean;
-		public static readonly Int32 Int32;
-		public static readonly Int64 Int64;
-		public static readonly Char Char;
-		public static readonly String String;
-		// TODO: public static readonly Date Date;
-		// TODO: public static readonly Time Time;
-		public static readonly DateTime DateTime;
-		public static readonly Name Name;
-		public static readonly Double Double;
-		public static readonly Guid GUID;
-		public static readonly TimeSpan TimeSpan;
-		public static readonly Version Version;
+    public class SystemModule
+    {
+        public static readonly Boolean Boolean;
+        public static readonly Int32 Int32;
+        public static readonly Int64 Int64;
+        public static readonly Char Char;
+        public static readonly String String;
+        // TODO: public static readonly Date Date;
+        // TODO: public static readonly Time Time;
+        public static readonly DateTime DateTime;
+        public static readonly Name Name;
+        public static readonly Double Double;
+        public static readonly Guid GUID;
+        public static readonly TimeSpan TimeSpan;
+        public static readonly Version Version;
 
-		public Storage.IRepository<ISet<ModuleTuple>> Modules;
+        public Storage.IRepository<ISet<ModuleTuple>> Modules;
 
-		public Storage.IRepository<ISet<UsingTuple>> DefaultUsings;
+        public Storage.IRepository<ISet<UsingTuple>> DefaultUsings;
 
-		public static IList<T> ToList<T>(ISet<T> setValue)
-		{
-			// TODO: ensure that the items coming from the set are ordered so that this is deterministic
-			return new ListEx<T>(setValue);
-		}
+        public static IList<T> ToList<T>(ISet<T> setValue)
+        {
+            // TODO: ensure that the items coming from the set are ordered so that this is deterministic
+            return new ListEx<T>(setValue);
+        }
 
-		public static ISet<T> ToSet<T>(IList<T> listValue)
-		{
-			return new Set<T>(listValue);
-		}
+        public static ISet<T> ToSet<T>(IList<T> listValue)
+        {
+            return new Set<T>(listValue);
+        }
 
-		public static DateTime AddMonth(DateTime start, int months)
-		{
-			return start.AddMonths(months);
-		}
+        //ToString overloads
+        public static string ToString(char value)
+        {
+            return value.ToString();
+        }
+
+        public static string ToString(int value)
+        {
+            return value.ToString();
+        }
+
+        public static DateTime AddMonth(DateTime start, int months)
+        {
+            return start.AddMonths(months);
+        }
 
         public static DateTime AddDay(DateTime start, double days)
         {
@@ -95,20 +106,27 @@ namespace Ancestry.QueryProcessor.Runtime
             return Math.Cosh(value);
         }
 
-        //public static double DivRem(double value)
-        //{
-        //    return Math.DivRem(value);
-        //}
-
         public static double Exp(double value)
         {
             return Math.Exp(value);
         }
 
-        //public static long Factorial(int value)
-        //{
+        public static long Factorial(int value)
+        {
+            var ex = 0.0;
+            var x = (double)value;
+            x = x + x + 1;
+            if (x > 1)
+            {
+                x = (Math.Log(2.0 * Math.PI) + Math.Log(x / 2.0) * x - x
+                - (1.0 - 7.0 / (30.0 * x * x)) / (6.0 * x)) / 2.0;
+                x = x / Math.Log(10);
+                ex = Math.Floor(x);
+                x = Math.Pow(10, x - ex);
+            }
 
-        //}
+            return (long)Math.Truncate(x * Math.Pow(10, ex));
+        }
 
         public static double Frac(double value)
         {
@@ -195,5 +213,51 @@ namespace Ancestry.QueryProcessor.Runtime
             return Math.Truncate(value);
         }
 
-	}
+        //String
+        public static string Uppercase(string value)
+        {
+            return value.ToUpper();
+        }
+
+        public static string Lowercase(string value)
+        {
+            return value.ToLower();
+        }
+
+        public static string Concat(string separator, IList<string> values)
+        {
+            return String.Join(separator, values);
+        }
+
+        public static IList<string> Split(string value, ISet<string> delimiters)
+        {
+            return new ListEx<string>(value.Split(delimiters.ToArray(), StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        public static int Length(string value)
+        {
+            return value.Length;
+        }
+
+        public static string Slice(string value, int startIndex, int length)
+        {
+            return value.Substring(startIndex, length);
+        }
+
+        public static string Normalize(string value)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
+        }
+
+        public static IList<char> Explode(string value)
+        {
+            return value.ToCharArray();
+        }
+
+        public static string Implode(IList<char> chars)
+        {
+            //TODO: Figure out why getting entry point not found with this code:
+            return new string(chars.ToArray());
+        }
+    }
 }
