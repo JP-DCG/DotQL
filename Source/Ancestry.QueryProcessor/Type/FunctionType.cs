@@ -29,6 +29,7 @@ namespace Ancestry.QueryProcessor.Type
 			 * or a Delegate.
 			 */
 
+			//TODO: Verify that there is no case where this needed because generic types should be resolved by call resolution code.
             MethodInfo methodType = null;
             if (function.Member != null)
             {

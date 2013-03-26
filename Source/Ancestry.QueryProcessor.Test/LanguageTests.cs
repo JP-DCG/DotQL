@@ -970,7 +970,7 @@ namespace Ancestry.QueryProcessor.Test
 
             result = processor.Evaluate
             (
-                @"return Concat(""-"", [""bubba"", ""joe""])"
+				@"return Concat( [""bubba"", ""joe""], ""-"")"
             );
             Assert.AreEqual("bubba-joe", result.Result);
 
