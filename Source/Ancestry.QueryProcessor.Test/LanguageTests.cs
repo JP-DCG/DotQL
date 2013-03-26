@@ -268,7 +268,7 @@ namespace Ancestry.QueryProcessor.Test
 		{
 			var processor = new Processor();
 
-			dynamic result = processor.Evaluate(@"module Test 1.0.0 { X: Int32, AddX: (y : Int32) return X + y }");
+			dynamic result = processor.Evaluate(@"module Test 1.0.0 { X: Int32, AddX: const (y : Int32) return X + y }");
 			result = processor.Evaluate
 			(
 				@"
