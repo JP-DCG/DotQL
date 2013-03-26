@@ -39,16 +39,21 @@ namespace Ancestry.QueryProcessor.Runtime
             return new Set<T>(listValue);
         }
 
-        //ToString overloads
-        public static string ToString(char value)
-        {
-            return value.ToString();
-        }
+		public static string ToString<T>(T value)
+		{
+			return value.ToString();
+		}
 
-        public static string ToString(int value)
-        {
-            return value.ToString();
-        }
+        //ToString overloads
+		//public static string ToString(char value)
+		//{
+		//	return value.ToString();
+		//}
+
+		//public static string ToString(int value)
+		//{
+		//	return value.ToString();
+		//}
 
         public static DateTime AddMonth(DateTime start, int months)
         {
@@ -224,7 +229,7 @@ namespace Ancestry.QueryProcessor.Runtime
             return value.ToLower();
         }
 
-        public static string Concat(string separator, IList<string> values)
+        public static string Concat(IList<string> values, string separator)
         {
             return String.Join(separator, values);
         }
@@ -241,13 +246,53 @@ namespace Ancestry.QueryProcessor.Runtime
 
         public static string Slice(string value, int startIndex, int length)
         {
+			if (startIndex >= value.Length)
+				return "";
+
             return value.Substring(startIndex, length);
         }
+
+		public static bool IsMatch(string value, string pattern)
+		{
+			return System.Text.RegularExpressions.Regex.Match(value, pattern).Success;
+		}
+
+		//TODO: Regex Matches returning set of matches.
 
         public static string Normalize(string value)
         {
             return System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
         }
+
+		public static int IndexOf(string value, string token)
+		{
+			return value.IndexOf(token);
+		}
+
+		public static int IndexOf(string value, string token, int startIndex)
+		{
+			return value.IndexOf(token, startIndex);
+		}
+
+		public static int IndexOf(string value, string token, int startIndex, int count)
+		{
+			return value.IndexOf(token, startIndex, count);
+		}
+
+		public static int LastIndexOf(string value, string token)
+		{
+			return value.LastIndexOf(token);
+		}
+
+		public static int LastIndexOf(string value, string token, int startIndex)
+		{
+			return value.LastIndexOf(token, startIndex);
+		}
+
+		public static int LastIndexOf(string value, string token, int startIndex, int count)
+		{
+			return value.LastIndexOf(token, startIndex, count);
+		}
 
         public static IList<char> Explode(string value)
         {
@@ -256,7 +301,6 @@ namespace Ancestry.QueryProcessor.Runtime
 
         public static string Implode(IList<char> chars)
         {
-            //TODO: Figure out why getting entry point not found with this code:
             return new string(chars.ToArray());
         }
     }
