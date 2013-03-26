@@ -23,6 +23,12 @@ namespace Ancestry.QueryProcessor.Type
 
         public ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint, ExpressionContext[] args)
         {
+			/* 
+			 * Functions are implemented as delegates if referencing a variable, or as methods if referencing a constant.
+			 * The logical type will always be a FunctionType, but the native type with either be a MethodInfo
+			 * or a Delegate.
+			 */
+
             MethodInfo methodType = null;
             if (function.Member != null)
             {
@@ -81,12 +87,6 @@ namespace Ancestry.QueryProcessor.Type
 
 		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint)
 		{
-			/* 
-			 * Functions are implemented as delegates if referencing a variable, or as methods if referencing a constant.
-			 * The logical type will always be a FunctionType, but the native type with either be a MethodInfo
-			 * or a Delegate.
-			 */
-
 			// Compile arguments
 			var args = new ExpressionContext[callExpression.Arguments.Count];
 			for (var i = 0; i < callExpression.Arguments.Count; i++)

@@ -192,7 +192,29 @@ namespace Ancestry.QueryProcessor.Compile
 
                 for (int f = 0; f < potential.Count; ++f)
                 {
-                    var parameters = potential[f].GetParameters();
+					var methodInfo = potential[f];
+                    var parameters = methodInfo.GetParameters();
+
+					if (methodInfo.ContainsGenericParameters)
+					{
+						var genericArgs = methodInfo.GetGenericArguments();
+						var resolved = new System.Type[genericArgs.Length];
+						if (callExpression.TypeArguments.Count > 0)
+						{
+							for (var i = 0; i < resolved.Length; i++)
+								resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(Emitter);
+						}
+						else
+						{
+							for (var i = 0; i < parameters.Length; i++)
+								DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(Emitter));
+						}
+
+						methodInfo = methodInfo.MakeGenericMethod(resolved);
+						parameters = methodInfo.GetParameters();
+					}
+
+
                     bool match = true;
                     for (int p = 0; p < parameters.Count(); p++)
                     {
@@ -1787,7 +1809,7 @@ namespace Ancestry.QueryProcessor.Compile
             if (symbol is MethodInfo[])
                 return new ExpressionContext
                 (
-                    identifierExpression,
+                    null,
                     SystemTypes.Void,
                     Characteristic.Default,
                     null

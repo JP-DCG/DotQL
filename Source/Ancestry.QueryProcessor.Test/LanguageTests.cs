@@ -833,13 +833,13 @@ namespace Ancestry.QueryProcessor.Test
 
             result = processor.Evaluate
             (
-                @"return Cos(0)"
+                @"return Cos(0.0)"
             );
             Assert.AreEqual(1, result.Result);
 
             result = processor.Evaluate
             (
-                @"return Cosh(0)"
+                @"return Cosh(0.0)"
             );
             Assert.AreEqual(1, result.Result);
 
@@ -1004,11 +1004,11 @@ namespace Ancestry.QueryProcessor.Test
             );
             CollectionAssert.AreEqual(new[] { 'c', 'h', 'a', 'r', 's' }, result.Result);
 
-            result = processor.Evaluate
-            (
-                @"return Implode(['c','h','a','r','s'])"
-            );
-            Assert.AreEqual("chars", result.Result);
+			result = processor.Evaluate
+			(
+				@"return Implode(['c'c,'h'c,'a'c,'r'c,'s'c])"
+			);
+			Assert.AreEqual("chars", result.Result);
 	}
     }
 }
