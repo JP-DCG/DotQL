@@ -169,6 +169,6 @@
     <value>Invalid Case Expression: {0}</value>
   </data>
   <data name="105117" xml:space="preserve">
-    <value>No functions match this signature: {0}</value>
+    <value>No function named {0} has matching arguments.</value>
   </data>
 </root>

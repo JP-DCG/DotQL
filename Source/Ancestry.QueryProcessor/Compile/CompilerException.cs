@@ -59,9 +59,9 @@ namespace Ancestry.QueryProcessor.Compile
             /// <summary>Error code 105116: "Invalid Case expression."</summary>
             InvalidCase = 105116,
 
-            /// <summary>Error code 105176: "No matching function signatures."</summary>
+			/// <summary>Error code 105117: "No function named {0} has matching arguments."</summary>
             SignatureMismatch = 105117
-        }
+		}
 
 		// Resource manager for this exception class
 		private static ResourceManager _resourceManager = new ResourceManager("Ancestry.QueryProcessor.Compile.CompilerException", typeof(CompilerException).Assembly);

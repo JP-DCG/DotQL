@@ -178,7 +178,7 @@ namespace Ancestry.QueryProcessor.Compile
         {
             var potential = methods.Where(m => m.GetParameters().Count() == callExpression.Arguments.Count).ToList();
             if (potential.Count == 0)
-                throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.ToString());
+                throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.Function.ToString());
 
             MethodInfo function = null;
             var args = new ExpressionContext[callExpression.Arguments.Count];
@@ -190,42 +190,61 @@ namespace Ancestry.QueryProcessor.Compile
                 for (var i = 0; i < callExpression.Arguments.Count; i++)
                     args[i] = CompileExpression(frame, callExpression.Arguments[i]);
 
-                for (int f = 0; f < potential.Count; ++f)
+                for (int f = 0; function == null && f < potential.Count; ++f)
                 {
-                    var parameters = potential[f].GetParameters();
-                    bool match = true;
-                    for (int p = 0; p < parameters.Count(); p++)
+					var methodInfo = potential[f];
+                    var parameters = methodInfo.GetParameters();
+
+					if (methodInfo.ContainsGenericParameters)
+					{
+						var genericArgs = methodInfo.GetGenericArguments();
+						var resolved = new System.Type[genericArgs.Length];
+						if (callExpression.TypeArguments.Count > 0)
+						{
+							for (var i = 0; i < resolved.Length; i++)
+								resolved[i] = CompileTypeDeclaration(frame, callExpression.TypeArguments[i]).GetNative(Emitter);
+						}
+						else
+						{
+							for (var i = 0; i < parameters.Length; i++)
+								DetermineTypeParameters(callExpression, resolved, parameters[i].ParameterType, args[i].NativeType ?? args[i].Type.GetNative(Emitter));
+						}
+
+						methodInfo = methodInfo.MakeGenericMethod(resolved);
+						parameters = methodInfo.GetParameters();
+					}
+
+					//If the first parameter isn't an exact match continue to the next function and try to match.
+					if (Emitter.TypeFromNative(parameters[0].ParameterType) != args[0].Type)
+						continue;
+
+					//Attempt to convert rest of parameters.
+                    for (int p = 1; p < parameters.Count(); p++)
                     {
-                        if (Emitter.TypeFromNative(parameters[p].ParameterType) != args[p].Type)
-                        {
-                            match = false;
-                            break;
-                        }
+						var parameterType = Emitter.TypeFromNative(parameters[p].ParameterType);
+						if (args[p].Type != parameterType)
+							args[p] = Convert(args[p], parameterType);                       
                     }
 
-                    if (match)
-                    {
-                        function = potential[f];
-                        break;
-                    }
+					function = potential[f];
                 }
             }
 
             if (function == null)
-                throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.ToString());
+				throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.Function.ToString());
 
             var functionType = FunctionType.FromMethod(function, Emitter);
 
-             var context = new ExpressionContext
-                    (
-                        new Parse.IdentifierExpression { Target = Name.FromNative(function.Name).ToID() },
-                        functionType,
-                        Characteristic.Constant,
-                        null
-                    )
-                    {
-                        Member = function
-                    };
+            var context = new ExpressionContext
+				(
+					new Parse.IdentifierExpression { Target = Name.FromNative(function.Name).ToID() },
+					functionType,
+					Characteristic.Constant,
+					null
+				)
+				{
+					Member = function
+				};
 
 
              return functionType.CompileCallExpression(this, frame, context, callExpression, typeHint, args);
@@ -1787,7 +1806,7 @@ namespace Ancestry.QueryProcessor.Compile
             if (symbol is MethodInfo[])
                 return new ExpressionContext
                 (
-                    identifierExpression,
+                    null,
                     SystemTypes.Void,
                     Characteristic.Default,
                     null
