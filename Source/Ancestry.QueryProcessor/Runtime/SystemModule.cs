@@ -79,15 +79,58 @@ namespace Ancestry.QueryProcessor.Runtime
 		}
 		
 		//DateTume functions
-        public static DateTime AddMonth(DateTime start, int months)
+		//return UTC string of datetime
+		public static string ToString(DateTime date)
+		{
+			return date.ToString("s", System.Globalization.CultureInfo.InvariantCulture);
+		}
+
+		public static DateTime ToUTC(DateTime date)
+		{
+			return date.ToUniversalTime();
+		}
+
+		public static DateTime AddYears(DateTime start, int years)
+		{
+			return start.AddYears(years);
+		}
+
+        public static DateTime AddMonths(DateTime start, int months)
         {
             return start.AddMonths(months);
         }
 
-        public static DateTime AddDay(DateTime start, double days)
+        public static DateTime AddDays(DateTime start, double days)
         {
             return start.AddDays(days);
         }
+
+		public static DateTime AddHours(DateTime start, double hours)
+		{
+			return start.AddHours(hours);
+		}
+
+		public static DateTime AddMinutes(DateTime start, double minutes)
+		{
+			return start.AddMinutes(minutes);
+		}
+
+		public static DateTime AddSeconds(DateTime start, double seconds)
+		{
+			return start.AddSeconds(seconds);
+		}
+
+		public static DateTime AddMilliseconds(DateTime start, long milliseconds)
+		{
+			return start.AddMilliseconds(milliseconds);
+		}
+
+		public static DateTime AddTicks(DateTime start, long ticks)
+		{
+			return start.AddTicks(ticks);
+		}
+
+		
 
         //Numeric functions
 
@@ -381,34 +424,34 @@ namespace Ancestry.QueryProcessor.Runtime
 			return value.ToString();
 		}
 
-		//public static string ToString(char value)
-		//{
-		//	return value.ToString();
-		//}
+		public static string ToString(char value)
+		{
+			return value.ToString();
+		}
 
-		//public static string ToString(int value)
-		//{
-		//	return value.ToString();
-		//}
+		public static string ToString(int value)
+		{
+			return value.ToString();
+		}
 
-		//public static string ToString(long value)
-		//{
-		//	return value.ToString();
-		//}
+		public static string ToString(long value)
+		{
+			return value.ToString();
+		}
 
-		//public static string ToString(bool value)
-		//{
-		//	return value.ToString();
-		//}
+		public static string ToString(bool value)
+		{
+			return value.ToString();
+		}
 
-		//public static string ToString(string value)
-		//{
-		//	return value;
-		//}
+		public static string ToString(string value)
+		{
+			return value;
+		}
 
-		//public static string ToString(DateTime value)
-		//{
-		//	return value.ToUniversalTime().ToString();
-		//}
-    }
+		public static string ToString(DateTime value)
+		{
+			return value.ToUniversalTime().ToString();
+		}
+	}
 }
