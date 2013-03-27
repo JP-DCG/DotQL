@@ -19,7 +19,7 @@ ModuleDeclaration :=
 	"module" Name : ID Version : Version "{" Members : [ moduleMember ]^[","] "}"
 
 moduleMember =
-	TypeMember | EnumMember	| ConstMember | VarMember
+	TypeMember | EnumMember	| ConstMember | VarMember | FunctionMember
 
 TypeMember :=
 	Name : ID ":" "typedef" Type : typeDeclaration
@@ -32,6 +32,16 @@ ConstMember :=
 
 VarMember :=
 	Name : ID ":" Type: typeDeclaration
+
+FunctionMember :=
+	Name : ID ":" "function" 
+		[ "`" TypeParameters : ID^[","] "`" ] 
+		"(" Parameters : [ FunctionParameter ]^[","] ")" 
+		":" ReturnType : typeDeclaration 
+		Expression : ClausedExpression
+
+FunctionParameter :
+	Name : ID ":" Type : typeDeclaration
 
 VarDeclaration :=
 	"var" Name : ID [ ":" Type : typeDeclaration ] [ ":=" Initializer : expression )
@@ -49,7 +59,7 @@ OptionalType :=
 	Type : requiredTypes IsRequired : ( "?" | "!" )
 
 requiredTypes =
-	ListType | TupleType | SetType | FunctionType | IntervalType | NamedType | TypeOf
+	ListType | TupleType | SetType | IntervalType | NamedType | TypeOf
 
 ListType :=
 	"[" Type : typeDeclaration "]"
@@ -69,15 +79,6 @@ TupleReference :=
 
 TupleKey :=
 	"key" "{" AttributeNames : [ ID ]^[","] "}"
-
-FunctionType :=
-	functionParameters [ "`" TypeParameters : typeDeclaration^[","] "`" ] ":" ReturnType : typeDeclaration
-
-functionParameters =
-	"(" Parameters : [ FunctionParameter ]^[","] ")"
-
-FunctionParameter :=
-	Name : ID ":" Type : typeDeclaration
 
 IntervalType :=
 	"interval" Type : typeDeclaration
@@ -123,18 +124,10 @@ expression 11 =
 	)
 
 expression 10 =
-	CallExpression : 
-	( 
-		Function : expression [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
-		( 
-			( "(" Arguments : expression^[","] ")" ) 
-				| ( "->" Argument : expression )
-		)
+	ExtractExpression :
+	(
+		Expression : expression "[" [ Condition : expression ] "]"
 	)
-		| ExtractExpression :
-		(
-			Expression : expression "[" [ Condition : expression ] "]"
-		)
 
 expression 12 =
 	DereferenceExpression : ( Left : expression Operator : ( "." | "<<" ) Right : expression )
@@ -144,7 +137,7 @@ expression =
 		| ListSelector
 		| TupleSelector
 		| SetSelector
-		| FunctionSelector
+		| CallExpression
 		| IdentifierExpression
 		| IntegerLiteral
 		| DoubleLiteral
@@ -171,8 +164,12 @@ TupleAttributeSelector :=
 SetSelector :=
 	"{" Items : [ expression ]^[","] "}"
 
-FunctionSelector :=
-	functionParameters ":" ReturnType : typeDeclaration Expression : ClausedExpression
+CallExpression := 
+	Name : ID [ "`" TypeArguments : typeDeclaration^[","] "`" ] 
+	( 
+		( "(" Arguments : expression^[","] ")" ) 
+			| ( "->" Argument : expression )
+	)
 
 IdentifierExpression := 
 	Target : ID

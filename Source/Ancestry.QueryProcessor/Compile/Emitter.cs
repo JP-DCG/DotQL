@@ -25,7 +25,6 @@ namespace Ancestry.QueryProcessor.Compile
 		private EmitterOptions _options;
 
 		private Dictionary<TupleType, System.Type> _tupleToNative;
-		private Dictionary<FunctionType, System.Type> _functionToDelegate;
 
 		public Emitter(EmitterOptions options)
 		{
@@ -102,31 +101,6 @@ namespace Ancestry.QueryProcessor.Compile
 					)
 				); 
 			return result;
-		}
-
-		public System.Type FindOrCreateNativeFromFunctionType(FunctionType functionType)
-		{
-			/* Custom delegates are needed for DotQL because the parameter names are part of the unique 
-			 * function type.  Expression.GetDelegateType, for instance, will give delegates that match 
-			 * the type signature, but not the parameter names. */
-
-			// TODO: Need accurate cache key - hash isn't perfect
-			var name = "Delegate" + functionType.GetHashCode().ToString();
-
-			var result = _module.GetType(name);
-			if (result != null)
-				return result;
-
-			var returnType = functionType.Type.GetNative(this);
-			var parameterTypes = functionType.Parameters.Select(p => p.Type.GetNative(this)).ToArray();
-			TypeBuilder builder = _module.DefineType(name, TypeAttributes.AutoClass | TypeAttributes.Sealed | TypeAttributes.Public, typeof(MulticastDelegate));
-			builder.DefineConstructor(MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public, CallingConventions.Standard, _DelegateConstructorSignature).SetImplementationFlags(MethodImplAttributes.CodeTypeMask);
-			var invoke = builder.DefineMethod("Invoke", MethodAttributes.NewSlot | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.Public, returnType, parameterTypes);
-			invoke.SetImplementationFlags(MethodImplAttributes.CodeTypeMask);
-			var num = 1;
-			foreach (var p in functionType.Parameters)
-				invoke.DefineParameter(num++, ParameterAttributes.None, p.Name.ToString());
-			return builder.CreateType();
 		}
 
 		public System.Type FindOrCreateNativeFromTupleType(TupleType tupleType)
@@ -340,8 +314,6 @@ namespace Ancestry.QueryProcessor.Compile
 				return new SetType(TypeFromNative(native.GenericTypeArguments[0]));
 			if (ReflectionUtility.IsNary(native))
 				return new ListType(TypeFromNative(native.GenericTypeArguments[0]));
-			if (ReflectionUtility.IsFunction(native))
-				return FunctionType.FromMethod(native.GetMethod("Invoke"), this);
 			BaseType scalarType;
 			if (_options.ScalarTypes == null || !_options.ScalarTypes.TryGetValue(native.ToString(), out scalarType))
 				return new ScalarType(native);

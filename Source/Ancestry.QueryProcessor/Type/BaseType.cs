@@ -355,9 +355,9 @@ namespace Ancestry.QueryProcessor.Type
 			throw new NotImplementedException(String.Format("Conversion from {0} to {1} is not supported.", expression.Type, target));
 		}
 
-		public virtual ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext function, Parse.CallExpression callExpression, BaseType typeHint)
+		public virtual ExpressionContext CompileExtractExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.ExtractExpression expression, BaseType typeHint)
 		{
-			throw new CompilerException(callExpression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Invoke, GetType());
+			throw new CompilerException(expression, CompilerException.Codes.OperatorNotSupported, Parse.Keywords.Extract, GetType());
 		}
 	}
 }

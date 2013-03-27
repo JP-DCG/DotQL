@@ -26,7 +26,7 @@ namespace Ancestry.QueryProcessor.Test
 			Assert.AreEqual(@using.Version, Version.Parse("1.2.3"));
 			Assert.AreEqual("Something", string.Join("\\", @using.Target.Components));
 
-			@using = new Parser().Using(new Lexer("using SomeAlias = Something 1.2.0"));
+			@using = new Parser().Using(new Lexer("using SomeAlias := Something 1.2.0"));
 			Assert.IsNotNull(@using.Alias.Components);
 			Assert.AreEqual("SomeAlias", string.Join("\\", @using.Alias.Components));
 			Assert.IsNotNull(@using.Target.Components);

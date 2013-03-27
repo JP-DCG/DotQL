@@ -401,52 +401,6 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
-	public class FunctionType : TypeDeclaration
-	{
-		private List<TypeDeclaration> _typeParameters = new List<TypeDeclaration>();
-		public List<TypeDeclaration> TypeParameters { get { return _typeParameters; } set { _typeParameters = value; } }
-
-		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
-		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
-
-		public TypeDeclaration ReturnType { get; set; }
-
-		public override string ToString()
-		{
-			return "(" + String.Join(", ", from p in Parameters select p.ToString()) 
-				+ ")  "
-				+ (TypeParameters.Count > 0 ? "`" + String.Join(", ", from tp in TypeParameters select tp.ToString()) + "` " : "")
-				+ ": " + ReturnType.ToString();
-		}
-
-		public override IEnumerable<Statement> GetChildren()
-		{
-			foreach (var tp in TypeParameters)
-				yield return tp;
-			foreach (var p in Parameters)
-				yield return p;
-			yield return ReturnType;
-		}
-	}
-
-	public class FunctionParameter : Statement, ISymbol
-	{
-		public ID Name { get; set; }
-
-		public TypeDeclaration Type { get; set; }
-
-		public override string ToString()
-		{
-			return Name + " : " + Type;
-		}
-
-		public override IEnumerable<Statement> GetChildren()
-		{
-			yield return Name;
-			yield return Type;
-		}
-	}
-
 	public class IntervalType : TypeDeclaration
 	{
 		public TypeDeclaration Type { get; set; }
@@ -666,7 +620,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 	public class CallExpression : Expression
 	{
-		public Expression Function { get; set; }
+		public ID Name { get; set; }
 
 		private List<TypeDeclaration> _typeArguments = new List<TypeDeclaration>();
 		public List<TypeDeclaration> TypeArguments { get { return _typeArguments; } }
@@ -680,7 +634,7 @@ namespace Ancestry.QueryProcessor.Parse
 		public override string ToString()
 		{
 			return
-				Function.ToString()
+				Name.ToString()
 					+ (TypeArguments.Count > 0 ? "`" + String.Join(", ", from ta in TypeArguments select ta.ToString()) + "`" : "")
 					+ (Argument != null ? "->" + Argument : "")
 					+ (Arguments != null ? "(" + String.Join(", ", from a in Arguments select a.ToString()) + ")" : "");
@@ -688,7 +642,7 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override IEnumerable<Statement> GetChildren()
 		{
-			yield return Function;
+			yield return this.Name;
 			foreach (var ta in TypeArguments)
 				yield return ta;
 			foreach (var a in Arguments)
@@ -807,8 +761,29 @@ namespace Ancestry.QueryProcessor.Parse
 		}
 	}
 
-	public class FunctionSelector : Expression
+	public class FunctionParameter : Statement, ISymbol
 	{
+		public ID Name { get; set; }
+
+		public TypeDeclaration Type { get; set; }
+
+		public override string ToString()
+		{
+			return Name + " : " + Type;
+		}
+
+		public override IEnumerable<Statement> GetChildren()
+		{
+			yield return Name;
+			yield return Type;
+		}
+	}
+
+	public class FunctionMember : ModuleMember
+	{
+		private List<ID> _typeParameters = new List<ID>();
+		public List<ID> TypeParameters { get { return _typeParameters; } set { _typeParameters = value; } }
+
 		private List<FunctionParameter> _parameters = new List<FunctionParameter>();
 		public List<FunctionParameter> Parameters { get { return _parameters; } set { _parameters = value; } }
 
@@ -818,15 +793,18 @@ namespace Ancestry.QueryProcessor.Parse
 
 		public override string ToString()
 		{
-			return "(" + String.Join(", ", from p in Parameters select p.ToString()) + ")"
-				+ " " + (ReturnType != null ? ReturnType.ToString() : "") + "\r\n\t" + Expression;
+			return Name.ToString() + ": function(" + String.Join(", ", from p in Parameters select p.ToString()) + ")"
+				+ (ReturnType != null ? " : " + ReturnType.ToString() : "") + "\r\n\t" + Expression;
 		}
 
 		public override IEnumerable<Statement> GetChildren()
 		{
+			foreach (var tp in TypeParameters)
+				yield return tp;
 			foreach (var p in Parameters)
 				yield return p;
 			yield return Expression;
+			yield return ReturnType;
 		}
 	}
 

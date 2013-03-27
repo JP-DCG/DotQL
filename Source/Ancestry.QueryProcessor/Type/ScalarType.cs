@@ -58,7 +58,7 @@ namespace Ancestry.QueryProcessor.Type
 		}
 
 		// Restriction
-		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.CallExpression expression, BaseType typeHint)
+		public override ExpressionContext CompileExtractExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.ExtractExpression expression, BaseType typeHint)
 		{
 			var local = compiler.AddFrame(frame, expression);
 			var alreadyOptional = left.Type is OptionalType;
@@ -66,14 +66,10 @@ namespace Ancestry.QueryProcessor.Type
 			var resultType = alreadyOptional ? left.Type : new OptionalType(left.Type);
 			var resultNative = resultType.GetNative(compiler.Emitter);
 
-			// Validate that there is only one argument
-			if (expression.Arguments.Count != 1)
-				throw new CompilerException(expression, CompilerException.Codes.CannotInvokeNonFunction, left.Type);
-
 			// Register value symbol
 			LocalBuilder valueLocal = null;
 			var localSymbol = new Object();
-			local.Add(expression.Arguments[0], Name.FromComponents(Parse.ReservedWords.Value), localSymbol);
+			local.Add(expression.Condition, Name.FromComponents(Parse.ReservedWords.Value), localSymbol);
 			compiler.ContextsBySymbol.Add
 			(
 				localSymbol, 
@@ -86,9 +82,9 @@ namespace Ancestry.QueryProcessor.Type
 				)
 			);
 
-			var condition = compiler.CompileExpression(local, expression.Arguments[0], SystemTypes.Boolean);
+			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
 			if (!(condition.Type is BooleanType))
-				throw new CompilerException(expression.Arguments[0], CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
+				throw new CompilerException(expression.Condition, CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
 
 			return
 				new ExpressionContext

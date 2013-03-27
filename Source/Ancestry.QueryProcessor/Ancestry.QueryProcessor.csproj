@@ -69,7 +69,6 @@
     <Compile Include="Runtime\IUpdateable.cs" />
     <Compile Include="Runtime\ListEx.cs" />
     <Compile Include="Runtime\ModuleTuple.cs" />
-    <Compile Include="Runtime\Optional.cs" />
     <Compile Include="Runtime\Runtime.cs" />
     <Compile Include="Runtime\Set.cs" />
     <Compile Include="Runtime\SystemModule.cs" />
@@ -102,8 +101,6 @@
     <Compile Include="Type\DateTimeType.cs" />
     <Compile Include="Type\DoubleType.cs" />
     <Compile Include="Type\EnumType.cs" />
-    <Compile Include="Type\FunctionParameter.cs" />
-    <Compile Include="Type\FunctionType.cs" />
     <Compile Include="Type\IComponentType.cs" />
     <Compile Include="Type\ListType.cs" />
     <Compile Include="Type\NaryType.cs" />
