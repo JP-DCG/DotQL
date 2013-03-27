@@ -39,22 +39,46 @@ namespace Ancestry.QueryProcessor.Runtime
             return new Set<T>(listValue);
         }
 
-		public static string ToString<T>(T value)
+		//List functions - what's the analog for head and tail? A tuple with the item and the lists
+		//Push, pop, enqueue, dequeue?
+		public static IList<T> Append<T>(IList<T> list, T value)
 		{
-			return value.ToString();
+			list.Add(value);
+			return list;
 		}
 
-        //ToString overloads
-		//public static string ToString(char value)
-		//{
-		//	return value.ToString();
-		//}
+		public static IList<T> Remove<T>(IList<T> list, T value)
+		{
+			list.Remove(value);
+			return list;
+		}
 
-		//public static string ToString(int value)
-		//{
-		//	return value.ToString();
-		//}
+		public static IList<T> Reverse<T>(IList<T> list)
+		{
+			//TODO: ToListEx extension method. How do we handle internal hidden functions?
+			return list.Reverse().ToList();
+		}
 
+		//TODO: Set functions Union, Difference, Intersection, Product?
+		public static ISet<T> Union<T>(ISet<T> left, ISet<T> right)
+		{
+			left.UnionWith(right);
+			return left;
+		}
+
+		public static ISet<T> Intersection<T>(ISet<T> left, ISet<T> right)
+		{
+			left.IntersectWith(right);
+			return left;
+		}
+
+		public static ISet<T> Difference<T>(ISet<T> left, ISet<T> right)
+		{
+			left.ExceptWith(right);
+			return left;
+		}
+		
+		//DateTume functions
         public static DateTime AddMonth(DateTime start, int months)
         {
             return start.AddMonths(months);
@@ -65,7 +89,9 @@ namespace Ancestry.QueryProcessor.Runtime
             return start.AddDays(days);
         }
 
-        //Numeric - TODO: overloading for various data types.
+        //Numeric functions
+
+		//Double functions
         public static double Abs(double value)
         {
             return Math.Abs(value);
@@ -91,11 +117,6 @@ namespace Ancestry.QueryProcessor.Runtime
             return Math.Atan2(x, y);
         }
 
-        public static long BigMul(int x, int y)
-        {
-            return Math.BigMul(x, y);
-        }
-
         public static double Ceiling(double value)
         {
             return Math.Ceiling(value);
@@ -114,24 +135,7 @@ namespace Ancestry.QueryProcessor.Runtime
         public static double Exp(double value)
         {
             return Math.Exp(value);
-        }
-
-        public static long Factorial(int value)
-        {
-            var ex = 0.0;
-            var x = (double)value;
-            x = x + x + 1;
-            if (x > 1)
-            {
-                x = (Math.Log(2.0 * Math.PI) + Math.Log(x / 2.0) * x - x
-                - (1.0 - 7.0 / (30.0 * x * x)) / (6.0 * x)) / 2.0;
-                x = x / Math.Log(10);
-                ex = Math.Floor(x);
-                x = Math.Pow(10, x - ex);
-            }
-
-            return (long)Math.Truncate(x * Math.Pow(10, ex));
-        }
+        }       
 
         public static double Frac(double value)
         {
@@ -218,7 +222,71 @@ namespace Ancestry.QueryProcessor.Runtime
             return Math.Truncate(value);
         }
 
-        //String
+		//Long functions
+		public static long Abs(long value)
+		{
+			return Math.Abs(value);
+		}
+
+		public static long Max(long x, long y)
+		{
+			return Math.Max(x, y);
+		}
+
+		public static long Min(long x, long y)
+		{
+			return Math.Min(x, y);
+		}
+
+		public static int Sign(long value)
+		{
+			return Math.Sign(value);
+		}
+
+		//Int functions
+		public static long BigMul(int x, int y)
+		{
+			return Math.BigMul(x, y);
+		}
+
+		public static long Factorial(int value)
+		{
+			var ex = 0.0;
+			var x = (double)value;
+			x = x + x + 1;
+			if (x > 1)
+			{
+				x = (Math.Log(2.0 * Math.PI) + Math.Log(x / 2.0) * x - x
+				- (1.0 - 7.0 / (30.0 * x * x)) / (6.0 * x)) / 2.0;
+				x = x / Math.Log(10);
+				ex = Math.Floor(x);
+				x = Math.Pow(10, x - ex);
+			}
+
+			return (long)Math.Truncate(x * Math.Pow(10, ex));
+		}
+
+		public static int Abs(int value)
+		{
+			return Math.Abs(value);
+		}
+
+		public static int Max(int x, int y)
+		{
+			return Math.Max(x, y);
+		}
+
+		public static int Min(int x, int y)
+		{
+			return Math.Min(x, y);
+		}
+
+		public static int Sign(int value)
+		{
+			return Math.Sign(value);
+		}
+
+        //String functions
         public static string Uppercase(string value)
         {
             return value.ToUpper();
@@ -257,7 +325,10 @@ namespace Ancestry.QueryProcessor.Runtime
 			return System.Text.RegularExpressions.Regex.Match(value, pattern).Success;
 		}
 
-		//TODO: Regex Matches returning set of matches.
+		//public static object Matches(string value, string pattern)
+		//{
+		//	var matches = System.Text.RegularExpressions.Regex.Matches(value, pattern);
+		//}
 
         public static string Normalize(string value)
         {
@@ -303,5 +374,41 @@ namespace Ancestry.QueryProcessor.Runtime
         {
             return new string(chars.ToArray());
         }
+
+		//ToString overloads -- Should these be grouped with the types?
+		public static string ToString<T>(T value)
+		{
+			return value.ToString();
+		}
+
+		//public static string ToString(char value)
+		//{
+		//	return value.ToString();
+		//}
+
+		//public static string ToString(int value)
+		//{
+		//	return value.ToString();
+		//}
+
+		//public static string ToString(long value)
+		//{
+		//	return value.ToString();
+		//}
+
+		//public static string ToString(bool value)
+		//{
+		//	return value.ToString();
+		//}
+
+		//public static string ToString(string value)
+		//{
+		//	return value;
+		//}
+
+		//public static string ToString(DateTime value)
+		//{
+		//	return value.ToUniversalTime().ToString();
+		//}
     }
 }

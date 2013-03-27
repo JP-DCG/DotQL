@@ -176,7 +176,7 @@ namespace Ancestry.QueryProcessor.Compile
 
         public ExpressionContext ResolveAndCompileFunction(Frame frame, Parse.CallExpression callExpression, BaseType typeHint, MethodInfo[] methods)
         {
-            var potential = methods.Where(m => m.GetParameters().Count() == callExpression.Arguments.Count).ToList();
+            var potential = methods.Where(m => m.GetParameters().Count() == callExpression.Arguments.Count).OrderBy(m => m.ContainsGenericParameters).ToList();
             if (potential.Count == 0)
                 throw new CompilerException(callExpression, CompilerException.Codes.SignatureMismatch, callExpression.Function.ToString());
 
@@ -226,7 +226,7 @@ namespace Ancestry.QueryProcessor.Compile
 							args[p] = Convert(args[p], parameterType);                       
                     }
 
-					function = potential[f];
+					function = methodInfo;
                 }
             }
 
@@ -1479,11 +1479,21 @@ namespace Ancestry.QueryProcessor.Compile
 				var argArgs = argumentType.GetGenericArguments();
 				if (paramArgs.Length != argArgs.Length)
 					throw new CompilerException(statement, CompilerException.Codes.MismatchedGeneric, parameterType, argumentType);
-				for (var i = 0; i < paramArgs.Length; i++)
-					if (paramArgs[i].IsGenericParameter && resolved[paramArgs[i].GenericParameterPosition] == null)
-						resolved[paramArgs[i].GenericParameterPosition] = argArgs[i];
-					else
-						DetermineTypeParameters(statement, resolved, paramArgs[i], argArgs[i]);
+
+				//If the parameter type is just a single generic type
+				if (paramArgs.Length == 0)
+				{
+					resolved[parameterType.GenericParameterPosition] = argumentType;
+				}
+				//The parameter type contains nested generics types
+				else
+				{
+					for (var i = 0; i < paramArgs.Length; i++)
+						if (paramArgs[i].IsGenericParameter && resolved[paramArgs[i].GenericParameterPosition] == null)
+							resolved[paramArgs[i].GenericParameterPosition] = argArgs[i];
+						else
+							DetermineTypeParameters(statement, resolved, paramArgs[i], argArgs[i]);
+				}
 			}
 		}
 
