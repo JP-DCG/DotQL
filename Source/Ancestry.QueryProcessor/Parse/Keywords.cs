@@ -11,6 +11,7 @@ namespace Ancestry.QueryProcessor.Parse
         public const string Module = "module";
 		public const string Enum = "enum";
 		public const string Const = "const";
+		public const string Function = "function";
 		public const string Var = "var";
 		public const string TypeDef = "typedef";
 		public const string TypeOf = "typeof";

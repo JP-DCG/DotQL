@@ -31,6 +31,24 @@ namespace Ancestry.QueryProcessor.Compile
 
 		private class Ambiguity : List<object> {}
 
+		public void AddFunction(Parse.Statement statement, Name name, object symbol)
+		{
+			if (name.IsRooted)
+				throw new CompilerException(statement, CompilerException.Codes.InvalidRootedIdentifier);
+
+			object group;
+			if (_items.TryGetValue(name, out group))
+			{
+				// Check for a conflict with another type
+				if (!(group is List<object>))
+					throw new CompilerException(statement, CompilerException.Codes.IdentifierConflict, name);
+				else
+					((List<object>)group).Add(symbol);
+			}
+			else
+				_items.Add(name, new List<object> { symbol });
+		}
+
 		public void Add(Parse.Statement statement, Name name, object symbol)
 		{
 			if (name.IsRooted)
@@ -41,6 +59,11 @@ namespace Ancestry.QueryProcessor.Compile
 				throw new CompilerException(statement, CompilerException.Codes.IdentifierConflict, name);
 			_items.Add(name, symbol);
 
+			InternalAdd(name, symbol);
+		}
+
+		private void InternalAdd(Name name, object symbol)
+		{
 			// Add each fragment recursively
 			for (var i = 1; i < name.Components.Length; i++)
 			{
@@ -53,7 +76,7 @@ namespace Ancestry.QueryProcessor.Compile
 						ambiguity = (Ambiguity)existing;
 					else
 						ambiguity = new Ambiguity { symbol, existing };
-					_fragments[attempt] = ambiguity; 
+					_fragments[attempt] = ambiguity;
 				}
 				else
 					_fragments.Add(attempt, symbol);
@@ -94,6 +117,36 @@ namespace Ancestry.QueryProcessor.Compile
 			if (!(result is T))
 				throw new CompilerException(statement, CompilerException.Codes.IncorrectTypeReferenced, typeof(T), result.GetType());
 			return (T)result;
+		}
+
+		/// <summary> Attempts to resolve the given symbol as a function; throws if unable. </summary>
+		/// <remarks> If a function group is found; this returns all matching functions in all frames.  If a non-function symbol is found first, an exception is thrown. </remarks>
+		public List<object> ResolveFunction(Parse.Statement statement, Name id)
+		{
+			var functions = new List<object>();
+			var rooted = id.IsRooted;
+			var current = this;
+			while (current != null)
+			{
+				object result;
+				if (!current._items.TryGetValue(id, out result) && !rooted)
+					current._fragments.TryGetValue(id, out result);
+				if (result != null)
+				{
+					if (result is Ambiguity)
+						throw new CompilerException(statement, CompilerException.Codes.AmbiguousReference, id);
+					if (result is List<object>)
+						functions.AddRange((List<object>)result);
+					else if (functions.Count == 0)
+						throw new CompilerException(statement, CompilerException.Codes.AmbiguousReference, id);
+				}
+				current = current.BaseFrame;
+			}
+
+			if (functions.Count() == 0)
+				throw new CompilerException(statement, CompilerException.Codes.UnknownIdentifier, id.ToString());
+
+			return functions;
 		}
 	}
 }

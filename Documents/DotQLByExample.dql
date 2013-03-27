@@ -183,7 +183,7 @@ Result: entire person table. e.g. `{ { ID:123, City:"Nephi" } { ID:124, ...`
 
 Restriction on a key attribute:
 
-	return Customers(ID = 234)
+	return Customers[ID = 234]
 
 e.g. `{ { ID:234, City:"Provo" } }`
 
@@ -193,7 +193,7 @@ Reads: Customers where ID is 234.
 
 Restriction is arbitrary boolean expression:
 
-	return Parts(not IsDiscontinued)
+	return Parts[not IsDiscontinued]
 
 e.g. `{ { ID:456, IsDiscontinued:false } ... `
 
@@ -207,13 +207,13 @@ Orders is a reference on the Customer tuple; accessing it gives Orders for all m
 
 Combining restriction with dereferencing:
 
-	return Customers(City = "Orem").Orders
+	return Customers[City = "Orem"].Orders
 
 ...reads: all Orders associated with Customers that have City of "Orem"
 
 Equivalent query:
 
-	return Orders(exists Customers(City = "Orem" and ID = CustomerID))
+	return Orders[exists Customers[City = "Orem" and ID = CustomerID]]
 
 The `ID' indicates the ID for Customer., To access the ID of Orders use `outer`., e.g. `outer.ID`
 																															,  
@@ -221,7 +221,7 @@ The `ID' indicates the ID for Customer., To access the ID of Orders use `outer`.
 
 Dotting through an Extention (one to zero or one) relationship: 
 
-	return Customers(ID = 123).Orders.OrderItems.Part
+	return Customers[ID = 123].Orders.OrderItems.Part
 
 e.g. `{ { ID:123, Name:"Frogalbadge", ... }` 
 
@@ -232,7 +232,7 @@ Embedded Path Expressions
 
 Embedded reference:
 
-	return Customers(ID = 123)<<Orders
+	return Customers[ID = 123]<<Orders
 
 e.g. result: `{ ID:123, City:"Provo", Orders:{ { ID:234, CustomerID:123, On:'1/23/2002 4:20:00'dt } ... }`
 
@@ -241,7 +241,7 @@ A row from the Customer table already has an Orders member, but it is a referenc
 
 Dot paths following an embedded path:
 
-	return Customers(ID = 123)<<Orders.OrderItems
+	return Customers[ID = 123]<<Orders.OrderItems
 
 e.g. result: `{ ID:123, City:"Provo", Orders\OrderItems:{ { OrderID:456, PartID:222, Quantity:3 } ... } }`
 
@@ -249,7 +249,7 @@ Remember... because Orders\OrderItems is a qualified name, it may be accessed as
 
 Dot paths preceding an embedded path:
 
-	return Customers(ID = 123).Orders<<OrderItems
+	return Customers[ID = 123].Orders<<OrderItems
 
 e.g. result: `{ ID:456, CustomerID:123, On:'1/23/2002 4:20:00'dt, OrderItems:{ { OrderID:456, PartID:222, Quantity:3 } }`
 
@@ -276,7 +276,7 @@ If an attribute name is omitted, it will be inferred from the expression. e.g. `
 
 Dereferencing multiple tables:
 
-	return Customers(ID = 123).Orders.{ :Customer, :OrderItems }
+	return Customers[ID = 123].Orders.{ :Customer, :OrderItems }
 
 This causes the table names to be nested as attributes in a new tuple., e.g.:
 
@@ -289,14 +289,14 @@ This causes the table names to be nested as attributes in a new tuple., e.g.:
 
 Using paths within claused expressions:
 
-	for o in Customers(ID = 123).Orders
+	for o in Customers[ID = 123].Orders
 	return { ID:, o.ID }
 
 e.g. `{ { ID:456 }, { ID:457 }, ... }`
 
 Ordering produces lists rather than sets (in order to preserve sequence)
 
-	for o in Customers(ID = 123).Orders
+	for o in Customers[ID = 123].Orders
 	order (o.ID)
 	return { ID: o.ID }
 
@@ -304,7 +304,7 @@ e.g. `[{ ID:456 }, { ID:457 }, ...]`
 
 Path restriction works on lists too:
 
-	return [{ ID:123 }, { ID:124 }]?(ID > 123)
+	return [{ ID:123 }, { ID:124 }][ID > 123]
 
 Result: `[{ ID:124 }]`
 
@@ -487,7 +487,7 @@ A function selector may specify a function type name rather than repeat the sign
 Polymorphic invocation of functions:
 
 	for PartID in Parts.ID 
-	return { :PartID, Quantity : InventoryCities(PartID in IDs)[].DetermineInventory(PartID) }
+	return { :PartID, Quantity : InventoryCities[PartID in IDs][].DetermineInventory(PartID) }
 
 This uses functions provided in a table to invoke a different inventory function depending on the ID of the part.
 
@@ -495,7 +495,7 @@ Complex function example:
 
 	let PreferredName := (PersonID : Int64)
 		let orderedn :=
-			for n in Attributes(value.PersonID = args.PersonID).Name
+			for n in Attributes[value.PersonID = args.PersonID].Name
 			let ap := n.Attribute.Priority
 			order (ap.Priority ?? 0 desc, n.ID)
 			return n
@@ -520,13 +520,13 @@ Out of range item extraction produces a null., The `??` (if null) operator resol
 
 Determining null:
 
-	return IsNull(OrderItems(ID = 1212)[].Delivered)
+	return IsNull(OrderItems[ID = 1212][].Delivered)
 
 e.g. result `true` if null either because there was no such row, or there was a row but the hypothetical Delivered attribute doesn't have a value
 
 Restricting off a singleton:
 
-	return 5(value > 10)
+	return 5[value > 10]
 
 Result: `null` (because the value doesn't pass the restriction)
 
@@ -707,13 +707,13 @@ All mutation (side-effects) happens within Set assignments:
 
 The left-hand side of assignments may contain reference-based path expressions:
 
-	set Customer(ID = 123).City := "American Fork"
+	set Customer[ID = 123].City := "American Fork"
 
 Effect: Updates the City attribute of the specified tuple of the Customer table
 
 Set statements follow the FLWOR pattern except for Return becomes any number of set Set clauses and there is no Order (FLWS):
 
-	let p := Customer(ID = 123)
+	let p := Customer[ID = 123]
 	set p := { ID:p.ID, City:"Cedar City" }
 
 Effect: Updates the specified tuple of the Customer table
@@ -722,18 +722,18 @@ Effect: Updates the specified tuple of the Customer table
 
 Insert using the restriction predicate for defaulting:
 
-	set Customer(ID = 123) := { City:"Spanish Fork" }
+	set Customer[ID = 123] := { City:"Spanish Fork" }
 
 ID 123 is implicitly included in the tuple being added or updated.
 
 Deletion is enabled by assignment to null:
 
-	set Customer(ID = 123) := null
+	set Customer[ID = 123] := null
 
 Practical insertion example:
 
 	let newID := GenerateID("Customer.ID")
-	set Customer(ID = newID) := { City:"Saratoga Springs" }
+	set Customer[ID = newID] := { City:"Saratoga Springs" }
 	return newID
 
 Effect: Generates a new ID, inserts a person tuple based on that ID, and returns the new ID
@@ -741,7 +741,7 @@ Effect: Generates a new ID, inserts a person tuple based on that ID, and returns
 Updating with iteration:
 
 	for i in 1..6
-	set Customer(ID = i).City := "Vinyard"
+	set Customer[ID = i].City := "Vinyard"
 
 Effect: Sets the City attribute of a range of person tuples in the person table variable
 
@@ -935,7 +935,7 @@ Result: `[{ Name:'Ray' }]`
 
 Quota:
 
-	return [30, 40, 10, 20](index < 2)
+	return [30, 40, 10, 20][index < 2]
 
 Result: `[30, 40]`, 
 `index` is a reserved word which indicates the zero-based ordinal position in the list.
@@ -989,7 +989,7 @@ Result: `{ true, false }`
 
 Quota:
 
-	return { 30, 40, 10, 20 }(index < 2)
+	return { 30, 40, 10, 20 }[index < 2]
 
 Result: `{ 10, 20 }`
 

@@ -42,24 +42,20 @@ namespace Ancestry.QueryProcessor.Type
 		}
 
 		// Restriction
-		public override ExpressionContext CompileCallExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.CallExpression expression, BaseType typeHint)
+		public override ExpressionContext CompileExtractExpression(Compiler compiler, Frame frame, ExpressionContext left, Parse.ExtractExpression expression, BaseType typeHint)
 		{
 			var memberType = ((NaryType)left.Type).Of;
 			var memberNative = left.NativeType ?? memberType.GetNative(compiler.Emitter);
 
 			var local = compiler.AddFrame(frame, expression);
 
-			// Validate that there is only one argument
-			if (expression.Arguments.Count != 1)
-				throw new CompilerException(expression, CompilerException.Codes.CannotInvokeNonFunction, left.Type);
-
 			// Prepare index and value symbols
-			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Arguments[0], memberType, memberNative, local);
+			var indexSymbol = PrepareValueIndexContext(compiler, left, expression.Condition, memberType, memberNative, local);
 
 			// Compile condition
-			var condition = compiler.CompileExpression(local, expression.Arguments[0], SystemTypes.Boolean);
+			var condition = compiler.CompileExpression(local, expression.Condition, SystemTypes.Boolean);
 			if (!(condition.Type is BooleanType))
-				throw new CompilerException(expression.Arguments[0], CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
+				throw new CompilerException(expression.Condition, CompilerException.Codes.IncorrectType, condition.Type, "Boolean");
 
 			var indexReferenced = compiler.References.ContainsKey(indexSymbol);
 

@@ -272,6 +272,7 @@ namespace Ancestry.QueryProcessor.Test
 			result = processor.Evaluate
 			(
 				@"
+					using Test 1.0.0
 					set X := 5
 					return AddX(2)
 				"
